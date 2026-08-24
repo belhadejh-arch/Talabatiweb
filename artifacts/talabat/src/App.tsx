@@ -52,7 +52,7 @@ function Router() {
         <Switch>
           <Route path="/admin/login" component={AdminLogin} />
 
-          <Route path="/admin*">
+          <Route path="/admin/*">
             <AdminLayout>
               <Switch>
                 <Route path="/admin" component={() => <Redirect to="/admin/dashboard" />} />

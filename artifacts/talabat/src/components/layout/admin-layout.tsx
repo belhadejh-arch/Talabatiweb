@@ -19,17 +19,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar');
+    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
   };
 
   const navItems = [
-    { icon: LayoutDashboard, label: t("admin.sidebar.dashboard"), path: "/admin/dashboard" },
-    { icon: Store, label: t("admin.sidebar.restaurants"), path: "/admin/restaurants" },
-    { icon: ShoppingBag, label: t("admin.sidebar.orders"), path: "/admin/orders" },
-    { icon: Truck, label: t("admin.sidebar.drivers"), path: "/admin/drivers" },
-    { icon: CreditCard, label: t("admin.sidebar.subscriptions"), path: "/admin/subscriptions" },
-    { icon: BarChart, label: t("admin.sidebar.analytics"), path: "/admin/analytics" },
-    { icon: Bell, label: t("admin.sidebar.notifications"), path: "/admin/notifications" },
-    { icon: Settings, label: t("admin.sidebar.settings"), path: "/admin/settings" },
+    { icon: LayoutDashboard, label: t("admin.sidebar.dashboard", "Dashboard"), path: "/admin/dashboard" },
+    { icon: Store, label: t("admin.sidebar.restaurants", "Restaurants"), path: "/admin/restaurants" },
+    { icon: ShoppingBag, label: t("admin.sidebar.orders", "Orders"), path: "/admin/orders" },
+    { icon: Truck, label: t("admin.sidebar.drivers", "Drivers"), path: "/admin/drivers" },
+    { icon: CreditCard, label: t("admin.sidebar.subscriptions", "Subscriptions"), path: "/admin/subscriptions" },
+    { icon: BarChart, label: t("admin.sidebar.analytics", "Analytics"), path: "/admin/analytics" },
+    { icon: Bell, label: t("admin.sidebar.notifications", "Notifications"), path: "/admin/notifications" },
+    { icon: Settings, label: t("admin.sidebar.settings", "Settings"), path: "/admin/settings" },
   ];
 
   const NavLinks = () => (
@@ -38,12 +39,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         const isActive = location === item.path || location.startsWith(`${item.path}/`);
         return (
           <Link key={item.path} href={item.path} className={cn(
-            "flex items-center gap-3 px-4 py-3 mx-3 rounded-lg text-sm font-medium transition-colors",
+            "flex items-center gap-3 px-4 py-3 mx-4 rounded-xl text-sm font-medium transition-all duration-200",
             isActive 
-              ? "bg-sidebar-primary text-sidebar-primary-foreground" 
-              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/20" 
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}>
-            <item.icon className="h-5 w-5 shrink-0" />
+            <item.icon className={cn("h-5 w-5 shrink-0 transition-transform", isActive && "scale-110")} />
             {item.label}
           </Link>
         );
@@ -52,81 +53,108 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background font-sans overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-        <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
-          <Link href="/admin/dashboard" className="flex items-center gap-2 font-bold text-2xl tracking-tighter text-sidebar-primary">
-            <span className="text-white bg-sidebar-primary px-2 rounded">T</span>
+      <aside className="hidden w-64 flex-col border-e border-sidebar-border bg-sidebar md:flex shadow-xl shadow-sidebar/5 z-10 relative">
+        <div className="flex flex-col h-40 px-6 py-6 border-b border-sidebar-border/50 justify-between">
+          <Link href="/admin/dashboard" className="flex items-center gap-3 font-bold text-2xl tracking-tighter text-sidebar-primary hover:opacity-90 transition-opacity">
+            <span className="text-white bg-gradient-to-br from-primary to-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">T</span>
             <span className="text-sidebar-foreground">TALABAT</span>
           </Link>
-        </div>
-        <NavLinks />
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 mb-4">
-            <Avatar className="h-9 w-9 bg-sidebar-accent">
-              <AvatarFallback className="text-sidebar-foreground bg-sidebar-accent">{user?.username?.[0]?.toUpperCase() || 'A'}</AvatarFallback>
+          
+          <div className="flex items-center gap-3 bg-sidebar-accent/50 p-2.5 rounded-xl border border-sidebar-border/50">
+            <Avatar className="h-9 w-9 border border-sidebar-border">
+              <AvatarFallback className="text-sidebar-foreground bg-sidebar-primary/20 text-sidebar-primary font-bold">
+                {user?.username?.[0]?.toUpperCase() || 'A'}
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.username || 'Admin'}</p>
-              <p className="text-xs text-sidebar-foreground/70 truncate">Super Admin</p>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.username || 'Admin User'}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.role || 'Super Admin'}</p>
             </div>
           </div>
+        </div>
+        
+        <div className="px-4 py-2">
+          <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">{t('admin.sidebar.menu', 'Main Menu')}</p>
+        </div>
+        <NavLinks />
+        
+        <div className="p-4 border-t border-sidebar-border/50">
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="w-full justify-start text-sidebar-foreground/80 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-colors"
             onClick={() => {
               logout.mutate(undefined, {
                 onSuccess: () => window.location.href = '/admin/login'
               });
             }}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            {t("admin.header.logout")}
+            <LogOut className="me-2 h-4 w-4" />
+            {t("admin.header.logout", "Logout")}
           </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center justify-between border-b px-4 sm:px-6 bg-card">
+      <div className="flex flex-1 flex-col overflow-hidden relative">
+        {/* Top Header */}
+        <header className="flex h-20 items-center justify-between px-6 sm:px-8 bg-background/80 backdrop-blur-md border-b border-border/50 sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
+                <Button variant="ghost" size="icon" className="md:hidden rounded-xl">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side={i18n.language === 'ar' ? 'right' : 'left'} className="w-64 p-0 bg-sidebar border-sidebar-border text-sidebar-foreground">
-                <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
-                  <span className="font-bold text-2xl tracking-tighter text-sidebar-foreground">TALABAT</span>
+              <SheetContent side={i18n.language === 'ar' ? 'right' : 'left'} className="w-72 p-0 bg-sidebar border-sidebar-border text-sidebar-foreground">
+                <div className="flex h-20 items-center px-6 border-b border-sidebar-border/50">
+                  <span className="font-bold text-2xl tracking-tighter text-sidebar-foreground flex items-center gap-3">
+                    <span className="text-white bg-primary w-8 h-8 rounded-lg flex items-center justify-center text-lg">T</span>
+                    TALABAT
+                  </span>
                 </div>
-                <div className="flex flex-col h-[calc(100vh-4rem)]">
-                  <NavLinks />
+                <div className="flex flex-col h-[calc(100vh-5rem)]">
+                  <div className="py-4">
+                    <NavLinks />
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
             
-            <h1 className="text-xl font-semibold hidden sm:block">
-              {navItems.find(i => location.startsWith(i.path))?.label || ""}
-            </h1>
+            <div className="hidden sm:block">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                {navItems.find(i => location.startsWith(i.path))?.label || "Dashboard"}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleLanguage} title="Toggle Language">
-              <Languages className="h-5 w-5" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
+          <div className="flex items-center gap-3">
+            <div className="bg-card rounded-full p-1 shadow-sm border flex items-center">
+              <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground" onClick={toggleLanguage} title="Toggle Language">
+                <Languages className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground relative">
+                <Bell className="h-4 w-4" />
+                <span className="absolute top-1.5 end-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-card" />
+              </Button>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-secondary/30">
+        {/* Canvas */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>
