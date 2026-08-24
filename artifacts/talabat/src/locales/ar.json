@@ -1,0 +1,92 @@
+{
+  "admin": {
+    "login": {
+      "title": "مرحباً بعودتك",
+      "subtitle": "تسجيل الدخول إلى مركز تحكم طلبات",
+      "email": "البريد الإلكتروني أو اسم المستخدم",
+      "password": "كلمة المرور",
+      "submit": "تسجيل الدخول",
+      "signingIn": "جاري تسجيل الدخول...",
+      "error": "بيانات الاعتماد غير صالحة"
+    },
+    "sidebar": {
+      "dashboard": "لوحة القيادة",
+      "restaurants": "المطاعم",
+      "orders": "الطلبات",
+      "drivers": "السائقين",
+      "subscriptions": "الاشتراكات",
+      "analytics": "التحليلات",
+      "notifications": "الإشعارات",
+      "settings": "الإعدادات"
+    },
+    "header": {
+      "search": "بحث...",
+      "profile": "الملف الشخصي",
+      "logout": "تسجيل الخروج"
+    },
+    "dashboard": {
+      "title": "لوحة القيادة",
+      "totalRevenue": "إجمالي الإيرادات",
+      "totalOrders": "إجمالي الطلبات",
+      "activeRestaurants": "المطاعم النشطة",
+      "activeDrivers": "السائقين النشطين",
+      "recentOrders": "أحدث الطلبات",
+      "revenueOverTime": "الإيرادات بمرور الوقت",
+      "ordersOverTime": "الطلبات بمرور الوقت",
+      "topRestaurants": "أفضل المطاعم"
+    },
+    "restaurants": {
+      "title": "المطاعم",
+      "add": "إضافة مطعم",
+      "search": "البحث في المطاعم...",
+      "all": "الكل",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "suspended": "موقوف",
+      "name": "الاسم",
+      "status": "الحالة",
+      "plan": "الخطة",
+      "actions": "إجراءات",
+      "view": "عرض التفاصيل"
+    },
+    "orders": {
+      "title": "الطلبات",
+      "search": "البحث في الطلبات...",
+      "id": "رقم الطلب",
+      "customer": "العميل",
+      "restaurant": "المطعم",
+      "amount": "المبلغ الإجمالي",
+      "status": "الحالة",
+      "date": "التاريخ"
+    }
+  },
+  "public": {
+    "menu": "القائمة",
+    "cart": {
+      "title": "طلبك",
+      "empty": "سلة التسوق فارغة",
+      "subtotal": "المجموع الفرعي",
+      "total": "الإجمالي",
+      "checkout": "متابعة الدفع"
+    },
+    "checkout": {
+      "title": "الدفع",
+      "contact": "معلومات الاتصال",
+      "name": "الاسم الكامل",
+      "phone": "رقم الهاتف",
+      "location": "موقع التوصيل",
+      "notes": "ملاحظات الطلب (اختياري)",
+      "placeOrder": "تأكيد الطلب",
+      "success": "تم تأكيد الطلب بنجاح!"
+    }
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ ما",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "currency": "ر.س"
+  }
+}

@@ -1,0 +1,4 @@
+- [Orval codegen collision fix](orval-codegen-fix.md) — Zod output must omit schemas:{} to avoid value/type name collision; printf postprocesses index.ts after each run
+- [Tailwind CSS v4 HSL variables](tailwind-css4-hsl.md) — design subagent writes RGB values, CSS needs HSL for hsl(var(--xxx)); must convert all colors after any design subagent run
+- [TanStack Query v5 hook patterns](tanstack-query-v5-patterns.md) — queryKey required in options; keepPreviousData replaced by placeholderData; hooks take (params, options) not options-only
+- [TALABAT session auth setup](talabat-auth.md) — custom-fetch.ts needs credentials:'include'; SESSION_SECRET env var; seed: admin/admin123
