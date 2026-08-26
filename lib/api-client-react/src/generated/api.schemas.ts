@@ -254,6 +254,17 @@ export interface Addon {
   isAvailable: boolean;
 }
 
+export interface ProductSize {
+  id: number;
+  productId: number;
+  name: string;
+  /** @nullable */
+  nameAr?: string | null;
+  price: number;
+  sortOrder?: number;
+  isAvailable: boolean;
+}
+
 export interface Product {
   id: number;
   restaurantId: number;
@@ -273,6 +284,7 @@ export interface Product {
   stockQuantity?: number | null;
   sortOrder?: number;
   addons?: Addon[];
+  sizes?: ProductSize[];
 }
 
 export interface ProductInput {
@@ -307,6 +319,25 @@ export interface ProductPatch {
   /** @nullable */
   stockQuantity?: number | null;
   sortOrder?: number;
+}
+
+export interface ProductSizeInput {
+  /** @minLength 1 */
+  name: string;
+  nameAr?: string;
+  /** @minimum 0 */
+  price: number;
+  sortOrder?: number;
+  isAvailable?: boolean;
+}
+
+export interface ProductSizePatch {
+  name?: string;
+  /** @nullable */
+  nameAr?: string | null;
+  price?: number;
+  sortOrder?: number;
+  isAvailable?: boolean;
 }
 
 export interface AddonInput {
@@ -426,6 +457,10 @@ export interface OrderItem {
   id: number;
   productId: number;
   productName: string;
+  /** @nullable */
+  sizeId?: number | null;
+  /** @nullable */
+  sizeName?: string | null;
   quantity: number;
   unitPrice: number;
   subtotal: number;
@@ -500,6 +535,8 @@ export interface OrderItemInput {
   productId: number;
   /** @minimum 1 */
   quantity: number;
+  /** @nullable */
+  selectedSizeId?: number | null;
   selectedAddonIds?: number[];
 }
 

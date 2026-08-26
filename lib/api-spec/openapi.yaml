@@ -14,6 +14,7 @@ tags:
   - name: subscriptions
   - name: categories
   - name: products
+  - name: productSizes
   - name: addons
   - name: drivers
   - name: orders
@@ -485,6 +486,87 @@ paths:
       operationId: deleteProduct
       tags: [products]
       summary: Delete product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Product Sizes ─────────────────────────────────────────────────────────────
+  /products/{id}/sizes:
+    get:
+      operationId: listProductSizes
+      tags: [productSizes]
+      summary: List sizes for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Sizes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductSize"
+
+    post:
+      operationId: createProductSize
+      tags: [productSizes]
+      summary: Create product size
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductSizeInput"
+      responses:
+        "201":
+          description: Size created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSize"
+
+  /product-sizes/{id}:
+    patch:
+      operationId: updateProductSize
+      tags: [productSizes]
+      summary: Update product size
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductSizePatch"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSize"
+
+    delete:
+      operationId: deleteProductSize
+      tags: [productSizes]
+      summary: Delete product size
       parameters:
         - name: id
           in: path
@@ -1318,6 +1400,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Addon"
+        sizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductSize"
 
     ProductInput:
       type: object
@@ -1347,6 +1433,38 @@ components:
         isAvailable: { type: boolean }
         stockQuantity: { type: ["number", "null"] }
         sortOrder: { type: number }
+
+    # ── Product Size ────────────────────────────────────────────────────────────
+    ProductSize:
+      type: object
+      required: [id, productId, name, price, isAvailable]
+      properties:
+        id: { type: number }
+        productId: { type: number }
+        name: { type: string }
+        nameAr: { type: ["string", "null"] }
+        price: { type: number }
+        sortOrder: { type: number }
+        isAvailable: { type: boolean }
+
+    ProductSizeInput:
+      type: object
+      required: [name, price]
+      properties:
+        name: { type: string, minLength: 1 }
+        nameAr: { type: string }
+        price: { type: number, minimum: 0 }
+        sortOrder: { type: number }
+        isAvailable: { type: boolean }
+
+    ProductSizePatch:
+      type: object
+      properties:
+        name: { type: string }
+        nameAr: { type: ["string", "null"] }
+        price: { type: number }
+        sortOrder: { type: number }
+        isAvailable: { type: boolean }
 
     # ── Addon ───────────────────────────────────────────────────────────────────
     Addon:
@@ -1483,6 +1601,8 @@ components:
         id: { type: number }
         productId: { type: number }
         productName: { type: string }
+        sizeId: { type: ["number", "null"] }
+        sizeName: { type: ["string", "null"] }
         quantity: { type: number }
         unitPrice: { type: number }
         subtotal: { type: number }
@@ -1558,6 +1678,7 @@ components:
       properties:
         productId: { type: number }
         quantity: { type: number, minimum: 1 }
+        selectedSizeId: { type: ["number", "null"] }
         selectedAddonIds:
           type: array
           items: { type: number }

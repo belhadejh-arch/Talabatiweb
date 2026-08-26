@@ -77,13 +77,14 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
   }
 
   const message = `🚨 طلب توصيل جديد
+
 🏪 المطعم: ${payload.restaurantName}
 📦 الطلب: #${payload.orderId}
-👤 العميل: ${payload.customerName}
 📞 الهاتف: ${payload.customerPhone}
 🍔 الطلب: ${payload.items}
 💰 الإجمالي: ${payload.total}
-📍 موقع العميل: ${payload.mapsUrl}`;
+📍 موقع العميل:
+${payload.mapsUrl}`;
 
   try {
     const response = await callWhatsAppApi(phoneNumberId, {

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, productsTable, addonsTable } from "@workspace/db";
+import { db, productsTable, addonsTable, productSizesTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import {
   CreateProductBody,
@@ -31,21 +31,25 @@ router.get("/restaurants/:id/products", requireAuth, async (req, res): Promise<v
 
   const productIds = products.map((p) => p.id);
   let addons: any[] = [];
+  let sizes: any[] = [];
   if (productIds.length > 0) {
-    addons = await db
-      .select()
-      .from(addonsTable)
-      .where(eq(addonsTable.productId, productIds[0]))
-      .orderBy(asc(addonsTable.id));
+    const all = await Promise.all(
+      productIds.map((pid) =>
+        db.select().from(addonsTable).where(eq(addonsTable.productId, pid)).orderBy(asc(addonsTable.id))
+      )
+    );
+    addons = all.flat();
 
-    if (productIds.length > 1) {
-      const all = await Promise.all(
-        productIds.map((pid) =>
-          db.select().from(addonsTable).where(eq(addonsTable.productId, pid)).orderBy(asc(addonsTable.id))
-        )
-      );
-      addons = all.flat();
-    }
+    const allSizes = await Promise.all(
+      productIds.map((pid) =>
+        db
+          .select()
+          .from(productSizesTable)
+          .where(eq(productSizesTable.productId, pid))
+          .orderBy(asc(productSizesTable.sortOrder), asc(productSizesTable.id))
+      )
+    );
+    sizes = allSizes.flat();
   }
 
   const addonsByProduct: Record<number, any[]> = {};
@@ -57,10 +61,20 @@ router.get("/restaurants/:id/products", requireAuth, async (req, res): Promise<v
     });
   }
 
+  const sizesByProduct: Record<number, any[]> = {};
+  for (const size of sizes) {
+    if (!sizesByProduct[size.productId]) sizesByProduct[size.productId] = [];
+    sizesByProduct[size.productId].push({
+      ...size,
+      price: parseFloat(size.price),
+    });
+  }
+
   const data = products.map((p) => ({
     ...p,
     price: parseFloat(p.price),
     addons: addonsByProduct[p.id] ?? [],
+    sizes: sizesByProduct[p.id] ?? [],
   }));
 
   res.json(data);
@@ -80,7 +94,7 @@ router.post("/restaurants/:id/products", requireAuth, async (req, res): Promise<
     .values({ ...parsed.data, restaurantId, price: String(parsed.data.price) })
     .returning();
 
-  res.status(201).json({ ...product, price: parseFloat(product.price), addons: [] });
+  res.status(201).json({ ...product, price: parseFloat(product.price), addons: [], sizes: [] });
 });
 
 // Update product
@@ -104,10 +118,16 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
   if (!product) { res.status(404).json({ error: "Not found" }); return; }
 
   const addons = await db.select().from(addonsTable).where(eq(addonsTable.productId, id));
+  const sizes = await db
+    .select()
+    .from(productSizesTable)
+    .where(eq(productSizesTable.productId, id))
+    .orderBy(asc(productSizesTable.sortOrder), asc(productSizesTable.id));
   res.json({
     ...product,
     price: parseFloat(product.price),
     addons: addons.map((a) => ({ ...a, price: parseFloat(a.price) })),
+    sizes: sizes.map((s) => ({ ...s, price: parseFloat(s.price) })),
   });
 });
 
@@ -180,6 +200,73 @@ router.delete("/addons/:id", requireAuth, async (req, res): Promise<void> => {
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   await db.delete(addonsTable).where(eq(addonsTable.id, id));
+  res.sendStatus(204);
+});
+
+// List sizes for a product
+router.get("/products/:id/sizes", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const productId = parseInt(raw, 10);
+  if (isNaN(productId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const sizes = await db
+    .select()
+    .from(productSizesTable)
+    .where(eq(productSizesTable.productId, productId))
+    .orderBy(asc(productSizesTable.sortOrder), asc(productSizesTable.id));
+  res.json(sizes.map((s) => ({ ...s, price: parseFloat(s.price) })));
+});
+
+// Create size
+router.post("/products/:id/sizes", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const productId = parseInt(raw, 10);
+  if (isNaN(productId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const parsed = req.body;
+  if (!parsed.name) { res.status(400).json({ error: "Name required" }); return; }
+
+  const [size] = await db
+    .insert(productSizesTable)
+    .values({
+      productId,
+      name: parsed.name,
+      nameAr: parsed.nameAr ?? null,
+      price: String(parsed.price ?? 0),
+      sortOrder: parsed.sortOrder ?? 0,
+      isAvailable: parsed.isAvailable ?? true,
+    })
+    .returning();
+
+  res.status(201).json({ ...size, price: parseFloat(size.price) });
+});
+
+// Update size
+router.patch("/product-sizes/:id", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const updateData: any = { ...req.body };
+  if (req.body.price !== undefined) updateData.price = String(req.body.price);
+
+  const [size] = await db
+    .update(productSizesTable)
+    .set(updateData)
+    .where(eq(productSizesTable.id, id))
+    .returning();
+
+  if (!size) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ ...size, price: parseFloat(size.price) });
+});
+
+// Delete size
+router.delete("/product-sizes/:id", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  await db.delete(productSizesTable).where(eq(productSizesTable.id, id));
   res.sendStatus(204);
 });
 

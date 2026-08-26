@@ -3,6 +3,7 @@ export * from "./restaurants";
 export * from "./subscriptions";
 export * from "./categories";
 export * from "./products";
+export * from "./product-sizes";
 export * from "./addons";
 export * from "./drivers";
 export * from "./orders";

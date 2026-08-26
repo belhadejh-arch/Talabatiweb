@@ -61,6 +61,8 @@ async function getOrderDetail(orderId: number) {
       id: i.id,
       productId: i.productId,
       productName: i.productName,
+      sizeId: i.sizeId,
+      sizeName: i.sizeName,
       quantity: i.quantity,
       unitPrice: parseFloat(i.unitPrice),
       subtotal: parseFloat(i.subtotal),

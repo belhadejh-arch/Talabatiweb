@@ -13,6 +13,9 @@ import {
   useCreateAddon,
   useUpdateAddon,
   useDeleteAddon,
+  useCreateProductSize,
+  useUpdateProductSize,
+  useDeleteProductSize,
   getGetRestaurantQueryKey,
   getListCategoriesQueryKey,
   getListProductsQueryKey,
@@ -44,6 +47,9 @@ const emptyProductForm: ProductFormState = {
 type AddonFormState = { name: string; nameAr: string; price: string; isAvailable: boolean };
 const emptyAddonForm: AddonFormState = { name: "", nameAr: "", price: "", isAvailable: true };
 
+type SizeFormState = { name: string; nameAr: string; price: string; sortOrder: string; isAvailable: boolean };
+const emptySizeForm: SizeFormState = { name: "", nameAr: "", price: "", sortOrder: "0", isAvailable: true };
+
 export default function AdminRestaurantMenu() {
   const { id } = useParams();
   const restaurantId = Number(id);
@@ -61,6 +67,10 @@ export default function AdminRestaurantMenu() {
   const [expandedAddonsProductId, setExpandedAddonsProductId] = useState<number | null>(null);
   const [addonForm, setAddonForm] = useState<AddonFormState>(emptyAddonForm);
   const [editingAddonId, setEditingAddonId] = useState<number | null>(null);
+
+  const [expandedSizesProductId, setExpandedSizesProductId] = useState<number | null>(null);
+  const [sizeForm, setSizeForm] = useState<SizeFormState>(emptySizeForm);
+  const [editingSizeId, setEditingSizeId] = useState<number | null>(null);
 
   const { data: restaurant } = useGetRestaurant(restaurantId, { query: { queryKey: getGetRestaurantQueryKey(restaurantId), enabled: !!restaurantId } });
 
@@ -96,9 +106,14 @@ export default function AdminRestaurantMenu() {
   const updateAddon = useUpdateAddon();
   const deleteAddon = useDeleteAddon();
 
+  const createSize = useCreateProductSize();
+  const updateSize = useUpdateProductSize();
+  const deleteSize = useDeleteProductSize();
+
   const resetCategoryForm = () => { setCategoryForm(emptyCategoryForm); setEditingCategoryId(null); setShowCategoryForm(false); };
   const resetProductForm = () => { setProductForm(emptyProductForm); setEditingProductId(null); setShowProductForm(false); };
   const resetAddonForm = () => { setAddonForm(emptyAddonForm); setEditingAddonId(null); };
+  const resetSizeForm = () => { setSizeForm(emptySizeForm); setEditingSizeId(null); };
 
   const startEditCategory = (c: Category) => {
     setEditingCategoryId(c.id);
@@ -189,6 +204,28 @@ export default function AdminRestaurantMenu() {
   const removeAddon = (addonId: number) => {
     if (!confirm("حذف هذه الإضافة؟")) return;
     deleteAddon.mutate({ id: addonId }, { onSuccess: invalidateProducts });
+  };
+
+  const submitSize = (e: React.FormEvent, productId: number) => {
+    e.preventDefault();
+    if (!sizeForm.name.trim() || !sizeForm.price) return;
+    const data = {
+      name: sizeForm.name,
+      nameAr: sizeForm.nameAr || undefined,
+      price: Number(sizeForm.price) || 0,
+      sortOrder: Number(sizeForm.sortOrder) || 0,
+      isAvailable: sizeForm.isAvailable,
+    };
+    if (editingSizeId) {
+      updateSize.mutate({ id: editingSizeId, data }, { onSuccess: () => { invalidateProducts(); resetSizeForm(); } });
+    } else {
+      createSize.mutate({ id: productId, data }, { onSuccess: () => { invalidateProducts(); resetSizeForm(); } });
+    }
+  };
+
+  const removeSize = (sizeId: number) => {
+    if (!confirm("حذف هذا الحجم؟")) return;
+    deleteSize.mutate({ id: sizeId }, { onSuccess: invalidateProducts });
   };
 
   const storeUrl = restaurant ? `${window.location.origin}/${restaurant.slug}` : "";
@@ -343,6 +380,37 @@ export default function AdminRestaurantMenu() {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="border-t border-border pt-2">
+                      <button
+                        className="text-xs text-primary font-medium"
+                        onClick={() => { setExpandedSizesProductId(expandedSizesProductId === product.id ? null : product.id); resetSizeForm(); }}
+                        data-testid={`button-toggle-sizes-${product.id}`}
+                      >
+                        {product.sizes && product.sizes.length > 0 ? `📏 الأحجام (${product.sizes.length})` : "📏 إضافة أحجام (صغير/وسط/كبير)"} {expandedSizesProductId === product.id ? "▲" : "▼"}
+                      </button>
+
+                      {expandedSizesProductId === product.id && (
+                        <div className="mt-2 space-y-2">
+                          {(product.sizes ?? []).map((size) => (
+                            <div key={size.id} className="flex items-center justify-between text-sm bg-secondary/30 rounded-md px-2 py-1.5">
+                              <span>{size.name} — {formatCurrency(size.price)}{!size.isAvailable && " (مخفي)"}</span>
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => { setEditingSizeId(size.id); setSizeForm({ name: size.name, nameAr: size.nameAr || "", price: String(size.price), sortOrder: String(size.sortOrder), isAvailable: size.isAvailable }); }}><Pencil className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => removeSize(size.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                              </div>
+                            </div>
+                          ))}
+                          <form onSubmit={(e) => submitSize(e, product.id)} className="flex items-center gap-2 flex-wrap">
+                            <Input placeholder="اسم الحجم (مثال: كبير)" className="h-8 flex-1 min-w-[100px]" value={sizeForm.name} onChange={(e) => setSizeForm({ ...sizeForm, name: e.target.value })} required data-testid="input-size-name" />
+                            <Input type="number" step="0.01" min="0" placeholder="السعر الكامل" className="h-8 w-28" value={sizeForm.price} onChange={(e) => setSizeForm({ ...sizeForm, price: e.target.value })} required data-testid="input-size-price" />
+                            <Button size="sm" type="submit" className="h-8" data-testid="button-submit-size">{editingSizeId ? "حفظ" : "إضافة"}</Button>
+                            {editingSizeId && <Button size="sm" type="button" variant="outline" className="h-8" onClick={resetSizeForm}>إلغاء</Button>}
+                          </form>
+                          <p className="text-[11px] text-muted-foreground">سعر الحجم يحل محل سعر المنتج الأساسي عند اختياره من قبل العميل.</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="border-t border-border pt-2">

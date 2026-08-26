@@ -60,6 +60,9 @@ import type {
   Product,
   ProductInput,
   ProductPatch,
+  ProductSize,
+  ProductSizeInput,
+  ProductSizePatch,
   ProductStat,
   PublicMenu,
   PublicRestaurant,
@@ -1889,6 +1892,298 @@ export const useDeleteProduct = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteProductMutationOptions(options));
+    }
+
+export const getListProductSizesUrl = (id: number,) => {
+
+
+
+
+  return `/api/products/${id}/sizes`
+}
+
+/**
+ * @summary List sizes for a product
+ */
+export const listProductSizes = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<ProductSize[]> => {
+
+  return customFetch<ProductSize[]>(getListProductSizesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProductSizesQueryKey = (id: number,) => {
+    return [
+    `/api/products/${id}/sizes`
+    ] as const;
+    }
+
+
+export const getListProductSizesQueryOptions = <TData = Awaited<ReturnType<typeof listProductSizes>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProductSizes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProductSizesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProductSizes>>> = ({ signal }) => listProductSizes(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProductSizes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProductSizesQueryResult = NonNullable<Awaited<ReturnType<typeof listProductSizes>>>
+export type ListProductSizesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List sizes for a product
+ */
+
+export function useListProductSizes<TData = Awaited<ReturnType<typeof listProductSizes>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProductSizes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProductSizesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProductSizeUrl = (id: number,) => {
+
+
+
+
+  return `/api/products/${id}/sizes`
+}
+
+/**
+ * @summary Create product size
+ */
+export const createProductSize = async (id: number,
+    productSizeInput: ProductSizeInput, options?: Parameters<typeof customFetch>[1]): Promise<ProductSize> => {
+
+  return customFetch<ProductSize>(getCreateProductSizeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(productSizeInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProductSizeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProductSize>>, TError,{id: number;data: BodyType<ProductSizeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProductSize>>, TError,{id: number;data: BodyType<ProductSizeInput>}, TContext> => {
+
+const mutationKey = ['createProductSize'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProductSize>>, {id: number;data: BodyType<ProductSizeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createProductSize(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProductSizeMutationResult = NonNullable<Awaited<ReturnType<typeof createProductSize>>>
+    export type CreateProductSizeMutationBody = BodyType<ProductSizeInput>
+    export type CreateProductSizeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create product size
+ */
+export const useCreateProductSize = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProductSize>>, TError,{id: number;data: BodyType<ProductSizeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProductSize>>,
+        TError,
+        {id: number;data: BodyType<ProductSizeInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProductSizeMutationOptions(options));
+    }
+
+export const getUpdateProductSizeUrl = (id: number,) => {
+
+
+
+
+  return `/api/product-sizes/${id}`
+}
+
+/**
+ * @summary Update product size
+ */
+export const updateProductSize = async (id: number,
+    productSizePatch: ProductSizePatch, options?: Parameters<typeof customFetch>[1]): Promise<ProductSize> => {
+
+  return customFetch<ProductSize>(getUpdateProductSizeUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(productSizePatch)
+  }
+);}
+
+
+
+
+
+export const getUpdateProductSizeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProductSize>>, TError,{id: number;data: BodyType<ProductSizePatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProductSize>>, TError,{id: number;data: BodyType<ProductSizePatch>}, TContext> => {
+
+const mutationKey = ['updateProductSize'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProductSize>>, {id: number;data: BodyType<ProductSizePatch>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProductSize(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProductSizeMutationResult = NonNullable<Awaited<ReturnType<typeof updateProductSize>>>
+    export type UpdateProductSizeMutationBody = BodyType<ProductSizePatch>
+    export type UpdateProductSizeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update product size
+ */
+export const useUpdateProductSize = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProductSize>>, TError,{id: number;data: BodyType<ProductSizePatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProductSize>>,
+        TError,
+        {id: number;data: BodyType<ProductSizePatch>},
+        TContext
+      > => {
+      return useMutation(getUpdateProductSizeMutationOptions(options));
+    }
+
+export const getDeleteProductSizeUrl = (id: number,) => {
+
+
+
+
+  return `/api/product-sizes/${id}`
+}
+
+/**
+ * @summary Delete product size
+ */
+export const deleteProductSize = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteProductSizeUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteProductSizeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProductSize>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProductSize>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteProductSize'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProductSize>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteProductSize(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProductSizeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProductSize>>>
+
+    export type DeleteProductSizeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete product size
+ */
+export const useDeleteProductSize = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProductSize>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProductSize>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteProductSizeMutationOptions(options));
     }
 
 export const getListAddonsUrl = (id: number,) => {

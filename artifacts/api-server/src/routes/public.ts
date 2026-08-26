@@ -6,6 +6,7 @@ import {
   categoriesTable,
   productsTable,
   addonsTable,
+  productSizesTable,
   ordersTable,
   orderItemsTable,
   orderItemAddonsTable,
@@ -93,6 +94,7 @@ router.get("/public/restaurants/:slug/menu", async (req, res): Promise<void> => 
 
   const productIds = products.map((p) => p.id);
   let allAddons: any[] = [];
+  let allSizes: any[] = [];
   if (productIds.length > 0) {
     allAddons = await db
       .select()
@@ -100,12 +102,25 @@ router.get("/public/restaurants/:slug/menu", async (req, res): Promise<void> => 
       .where(eq(addonsTable.isAvailable, true))
       .orderBy(asc(addonsTable.id));
     allAddons = allAddons.filter((a) => productIds.includes(a.productId));
+
+    allSizes = await db
+      .select()
+      .from(productSizesTable)
+      .where(eq(productSizesTable.isAvailable, true))
+      .orderBy(asc(productSizesTable.sortOrder), asc(productSizesTable.id));
+    allSizes = allSizes.filter((s) => productIds.includes(s.productId));
   }
 
   const addonsByProduct: Record<number, any[]> = {};
   for (const a of allAddons) {
     if (!addonsByProduct[a.productId]) addonsByProduct[a.productId] = [];
     addonsByProduct[a.productId].push({ ...a, price: parseFloat(a.price) });
+  }
+
+  const sizesByProduct: Record<number, any[]> = {};
+  for (const s of allSizes) {
+    if (!sizesByProduct[s.productId]) sizesByProduct[s.productId] = [];
+    sizesByProduct[s.productId].push({ ...s, price: parseFloat(s.price) });
   }
 
   const productsByCategory: Record<number, any[]> = {};
@@ -115,6 +130,7 @@ router.get("/public/restaurants/:slug/menu", async (req, res): Promise<void> => 
       ...p,
       price: parseFloat(p.price),
       addons: addonsByProduct[p.id] ?? [],
+      sizes: sizesByProduct[p.id] ?? [],
     });
   }
 
@@ -191,6 +207,8 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   const lineItems: Array<{
     productId: number;
     productName: string;
+    sizeId: number | null;
+    sizeName: string | null;
     quantity: number;
     unitPrice: number;
     subtotal: number;
@@ -204,6 +222,23 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       return;
     }
 
+    let sizeId: number | null = null;
+    let sizeName: string | null = null;
+    let basePrice = parseFloat(product.price);
+    if (item.selectedSizeId != null) {
+      const [size] = await db
+        .select()
+        .from(productSizesTable)
+        .where(and(eq(productSizesTable.id, item.selectedSizeId), eq(productSizesTable.productId, item.productId)));
+      if (!size || !size.isAvailable) {
+        res.status(400).json({ error: `Size ${item.selectedSizeId} is not available for product ${item.productId}` });
+        return;
+      }
+      sizeId = size.id;
+      sizeName = size.name;
+      basePrice = parseFloat(size.price);
+    }
+
     const addonIds = item.selectedAddonIds ?? [];
     let addonTotal = 0;
     if (addonIds.length > 0) {
@@ -212,13 +247,15 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       addonTotal = validAddons.reduce((sum, a) => sum + parseFloat(a.price), 0);
     }
 
-    const unitPrice = parseFloat(product.price) + addonTotal;
+    const unitPrice = basePrice + addonTotal;
     const subtotal = unitPrice * item.quantity;
     totalAmount += subtotal;
 
     lineItems.push({
       productId: item.productId,
       productName: product.name,
+      sizeId,
+      sizeName,
       quantity: item.quantity,
       unitPrice,
       subtotal,
@@ -257,6 +294,8 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
         orderId: order.id,
         productId: li.productId,
         productName: li.productName,
+        sizeId: li.sizeId,
+        sizeName: li.sizeName,
         quantity: li.quantity,
         unitPrice: String(li.unitPrice.toFixed(2)),
         subtotal: String(li.subtotal.toFixed(2)),
@@ -318,7 +357,9 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       relatedType: "order",
     });
 
-    const itemsSummary = lineItems.map((li) => `${li.productName} x${li.quantity}`).join(", ");
+    const itemsSummary = lineItems
+      .map((li) => `${li.productName}${li.sizeName ? ` (${li.sizeName})` : ""} x${li.quantity}`)
+      .join(", ");
 
     sendWhatsAppToDriver({
       restaurantName: restaurant.name,

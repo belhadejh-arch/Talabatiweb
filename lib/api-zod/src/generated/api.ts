@@ -518,6 +518,15 @@ export const ListProductsResponseItem = zod.object({
   "nameAr": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean()
+})).optional(),
+  "sizes": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
 })).optional()
 })
 export const ListProductsResponse = zod.array(ListProductsResponseItem)
@@ -568,6 +577,15 @@ export const CreateProductResponse = zod.object({
   "nameAr": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean()
+})).optional(),
+  "sizes": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
 })).optional()
 })
 
@@ -612,6 +630,15 @@ export const UpdateProductResponse = zod.object({
   "nameAr": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean()
+})).optional(),
+  "sizes": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
 })).optional()
 })
 
@@ -624,6 +651,92 @@ export const DeleteProductParams = zod.object({
 })
 
 export const DeleteProductResponse = zod.void()
+
+
+/**
+ * @summary List sizes for a product
+ */
+export const ListProductSizesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListProductSizesResponseItem = zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
+})
+export const ListProductSizesResponse = zod.array(ListProductSizesResponseItem)
+
+
+/**
+ * @summary Create product size
+ */
+export const CreateProductSizeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const createProductSizeBodyPriceMin = 0;
+
+
+
+export const CreateProductSizeBody = zod.object({
+  "name": zod.string().min(1),
+  "nameAr": zod.string().optional(),
+  "price": zod.number().min(createProductSizeBodyPriceMin),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean().optional()
+})
+
+export const CreateProductSizeResponse = zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
+})
+
+
+/**
+ * @summary Update product size
+ */
+export const UpdateProductSizeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProductSizeBody = zod.object({
+  "name": zod.string().optional(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number().optional(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean().optional()
+})
+
+export const UpdateProductSizeResponse = zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
+})
+
+
+/**
+ * @summary Delete product size
+ */
+export const DeleteProductSizeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteProductSizeResponse = zod.void()
 
 
 /**
@@ -872,6 +985,8 @@ export const GetOrderResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
   "quantity": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number(),
@@ -923,6 +1038,8 @@ export const UpdateOrderStatusResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
   "quantity": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number(),
@@ -973,6 +1090,8 @@ export const AssignDriverResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
   "quantity": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number(),
@@ -1059,6 +1178,15 @@ export const GetPublicMenuResponse = zod.object({
   "nameAr": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean()
+})).optional(),
+  "sizes": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "name": zod.string(),
+  "nameAr": zod.string().nullish(),
+  "price": zod.number(),
+  "sortOrder": zod.number().optional(),
+  "isAvailable": zod.boolean()
 })).optional()
 }))
 }))
@@ -1086,6 +1214,7 @@ export const PlaceOrderBody = zod.object({
   "items": zod.array(zod.object({
   "productId": zod.number(),
   "quantity": zod.number().min(1),
+  "selectedSizeId": zod.number().nullish(),
   "selectedAddonIds": zod.array(zod.number()).optional()
 })).min(1)
 })

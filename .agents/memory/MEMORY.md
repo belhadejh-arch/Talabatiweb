@@ -5,3 +5,4 @@
 - [shadcn FormLabel requires FormField context](shadcn-formlabel-context.md) — using FormLabel outside a FormField/FormItem crashes the page; use plain Label for non-field labels
 - [Replit connectors-sdk runtime constraint](replit-connectors-runtime.md) — @replit/connectors-sdk only works inside a Replit runtime; external deploys (Render/Vercel) need a raw API-key fallback path
 - [TALABAT WhatsApp send gate](talabat-whatsapp-settings-gate.md) — sends no-op unless settings.whatsappEnabled+whatsappPhoneId are set, even with a direct token configured
+- [TALABAT product sizes vs addons](talabat-product-sizes.md) — sizes are exclusive/replace base price, addons are additive; cart id must encode both or combos collide

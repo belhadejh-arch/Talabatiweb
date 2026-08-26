@@ -106,7 +106,8 @@ export default function PublicCheckout() {
     const orderItems = items.map(item => ({
       productId: item.product.id,
       quantity: item.quantity,
-      selectedAddonIds: item.selectedAddonIds
+      selectedAddonIds: item.selectedAddonIds,
+      selectedSizeId: item.selectedSizeId ?? undefined,
     }));
 
     placeOrder.mutate({ 
@@ -265,18 +266,24 @@ export default function PublicCheckout() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="p-4 space-y-4 max-h-[40vh] overflow-y-auto">
-                {items.map((item) => (
-                  <div key={item.id} className="flex justify-between gap-4 text-sm">
+                {items.map((item) => {
+                  const addonNames = (item.product.addons || [])
+                    .filter((a) => item.selectedAddonIds.includes(a.id))
+                    .map((a) => a.name);
+                  return (
+                  <div key={item.id} className="flex justify-between gap-4 text-sm" data-testid={`summary-item-${item.id}`}>
                     <div className="flex gap-2">
                       <span className="font-semibold">{item.quantity}x</span>
                       <div>
-                        <p className="font-medium text-foreground">{item.product.name}</p>
-                         {item.selectedAddonIds.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">إضافات مخصصة</p>}
+                        <p className="font-medium text-foreground">{item.product.name}{item.selectedSizeName ? ` (${item.selectedSizeName})` : ""}</p>
+                         {addonNames.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">+ {addonNames.join("، ")}</p>}
+                         <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(item.price)} للوحدة</p>
                       </div>
                     </div>
                      <span className="font-medium whitespace-nowrap">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="p-4 border-t bg-card/50 space-y-3">
                 <div className="flex justify-between text-sm">

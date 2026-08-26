@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useListRestaurants, RestaurantStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { restaurantStatusLabel, subscriptionPlanLabel, subscriptionStatusLabel } from "@/lib/labels";
 
 export default function AdminRestaurants() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
@@ -114,7 +115,12 @@ export default function AdminRestaurants() {
                 </TableRow>
               ) : (
                 data?.data.map((restaurant) => (
-                  <TableRow key={restaurant.id} className="border-border group">
+                  <TableRow
+                    key={restaurant.id}
+                    className="border-border group cursor-pointer hover:bg-secondary/40"
+                    onClick={() => navigate(`/admin/restaurants/${restaurant.id}`)}
+                    data-testid={`row-restaurant-${restaurant.id}`}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-md bg-secondary flex items-center justify-center overflow-hidden shrink-0 border border-border">
@@ -153,29 +159,37 @@ export default function AdminRestaurants() {
                         <span className="text-xs text-muted-foreground">لا توجد خطة</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                            <span className="sr-only">فتح القائمة</span>
-                            <MoreHorizontal className="h-4 w-4" />
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/admin/restaurants/${restaurant.id}`}>
+                          <Button variant="outline" size="sm" className="h-8 gap-1.5" data-testid={`button-view-restaurant-${restaurant.id}`}>
+                            <Eye className="h-3.5 w-3.5" />
+                            عرض التفاصيل
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover border-border">
-                          <Link href={`/admin/restaurants/${restaurant.id}`}>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                              عرض التفاصيل
-                            </DropdownMenuItem>
-                          </Link>
-                          <Link href={`/admin/restaurants/${restaurant.id}/menu`}>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <FileEdit className="mr-2 h-4 w-4 text-muted-foreground" />
-                              إدارة القائمة
-                            </DropdownMenuItem>
-                          </Link>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">فتح القائمة</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-popover border-border">
+                            <Link href={`/admin/restaurants/${restaurant.id}`}>
+                              <DropdownMenuItem className="cursor-pointer">
+                                <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                                عرض التفاصيل
+                              </DropdownMenuItem>
+                            </Link>
+                            <Link href={`/admin/restaurants/${restaurant.id}/menu`}>
+                              <DropdownMenuItem className="cursor-pointer">
+                                <FileEdit className="mr-2 h-4 w-4 text-muted-foreground" />
+                                إدارة القائمة
+                              </DropdownMenuItem>
+                            </Link>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
