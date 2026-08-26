@@ -70,7 +70,7 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
     return false;
   }
 
-  const phoneNumberId = settings.whatsappPhoneId;
+  const phoneNumberId = settings.whatsappPhoneId || process.env.WHATSAPP_PHONE_ID;
   if (!phoneNumberId) {
     logger.warn("WhatsApp phone number ID is not configured — skipping message send");
     return false;
@@ -81,8 +81,13 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
 🏪 المطعم: ${payload.restaurantName}
 📦 الطلب: #${payload.orderId}
 📞 الهاتف: ${payload.customerPhone}
-🍔 الطلب: ${payload.items}
-💰 الإجمالي: ${payload.total}
+
+🍔 الطلب:
+${payload.items}
+
+💰 الإجمالي:
+${payload.total}
+
 📍 موقع العميل:
 ${payload.mapsUrl}`;
 

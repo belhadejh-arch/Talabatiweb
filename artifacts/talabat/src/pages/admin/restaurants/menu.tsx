@@ -30,6 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/currency";
+import { getAssetUrl } from "@/lib/asset-url";
+import { ImageUpload } from "@/components/admin/image-upload";
 import { useQueryClient } from "@tanstack/react-query";
 
 type CategoryFormState = { name: string; nameAr: string; imageUrl: string; sortOrder: string; isAvailable: boolean };
@@ -266,7 +268,7 @@ export default function AdminRestaurantMenu() {
           {showCategoryForm && (
             <form onSubmit={submitCategory} className="p-3 border-b border-border space-y-2 bg-secondary/20">
               <Input placeholder="اسم القسم" value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })} required />
-              <Input placeholder="رابط صورة القسم (اختياري)" value={categoryForm.imageUrl} onChange={(e) => setCategoryForm({ ...categoryForm, imageUrl: e.target.value })} />
+              <ImageUpload folder="categories" value={categoryForm.imageUrl} onChange={(url) => setCategoryForm({ ...categoryForm, imageUrl: url })} label="صورة القسم (اختياري)" />
               <div className="flex items-center gap-2">
                 <Input type="number" placeholder="الترتيب" className="w-20" value={categoryForm.sortOrder} onChange={(e) => setCategoryForm({ ...categoryForm, sortOrder: e.target.value })} />
                 <label className="flex items-center gap-1.5 text-sm">
@@ -317,7 +319,7 @@ export default function AdminRestaurantMenu() {
             <form onSubmit={submitProduct} className="p-4 border-b border-border bg-secondary/20 grid gap-3 md:grid-cols-2">
               <Input placeholder="اسم المنتج" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required />
               <Input type="number" step="0.01" min="0" placeholder="السعر (د.ل)" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} required />
-              <Input placeholder="رابط صورة المنتج" className="md:col-span-2" value={productForm.imageUrl} onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })} />
+              <ImageUpload folder="products" className="md:col-span-2" value={productForm.imageUrl} onChange={(url) => setProductForm({ ...productForm, imageUrl: url })} label="صورة المنتج" />
               <Textarea placeholder="الوصف (اختياري)" className="md:col-span-2" value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} />
               <Input type="number" min="0" placeholder="الكمية المتوفرة (اتركه فارغاً = غير محدود)" value={productForm.stockQuantity} onChange={(e) => setProductForm({ ...productForm, stockQuantity: e.target.value })} />
               <Input type="number" placeholder="الترتيب" value={productForm.sortOrder} onChange={(e) => setProductForm({ ...productForm, sortOrder: e.target.value })} />
@@ -352,7 +354,7 @@ export default function AdminRestaurantMenu() {
                     <div className="flex gap-4">
                       <div className="h-20 w-20 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
                         {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                          <img src={getAssetUrl(product.imageUrl)} alt={product.name} className="h-full w-full object-cover" />
                         ) : (
                           <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
                         )}

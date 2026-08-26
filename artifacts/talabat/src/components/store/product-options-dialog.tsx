@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { getAssetUrl } from "@/lib/asset-url";
 
 export function ProductOptionsDialog({
   product,
@@ -82,7 +83,7 @@ export function ProductOptionsDialog({
             <div className="w-full relative h-[35vh] min-h-[250px] bg-secondary flex items-center justify-center shrink-0">
               {product.imageUrl ? (
                 <img 
-                  src={product.imageUrl} 
+                  src={getAssetUrl(product.imageUrl)} 
                   alt={product.name} 
                   className="absolute inset-0 h-full w-full object-cover" 
                 />

@@ -65,6 +65,12 @@ app.use(
   }),
 );
 
+// Unprefixed health check — some hosting platforms (e.g. Render) probe this
+// exact path regardless of where the API is otherwise mounted.
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.use("/api", router);
 
 export default app;

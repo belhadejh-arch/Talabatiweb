@@ -8,6 +8,7 @@ import {
   DeleteCategoryParams,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { deleteStoredImage } from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -52,6 +53,8 @@ router.patch("/categories/:id", requireAuth, async (req, res): Promise<void> => 
   const parsed = UpdateCategoryBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [existing] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, id));
+
   const [category] = await db
     .update(categoriesTable)
     .set(parsed.data)
@@ -59,6 +62,16 @@ router.patch("/categories/:id", requireAuth, async (req, res): Promise<void> => 
     .returning();
 
   if (!category) { res.status(404).json({ error: "Not found" }); return; }
+
+  // If the image was replaced, best-effort delete the old stored object.
+  if (
+    parsed.data.imageUrl !== undefined &&
+    existing?.imageUrl &&
+    existing.imageUrl !== category.imageUrl
+  ) {
+    void deleteStoredImage(existing.imageUrl);
+  }
+
   res.json(category);
 });
 
@@ -68,7 +81,9 @@ router.delete("/categories/:id", requireAuth, async (req, res): Promise<void> =>
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const [existing] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, id));
   await db.delete(categoriesTable).where(eq(categoriesTable.id, id));
+  if (existing?.imageUrl) void deleteStoredImage(existing.imageUrl);
   res.sendStatus(204);
 });
 

@@ -11,6 +11,8 @@ import publicRouter from "./public";
 import analyticsRouter from "./analytics";
 import notificationsRouter from "./notifications";
 import settingsRouter from "./settings";
+import storageRouter from "./storage";
+import uploadsRouter from "./uploads";
 
 const router = Router();
 
@@ -26,5 +28,7 @@ router.use(publicRouter);
 router.use(analyticsRouter);
 router.use(notificationsRouter);
 router.use(settingsRouter);
+router.use(storageRouter);
+router.use(uploadsRouter);
 
 export default router;

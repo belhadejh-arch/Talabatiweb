@@ -6,3 +6,4 @@
 - [Replit connectors-sdk runtime constraint](replit-connectors-runtime.md) — @replit/connectors-sdk only works inside a Replit runtime; external deploys (Render/Vercel) need a raw API-key fallback path
 - [TALABAT WhatsApp send gate](talabat-whatsapp-settings-gate.md) — sends no-op unless settings.whatsappEnabled+whatsappPhoneId are set, even with a direct token configured
 - [TALABAT product sizes vs addons](talabat-product-sizes.md) — sizes are exclusive/replace base price, addons are additive; cart id must encode both or combos collide
+- [pnpm workspace lib typecheck](pnpm-workspace-lib-typecheck.md) — editing lib/* package source needs a `tsc -p lib/<pkg>/tsconfig.json` rebuild or consumers typecheck against stale dist/*.d.ts

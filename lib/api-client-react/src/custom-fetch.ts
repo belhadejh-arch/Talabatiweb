@@ -30,6 +30,16 @@ export function setBaseUrl(url: string | null): void {
 }
 
 /**
+ * Returns the currently configured base URL (or null when requests are
+ * relative to the current origin). Useful for constructing absolute asset
+ * URLs (e.g. `<img src>`) that must resolve to the API server even when the
+ * frontend and backend are deployed on different domains.
+ */
+export function getBaseUrl(): string | null {
+  return _baseUrl;
+}
+
+/**
  * Register a getter that supplies a bearer auth token.  Before every fetch
  * the getter is invoked; when it returns a non-null string, an
  * `Authorization: Bearer <token>` header is attached to the request.

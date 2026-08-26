@@ -7,6 +7,7 @@ import {
   ListProductsQueryParams,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { deleteStoredImage } from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -109,6 +110,8 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
   const updateData: any = { ...parsed.data };
   if (parsed.data.price !== undefined) updateData.price = String(parsed.data.price);
 
+  const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id));
+
   const [product] = await db
     .update(productsTable)
     .set(updateData)
@@ -116,6 +119,15 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
     .returning();
 
   if (!product) { res.status(404).json({ error: "Not found" }); return; }
+
+  // If the image was replaced, best-effort delete the old stored object.
+  if (
+    parsed.data.imageUrl !== undefined &&
+    existing?.imageUrl &&
+    existing.imageUrl !== product.imageUrl
+  ) {
+    void deleteStoredImage(existing.imageUrl);
+  }
 
   const addons = await db.select().from(addonsTable).where(eq(addonsTable.productId, id));
   const sizes = await db
@@ -137,7 +149,9 @@ router.delete("/products/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id));
   await db.delete(productsTable).where(eq(productsTable.id, id));
+  if (existing?.imageUrl) void deleteStoredImage(existing.imageUrl);
   res.sendStatus(204);
 });
 

@@ -7,6 +7,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { MapPin, Info, Plus, Minus, ShoppingBag, Trash2, ArrowLeft, MoreHorizontal } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { formatCurrency } from "@/lib/currency";
+import { getAssetUrl } from "@/lib/asset-url";
 import { ProductOptionsDialog } from "@/components/store/product-options-dialog";
 import {
   Drawer,
@@ -97,7 +98,7 @@ export default function PublicRestaurant() {
                 <div key={item.id} className="flex gap-4 p-4 rounded-2xl bg-secondary/30 border border-border/5" data-testid={`cart-item-${item.id}`}>
                   <div className="h-20 w-20 rounded-xl bg-secondary shrink-0 overflow-hidden shadow-sm">
                     {item.product.imageUrl ? (
-                      <img src={item.product.imageUrl} alt={item.product.name} className="h-full w-full object-cover" />
+                      <img src={getAssetUrl(item.product.imageUrl)} alt={item.product.name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-3xl font-bold opacity-20">
                         {item.product.name.charAt(0)}
@@ -163,7 +164,7 @@ export default function PublicRestaurant() {
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center border border-primary/20 shrink-0">
             {restaurant.logoUrl ? (
-              <img src={restaurant.logoUrl} alt={restaurant.name} className="h-full w-full object-cover" />
+              <img src={getAssetUrl(restaurant.logoUrl)} alt={restaurant.name} className="h-full w-full object-cover" />
             ) : (
               <span className="font-bold text-primary">{restaurant.name.charAt(0)}</span>
             )}
@@ -175,7 +176,7 @@ export default function PublicRestaurant() {
       {/* Hero Section */}
       <div className="relative h-[30vh] min-h-[220px] w-full bg-secondary">
         {restaurant.coverUrl ? (
-          <img src={restaurant.coverUrl} alt={restaurant.name} className="w-full h-full object-cover" />
+          <img src={getAssetUrl(restaurant.coverUrl)} alt={restaurant.name} className="w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 bg-primary/10" />
         )}
@@ -186,7 +187,7 @@ export default function PublicRestaurant() {
           <div className="flex items-end gap-5">
             <div className="h-20 w-20 md:h-24 md:w-24 rounded-2xl bg-card border-2 border-border/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl relative z-10">
               {restaurant.logoUrl ? (
-                <img src={restaurant.logoUrl} alt={restaurant.name} className="h-full w-full object-cover" />
+                <img src={getAssetUrl(restaurant.logoUrl)} alt={restaurant.name} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-4xl font-bold text-muted-foreground">{restaurant.name.charAt(0)}</span>
               )}
@@ -261,7 +262,7 @@ export default function PublicRestaurant() {
                       <div className="w-full aspect-[4/3] bg-secondary relative overflow-hidden">
                         {product.imageUrl ? (
                           <img 
-                            src={product.imageUrl} 
+                            src={getAssetUrl(product.imageUrl)} 
                             alt={product.name} 
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
                           />
