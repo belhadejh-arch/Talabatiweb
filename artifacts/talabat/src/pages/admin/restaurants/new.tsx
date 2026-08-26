@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,10 +27,26 @@ const formSchema = z.object({
   subscriptionPlan: z.nativeEnum(RestaurantInputSubscriptionPlan)
 });
 
+/** Derives a URL-safe slug from a restaurant name. Arabic/other non-Latin
+ * characters are dropped since slugs must stay lowercase Latin + digits +
+ * hyphens (URL-safe); falls back to a short random slug when nothing usable
+ * remains, e.g. an Arabic-only name. */
+function slugify(value: string): string {
+  const base = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return base || `restaurant-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export default function AdminRestaurantNew() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createRestaurant = useCreateRestaurant();
+  const slugManuallyEdited = useRef(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,6 +64,13 @@ export default function AdminRestaurantNew() {
     }
   });
 
+  const handleNameChange = (name: string) => {
+    form.setValue("name", name);
+    if (!slugManuallyEdited.current) {
+      form.setValue("slug", slugify(name), { shouldValidate: true });
+    }
+  };
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     createRestaurant.mutate({ data: {
       ...values,
@@ -58,6 +82,10 @@ export default function AdminRestaurantNew() {
       onSuccess: (restaurant) => {
         queryClient.invalidateQueries({ queryKey: getListRestaurantsQueryKey() });
         setLocation(`/admin/restaurants/${restaurant.id}`);
+      },
+      onError: (err: any) => {
+        const message = err?.error || err?.message || "تعذّر إنشاء المطعم. حاول مجدداً.";
+        form.setError("slug", { message: typeof message === "string" && message.toLowerCase().includes("slug") ? "هذا الرابط المختصر مستخدم بالفعل، جرّب رابطاً آخر." : message });
       }
     });
   };
@@ -94,7 +122,7 @@ export default function AdminRestaurantNew() {
                     <FormItem>
                       <FormLabel>اسم المطعم *</FormLabel>
                       <FormControl>
-                        <Input placeholder="مثال: مطعم الأصالة" {...field} />
+                        <Input placeholder="مثال: مطعم الأصالة" {...field} onChange={(e) => handleNameChange(e.target.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -109,9 +137,10 @@ export default function AdminRestaurantNew() {
                       <FormControl>
                         <div className="flex items-center">
                           <span className="flex items-center h-10 px-3 bg-muted border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">talabat.app/</span>
-                          <Input className="rounded-l-none" placeholder="al-asala" {...field} />
+                          <Input className="rounded-l-none" placeholder="يُنشأ تلقائياً من الاسم، ويمكن تعديله" {...field} onChange={(e) => { slugManuallyEdited.current = true; field.onChange(e); }} />
                         </div>
                       </FormControl>
+                      <FormDescription>يتم إنشاؤه تلقائياً من اسم المطعم، ويمكنك تعديله يدوياً قبل الحفظ.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

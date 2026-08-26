@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/use-cart";
-import { ArrowLeft, MapPin, Receipt, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, MapPin, Receipt, CheckCircle2, LocateFixed, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -54,6 +54,7 @@ export default function PublicCheckout() {
   const [orderId, setOrderId] = useState<number | null>(null);
 
   const { data: restaurant } = useGetPublicRestaurant(slug, { query: { queryKey: getGetPublicRestaurantQueryKey(slug), enabled: !!slug } });
+  const deliveryFee = restaurant?.deliveryFee ?? 0;
   const placeOrder = usePlaceOrder();
 
   const form = useForm<z.infer<typeof checkoutSchema>>({
@@ -66,15 +67,24 @@ export default function PublicCheckout() {
   });
 
   const [mapPosition, setMapPosition] = useState<L.LatLng | null>(null);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "unavailable">("idle");
   const fallbackPosition: [number, number] = [32.8872, 13.1913];
-  useEffect(() => {
-    if (!navigator.geolocation) return;
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("unavailable");
+      return;
+    }
+    setLocationStatus("requesting");
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => setMapPosition(L.latLng(coords.latitude, coords.longitude)),
-      () => undefined,
+      ({ coords }) => {
+        setMapPosition(L.latLng(coords.latitude, coords.longitude));
+        setLocationStatus("granted");
+      },
+      () => setLocationStatus("denied"),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     );
-  }, []);
+  };
 
   useEffect(() => {
     if (mapPosition) {
@@ -188,14 +198,44 @@ export default function PublicCheckout() {
                     <Label className={form.formState.errors.latitude ? "text-destructive" : ""}>
                        موقع التوصيل *
                     </Label>
-                    <div className="h-[300px] w-full rounded-xl overflow-hidden border border-border">
-                       <MapContainer center={mapPosition || fallbackPosition} zoom={13} style={{ height: '100%', width: '100%' }} key={mapPosition ? `${mapPosition.lat}-${mapPosition.lng}` : "fallback"}>
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <LocationMarker position={mapPosition} setPosition={setMapPosition} />
-                      </MapContainer>
-                    </div>
+
+                    {locationStatus !== "granted" ? (
+                      <div className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-6 text-center space-y-4">
+                        <MapPin className="h-10 w-10 text-primary mx-auto" />
+                        <h3 className="text-lg font-bold">📍 تفعيل الموقع مطلوب</h3>
+                        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                          نحتاج إلى معرفة موقعك الحالي حتى يتمكن السائق من الوصول إليك بدقة. لا يمكن تأكيد الطلب بدون تحديد الموقع.
+                        </p>
+                        <Button type="button" size="lg" onClick={requestLocation} disabled={locationStatus === "requesting"} className="gap-2">
+                          <LocateFixed className="h-5 w-5" />
+                          {locationStatus === "requesting" ? "جاري تحديد الموقع..." : "📍 السماح باستخدام موقعي"}
+                        </Button>
+
+                        {(locationStatus === "denied" || locationStatus === "unavailable") && (
+                          <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3 text-right max-w-sm mx-auto">
+                            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <span>
+                              {locationStatus === "unavailable"
+                                ? "متصفحك لا يدعم تحديد الموقع. لا يمكن إتمام الطلب بدون موقع."
+                                : "تم رفض إذن الموقع أو تعذّر تحديده. يرجى السماح بالوصول إلى الموقع من إعدادات المتصفح ثم إعادة المحاولة — لا يمكن تأكيد الطلب بدون تحديد موقعك."}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="h-[300px] w-full rounded-xl overflow-hidden border border-border">
+                          <MapContainer center={mapPosition || fallbackPosition} zoom={15} style={{ height: '100%', width: '100%' }} key={mapPosition ? `${mapPosition.lat}-${mapPosition.lng}` : "fallback"}>
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            <LocationMarker position={mapPosition} setPosition={setMapPosition} />
+                          </MapContainer>
+                        </div>
+                        <p className="text-xs text-muted-foreground">تم تحديد موقعك تلقائياً. يمكنك النقر على الخريطة أو سحب الدبوس لضبط الموقع بدقة.</p>
+                      </>
+                    )}
+
                     {form.formState.errors.latitude && (
-                      <p className="text-sm font-medium text-destructive">{form.formState.errors.latitude.message}</p>
+                      <p className="text-sm font-medium text-destructive">يرجى تحديد موقع التوصيل على الخريطة</p>
                     )}
                   </div>
 
@@ -244,19 +284,22 @@ export default function PublicCheckout() {
                    <span>{formatCurrency(total)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                   <span className="text-muted-foreground">التوصيل</span>
-                   <span>{formatCurrency(0)}</span>
+                   <span className="text-muted-foreground">رسوم التوصيل</span>
+                   <span>{formatCurrency(deliveryFee)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                    <span>الإجمالي</span>
-                   <span className="text-primary">{formatCurrency(total)}</span>
+                   <span className="text-primary">{formatCurrency(total + deliveryFee)}</span>
                 </div>
-                
+
+                {locationStatus !== "granted" && (
+                  <p className="text-xs text-destructive text-center">لا يمكن تأكيد الطلب قبل تفعيل الموقع أعلاه.</p>
+                )}
                 <Button 
                   type="submit" 
                   form="checkout-form" 
                   className="w-full h-14 mt-4 text-base font-semibold shadow-md"
-                  disabled={placeOrder.isPending}
+                  disabled={placeOrder.isPending || locationStatus !== "granted"}
                 >
                    {placeOrder.isPending ? "جاري الإرسال..." : "تأكيد الطلب"}
                 </Button>

@@ -112,6 +112,7 @@ export const ListRestaurantsResponse = zod.object({
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
   "id": zod.number(),
@@ -136,6 +137,8 @@ export const ListRestaurantsResponse = zod.object({
 
 
 export const createRestaurantBodySlugRegExp = new RegExp('^[a-z0-9-]+$');
+export const createRestaurantBodyDeliveryFeeMin = 0;
+
 
 
 export const CreateRestaurantBody = zod.object({
@@ -148,6 +151,7 @@ export const CreateRestaurantBody = zod.object({
   "description": zod.string().optional(),
   "primaryColor": zod.string().optional(),
   "whatsappNumber": zod.string().optional(),
+  "deliveryFee": zod.number().min(createRestaurantBodyDeliveryFeeMin).optional(),
   "subscriptionPlan": zod.enum(['TRIAL', 'MONTHLY', 'YEARLY'])
 })
 
@@ -163,6 +167,7 @@ export const CreateRestaurantResponse = zod.object({
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
   "id": zod.number(),
@@ -195,6 +200,7 @@ export const GetRestaurantResponse = zod.object({
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
   "id": zod.number(),
@@ -215,6 +221,10 @@ export const UpdateRestaurantParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateRestaurantBodyDeliveryFeeMin = 0;
+
+
+
 export const UpdateRestaurantBody = zod.object({
   "name": zod.string().optional(),
   "phone": zod.string().optional(),
@@ -223,7 +233,8 @@ export const UpdateRestaurantBody = zod.object({
   "coverUrl": zod.string().nullish(),
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
-  "whatsappNumber": zod.string().nullish()
+  "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().min(updateRestaurantBodyDeliveryFeeMin).optional()
 })
 
 export const UpdateRestaurantResponse = zod.object({
@@ -238,6 +249,7 @@ export const UpdateRestaurantResponse = zod.object({
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
   "id": zod.number(),
@@ -284,6 +296,7 @@ export const UpdateRestaurantStatusResponse = zod.object({
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
   "whatsappNumber": zod.string().nullish(),
+  "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
   "id": zod.number(),
@@ -496,6 +509,7 @@ export const ListProductsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional(),
   "addons": zod.array(zod.object({
   "id": zod.number(),
@@ -530,6 +544,7 @@ export const CreateProductBody = zod.object({
   "imageUrl": zod.string().optional(),
   "price": zod.number().min(createProductBodyPriceMin),
   "isAvailable": zod.boolean().optional(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional()
 })
 
@@ -544,6 +559,7 @@ export const CreateProductResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional(),
   "addons": zod.array(zod.object({
   "id": zod.number(),
@@ -572,6 +588,7 @@ export const UpdateProductBody = zod.object({
   "imageUrl": zod.string().nullish(),
   "price": zod.number().optional(),
   "isAvailable": zod.boolean().optional(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional()
 })
 
@@ -586,6 +603,7 @@ export const UpdateProductResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional(),
   "addons": zod.array(zod.object({
   "id": zod.number(),
@@ -812,6 +830,8 @@ export const ListOrdersResponse = zod.object({
   "latitude": zod.number().optional(),
   "longitude": zod.number().optional(),
   "mapsUrl": zod.string().optional(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
   "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
@@ -841,6 +861,8 @@ export const GetOrderResponse = zod.object({
   "latitude": zod.number().optional(),
   "longitude": zod.number().optional(),
   "mapsUrl": zod.string().optional(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
   "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
@@ -890,6 +912,8 @@ export const UpdateOrderStatusResponse = zod.object({
   "latitude": zod.number().optional(),
   "longitude": zod.number().optional(),
   "mapsUrl": zod.string().optional(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
   "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
@@ -938,6 +962,8 @@ export const AssignDriverResponse = zod.object({
   "latitude": zod.number().optional(),
   "longitude": zod.number().optional(),
   "mapsUrl": zod.string().optional(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
   "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
@@ -982,7 +1008,8 @@ export const GetPublicRestaurantResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.string(),
-  "isAcceptingOrders": zod.boolean().optional()
+  "isAcceptingOrders": zod.boolean().optional(),
+  "deliveryFee": zod.number().optional()
 })
 
 
@@ -1004,7 +1031,8 @@ export const GetPublicMenuResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.string(),
-  "isAcceptingOrders": zod.boolean().optional()
+  "isAcceptingOrders": zod.boolean().optional(),
+  "deliveryFee": zod.number().optional()
 }),
   "categories": zod.array(zod.object({
   "id": zod.number(),
@@ -1022,6 +1050,7 @@ export const GetPublicMenuResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "price": zod.number(),
   "isAvailable": zod.boolean(),
+  "stockQuantity": zod.number().nullish(),
   "sortOrder": zod.number().optional(),
   "addons": zod.array(zod.object({
   "id": zod.number(),

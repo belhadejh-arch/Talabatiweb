@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, productsTable, addonsTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import {
   CreateProductBody,
   UpdateProductBody,
@@ -20,7 +20,7 @@ router.get("/restaurants/:id/products", requireAuth, async (req, res): Promise<v
   const categoryId = qp.success ? qp.data.categoryId : undefined;
 
   const where = categoryId
-    ? eq(productsTable.categoryId, categoryId)
+    ? and(eq(productsTable.restaurantId, restaurantId), eq(productsTable.categoryId, categoryId))
     : eq(productsTable.restaurantId, restaurantId);
 
   const products = await db

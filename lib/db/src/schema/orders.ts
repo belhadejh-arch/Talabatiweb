@@ -14,6 +14,8 @@ export const ordersTable = pgTable("orders", {
   latitude: doublePrecision("latitude").notNull(),
   longitude: doublePrecision("longitude").notNull(),
   mapsUrl: text("maps_url").notNull(),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }).notNull().default("0"),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("NEW"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

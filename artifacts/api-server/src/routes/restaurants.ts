@@ -64,6 +64,7 @@ router.get("/restaurants", requireAuth, async (req, res): Promise<void> => {
 
   const data = restaurants.map((r) => ({
     ...r,
+    deliveryFee: parseFloat(r.deliveryFee),
     subscription: subByRestaurant[r.id] ?? null,
   }));
 
@@ -91,7 +92,11 @@ router.post("/restaurants", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [restaurant] = await db.insert(restaurantsTable).values(restaurantData).returning();
+  const insertValues: any = {
+    ...restaurantData,
+    ...(restaurantData.deliveryFee !== undefined ? { deliveryFee: String(restaurantData.deliveryFee) } : {}),
+  };
+  const [restaurant] = await db.insert(restaurantsTable).values(insertValues).returning();
 
   // Create subscription
   const { startDate, expiryDate, status } = computeSubscriptionDates(subscriptionPlan);
@@ -111,7 +116,7 @@ router.post("/restaurants", requireAuth, async (req, res): Promise<void> => {
     relatedType: "restaurant",
   });
 
-  res.status(201).json({ ...restaurant, subscription });
+  res.status(201).json({ ...restaurant, deliveryFee: parseFloat(restaurant.deliveryFee), subscription });
 });
 
 // Get restaurant
@@ -129,7 +134,7 @@ router.get("/restaurants/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(subscriptionsTable.restaurantId, id))
     .orderBy(desc(subscriptionsTable.createdAt));
 
-  res.json({ ...restaurant, subscription: subscription ?? null });
+  res.json({ ...restaurant, deliveryFee: parseFloat(restaurant.deliveryFee), subscription: subscription ?? null });
 });
 
 // Update restaurant
@@ -141,9 +146,12 @@ router.patch("/restaurants/:id", requireAuth, async (req, res): Promise<void> =>
   const parsed = UpdateRestaurantBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const updateValues: any = { ...parsed.data };
+  if (parsed.data.deliveryFee !== undefined) updateValues.deliveryFee = String(parsed.data.deliveryFee);
+
   const [restaurant] = await db
     .update(restaurantsTable)
-    .set(parsed.data)
+    .set(updateValues)
     .where(eq(restaurantsTable.id, id))
     .returning();
 
@@ -155,7 +163,7 @@ router.patch("/restaurants/:id", requireAuth, async (req, res): Promise<void> =>
     .where(eq(subscriptionsTable.restaurantId, id))
     .orderBy(desc(subscriptionsTable.createdAt));
 
-  res.json({ ...restaurant, subscription: subscription ?? null });
+  res.json({ ...restaurant, deliveryFee: parseFloat(restaurant.deliveryFee), subscription: subscription ?? null });
 });
 
 // Delete restaurant
@@ -191,7 +199,7 @@ router.patch("/restaurants/:id/status", requireAuth, async (req, res): Promise<v
     .where(eq(subscriptionsTable.restaurantId, id))
     .orderBy(desc(subscriptionsTable.createdAt));
 
-  res.json({ ...restaurant, subscription: subscription ?? null });
+  res.json({ ...restaurant, deliveryFee: parseFloat(restaurant.deliveryFee), subscription: subscription ?? null });
 });
 
 export default router;

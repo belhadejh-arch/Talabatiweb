@@ -53,6 +53,7 @@ router.get("/public/restaurants/:slug", async (req, res): Promise<void> => {
     primaryColor: restaurant.primaryColor,
     status: restaurant.status,
     isAcceptingOrders,
+    deliveryFee: parseFloat(restaurant.deliveryFee),
   });
 });
 
@@ -137,6 +138,7 @@ router.get("/public/restaurants/:slug/menu", async (req, res): Promise<void> => 
       primaryColor: restaurant.primaryColor,
       status: restaurant.status,
       isAcceptingOrders,
+      deliveryFee: parseFloat(restaurant.deliveryFee),
     },
     categories: menuCategories,
   });
@@ -225,6 +227,9 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   }
 
   const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+  const deliveryFee = parseFloat(restaurant.deliveryFee);
+  const subtotal = totalAmount;
+  const grandTotal = subtotal + deliveryFee;
 
   // Create order
   const [order] = await db
@@ -237,7 +242,9 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       latitude,
       longitude,
       mapsUrl,
-      totalAmount: String(totalAmount.toFixed(2)),
+      subtotal: String(subtotal.toFixed(2)),
+      deliveryFee: String(deliveryFee.toFixed(2)),
+      totalAmount: String(grandTotal.toFixed(2)),
       status: "NEW",
     })
     .returning();
@@ -319,7 +326,7 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       customerName: customerInfo.customerName,
       customerPhone: customerInfo.customerPhone,
       items: itemsSummary,
-      total: `${totalAmount.toFixed(2)} د.ل`,
+      total: `${grandTotal.toFixed(2)} د.ل`,
       mapsUrl,
       driverPhone: driver.phone,
     }).catch(() => {}); // fire and forget — order creation must not fail on WhatsApp errors

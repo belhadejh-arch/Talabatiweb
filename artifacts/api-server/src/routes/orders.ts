@@ -51,6 +51,8 @@ async function getOrderDetail(orderId: number) {
 
   return {
     ...order,
+    subtotal: parseFloat(order.subtotal),
+    deliveryFee: parseFloat(order.deliveryFee),
     totalAmount: parseFloat(order.totalAmount),
     restaurantName: restaurant?.name ?? "",
     driverName: driver?.name ?? null,
@@ -116,6 +118,8 @@ router.get("/orders", requireAuth, async (req, res): Promise<void> => {
 
   const data = orders.map((o) => ({
     ...o,
+    subtotal: parseFloat(o.subtotal),
+    deliveryFee: parseFloat(o.deliveryFee),
     totalAmount: parseFloat(o.totalAmount),
     restaurantName: restaurantMap[o.restaurantId] ?? "",
     driverName: o.driverId ? (driverMap[o.driverId] ?? null) : null,

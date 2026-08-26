@@ -15,6 +15,7 @@ export const productsTable = pgTable("products", {
   imageUrl: text("image_url"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   isAvailable: boolean("is_available").notNull().default(true),
+  stockQuantity: integer("stock_quantity"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

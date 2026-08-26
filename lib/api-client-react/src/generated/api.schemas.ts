@@ -94,6 +94,7 @@ export interface Restaurant {
   status: RestaurantStatus;
   /** @nullable */
   whatsappNumber?: string | null;
+  deliveryFee?: number;
   createdAt: string;
   subscription?: Subscription;
 }
@@ -122,6 +123,8 @@ export interface RestaurantInput {
   description?: string;
   primaryColor?: string;
   whatsappNumber?: string;
+  /** @minimum 0 */
+  deliveryFee?: number;
   subscriptionPlan: RestaurantInputSubscriptionPlan;
 }
 
@@ -139,6 +142,8 @@ export interface RestaurantPatch {
   primaryColor?: string | null;
   /** @nullable */
   whatsappNumber?: string | null;
+  /** @minimum 0 */
+  deliveryFee?: number;
 }
 
 export type StatusUpdateStatus = typeof StatusUpdateStatus[keyof typeof StatusUpdateStatus];
@@ -264,6 +269,8 @@ export interface Product {
   imageUrl?: string | null;
   price: number;
   isAvailable: boolean;
+  /** @nullable */
+  stockQuantity?: number | null;
   sortOrder?: number;
   addons?: Addon[];
 }
@@ -279,6 +286,8 @@ export interface ProductInput {
   /** @minimum 0 */
   price: number;
   isAvailable?: boolean;
+  /** @nullable */
+  stockQuantity?: number | null;
   sortOrder?: number;
 }
 
@@ -295,6 +304,8 @@ export interface ProductPatch {
   imageUrl?: string | null;
   price?: number;
   isAvailable?: boolean;
+  /** @nullable */
+  stockQuantity?: number | null;
   sortOrder?: number;
 }
 
@@ -381,6 +392,8 @@ export interface Order {
   latitude?: number;
   longitude?: number;
   mapsUrl?: string;
+  subtotal?: number;
+  deliveryFee?: number;
   totalAmount: number;
   status: OrderStatus;
   /** @nullable */
@@ -437,6 +450,8 @@ export interface OrderDetail {
   latitude?: number;
   longitude?: number;
   mapsUrl?: string;
+  subtotal?: number;
+  deliveryFee?: number;
   totalAmount: number;
   status: OrderDetailStatus;
   /** @nullable */
@@ -514,6 +529,7 @@ export interface PublicRestaurant {
   primaryColor?: string | null;
   status: string;
   isAcceptingOrders?: boolean;
+  deliveryFee?: number;
 }
 
 export interface PublicCategory {

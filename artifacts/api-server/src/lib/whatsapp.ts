@@ -21,37 +21,45 @@ function isReplitRuntime(): boolean {
   return !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL);
 }
 
+/** Reads a directly configured long-lived WhatsApp Cloud API token, if any. */
+function getDirectToken(): string | undefined {
+  return process.env.WhatsApp_API_Secret || process.env.WHATSAPP_API_KEY || undefined;
+}
+
 /**
  * Sends a WhatsApp Cloud API request.
  *
- * Inside Replit, requests go through the connected WhatsApp Business connector
- * (no secret ever touches this codebase). Outside Replit (e.g. a backend
- * deployed to Render), the connector proxy is unavailable, so we fall back to
- * a directly configured long-lived token via the WHATSAPP_API_KEY secret.
+ * When a directly configured token is present (WhatsApp_API_Secret), it is
+ * always preferred — this lets the platform owner bypass a misbehaving
+ * Replit connector by supplying their own long-lived Meta token. Otherwise,
+ * inside Replit, requests go through the connected WhatsApp Business
+ * connector (no secret ever touches this codebase). Outside Replit (e.g. a
+ * backend deployed to Render) with no direct token configured, sending fails
+ * with a clear error.
  */
 async function callWhatsAppApi(phoneNumberId: string, body: unknown): Promise<Response> {
   const path = `/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+
+  const token = getDirectToken();
+  if (token) {
+    return fetch(`https://graph.facebook.com${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  }
 
   if (isReplitRuntime()) {
     const connectors = new ReplitConnectors();
     return connectors.proxy(WHATSAPP_CONNECTOR, path, { method: "POST", body });
   }
 
-  const token = process.env.WHATSAPP_API_KEY;
-  if (!token) {
-    throw new Error(
-      "WhatsApp is not configured for this runtime: no Replit connector available and WHATSAPP_API_KEY is not set",
-    );
-  }
-
-  return fetch(`https://graph.facebook.com${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  throw new Error(
+    "WhatsApp is not configured for this runtime: no Replit connector available and no direct API token (WhatsApp_API_Secret) is set",
+  );
 }
 
 export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<boolean> {
