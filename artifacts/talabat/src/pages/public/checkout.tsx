@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
-import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useGetPublicRestaurant, usePlaceOrder, getGetPublicRestaurantQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { formatCurrency } from "@/lib/currency";
 
 // Fix leaflet marker icon
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -42,12 +43,11 @@ function LocationMarker({ position, setPosition }: { position: L.LatLng | null, 
       setPosition(e.latlng);
     },
   });
-  return position === null ? null : <Marker position={position} />;
+  return position === null ? null : <Marker position={position} draggable eventHandlers={{ dragend: event => setPosition(event.target.getLatLng()) }} />;
 }
 
 export default function PublicCheckout() {
   const { slug } = useParams<{ slug: string }>();
-  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { items, total, clearCart } = useCart();
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -66,6 +66,15 @@ export default function PublicCheckout() {
   });
 
   const [mapPosition, setMapPosition] = useState<L.LatLng | null>(null);
+  const fallbackPosition: [number, number] = [32.8872, 13.1913];
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setMapPosition(L.latLng(coords.latitude, coords.longitude)),
+      () => undefined,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
+  }, []);
 
   useEffect(() => {
     if (mapPosition) {
@@ -101,10 +110,10 @@ export default function PublicCheckout() {
         setOrderId(res.orderId);
         setOrderPlaced(true);
         clearCart();
-        toast.success(t("public.checkout.success"));
+        toast.success("تم تأكيد الطلب بنجاح!");
       },
       onError: () => {
-        toast.error(t("common.error"));
+        toast.error("حدث خطأ ما، يرجى المحاولة مرة أخرى.");
       }
     });
   };
@@ -114,10 +123,10 @@ export default function PublicCheckout() {
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-secondary/30">
         <Card className="w-full max-w-md border-none shadow-xl text-center p-8 hover-elevate">
           <CheckCircle2 className="h-20 w-20 text-emerald-500 mx-auto mb-6" />
-          <h2 className="text-3xl font-bold mb-2">{t("public.checkout.success")}</h2>
-          <p className="text-muted-foreground mb-6">Your order #{orderId?.toString().padStart(6, '0')} has been placed successfully and is being reviewed.</p>
+           <h2 className="text-3xl font-bold mb-2">تم تأكيد الطلب بنجاح!</h2>
+           <p className="text-muted-foreground mb-6">تم استلام طلبك رقم #{orderId?.toString().padStart(6, '0')} وهو قيد المراجعة.</p>
           <Link href={`/${slug}`}>
-            <Button className="w-full h-12 text-base">Back to Menu</Button>
+             <Button className="w-full h-12 text-base">العودة إلى القائمة</Button>
           </Link>
         </Card>
       </div>
@@ -131,7 +140,7 @@ export default function PublicCheckout() {
           <Link href={`/${slug}`} className="p-2 -ml-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-xl font-bold tracking-tight">{t("public.checkout.title")}</h1>
+           <h1 className="text-xl font-bold tracking-tight">إتمام الطلب</h1>
         </div>
       </div>
 
@@ -140,7 +149,7 @@ export default function PublicCheckout() {
           <Card className="border-none shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-primary" /> {t("public.checkout.contact")}
+                 <Receipt className="h-5 w-5 text-primary" /> معلومات الاتصال
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -152,9 +161,9 @@ export default function PublicCheckout() {
                       name="customerName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("public.checkout.name")}</FormLabel>
+                           <FormLabel>الاسم الكامل</FormLabel>
                           <FormControl>
-                            <Input placeholder="John Doe" className="h-12" {...field} />
+                             <Input placeholder="الاسم الكامل" className="h-12" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -165,9 +174,9 @@ export default function PublicCheckout() {
                       name="customerPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("public.checkout.phone")}</FormLabel>
+                           <FormLabel>رقم الهاتف</FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="+966 50 000 0000" className="h-12" {...field} />
+                             <Input type="tel" placeholder="+218 ..." className="h-12" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -176,11 +185,11 @@ export default function PublicCheckout() {
                   </div>
 
                   <div className="space-y-4">
-                    <FormLabel className={form.formState.errors.latitude ? "text-destructive" : ""}>
-                      {t("public.checkout.location")} *
-                    </FormLabel>
+                    <Label className={form.formState.errors.latitude ? "text-destructive" : ""}>
+                       موقع التوصيل *
+                    </Label>
                     <div className="h-[300px] w-full rounded-xl overflow-hidden border border-border">
-                      <MapContainer center={[24.7136, 46.6753]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                       <MapContainer center={mapPosition || fallbackPosition} zoom={13} style={{ height: '100%', width: '100%' }} key={mapPosition ? `${mapPosition.lat}-${mapPosition.lng}` : "fallback"}>
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                         <LocationMarker position={mapPosition} setPosition={setMapPosition} />
                       </MapContainer>
@@ -195,9 +204,9 @@ export default function PublicCheckout() {
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("public.checkout.notes")}</FormLabel>
+                           <FormLabel>ملاحظات الطلب (اختياري)</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Any special requests?" className="resize-none min-h-[100px]" {...field} />
+                             <Textarea placeholder="أي طلبات خاصة؟" className="resize-none min-h-[100px]" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -212,7 +221,7 @@ export default function PublicCheckout() {
         <div className="w-full lg:w-96 shrink-0 space-y-6">
           <Card className="border-none shadow-sm sticky top-40">
             <CardHeader className="bg-muted/50 pb-4 border-b">
-              <CardTitle>Order Summary</CardTitle>
+               <CardTitle>ملخص الطلب</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="p-4 space-y-4 max-h-[40vh] overflow-y-auto">
@@ -222,25 +231,25 @@ export default function PublicCheckout() {
                       <span className="font-semibold">{item.quantity}x</span>
                       <div>
                         <p className="font-medium text-foreground">{item.product.name}</p>
-                        {item.selectedAddonIds.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">Customized</p>}
+                         {item.selectedAddonIds.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">إضافات مخصصة</p>}
                       </div>
                     </div>
-                    <span className="font-medium whitespace-nowrap">{t("common.currency")}{(item.price * item.quantity).toFixed(2)}</span>
+                     <span className="font-medium whitespace-nowrap">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>
               <div className="p-4 border-t bg-card/50 space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{t("common.currency")}{total.toFixed(2)}</span>
+                   <span className="text-muted-foreground">المجموع الفرعي</span>
+                   <span>{formatCurrency(total)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Delivery</span>
-                  <span>{t("common.currency")}0.00</span>
+                   <span className="text-muted-foreground">التوصيل</span>
+                   <span>{formatCurrency(0)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                  <span>Total</span>
-                  <span className="text-primary">{t("common.currency")}{total.toFixed(2)}</span>
+                   <span>الإجمالي</span>
+                   <span className="text-primary">{formatCurrency(total)}</span>
                 </div>
                 
                 <Button 
@@ -249,7 +258,7 @@ export default function PublicCheckout() {
                   className="w-full h-14 mt-4 text-base font-semibold shadow-md"
                   disabled={placeOrder.isPending}
                 >
-                  {placeOrder.isPending ? t("common.loading") : t("public.checkout.placeOrder")}
+                   {placeOrder.isPending ? "جاري الإرسال..." : "تأكيد الطلب"}
                 </Button>
               </div>
             </CardContent>

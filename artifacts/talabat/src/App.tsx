@@ -6,7 +6,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ThemeProvider } from '@/components/theme-provider';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import '@/i18n';
 
 // Import layouts
 import { AdminLayout } from '@/components/layout/admin-layout';
@@ -20,7 +19,6 @@ import AdminRestaurants from '@/pages/admin/restaurants';
 import AdminRestaurantNew from '@/pages/admin/restaurants/new';
 import AdminRestaurantDetail from '@/pages/admin/restaurants/detail';
 import AdminRestaurantMenu from '@/pages/admin/restaurants/menu';
-import AdminOrders from '@/pages/admin/orders';
 import AdminDrivers from '@/pages/admin/drivers';
 import AdminSubscriptions from '@/pages/admin/subscriptions';
 import AdminAnalytics from '@/pages/admin/analytics';
@@ -61,7 +59,6 @@ function Router() {
                 <ProtectedRoute path="/admin/restaurants/:id/menu" component={AdminRestaurantMenu} />
                 <ProtectedRoute path="/admin/restaurants/:id" component={AdminRestaurantDetail} />
                 <ProtectedRoute path="/admin/restaurants" component={AdminRestaurants} />
-                <ProtectedRoute path="/admin/orders" component={AdminOrders} />
                 <ProtectedRoute path="/admin/drivers" component={AdminDrivers} />
                 <ProtectedRoute path="/admin/subscriptions" component={AdminSubscriptions} />
                 <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />

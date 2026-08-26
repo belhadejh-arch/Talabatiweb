@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Store, ShoppingBag, Truck, CreditCard, BarChart, Bell, Settings, LogOut, Menu, Moon, Sun, Languages } from "lucide-react";
+import { LayoutDashboard, Store, Truck, CreditCard, BarChart, Bell, Settings, LogOut, Menu, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { useLogout, useGetMe } from "@workspace/api-client-react";
@@ -10,27 +9,20 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
-  const { t, i18n } = useTranslation();
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
   
   const { data: user } = useGetMe();
   const logout = useLogout();
 
-  const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar');
-    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
-  };
-
   const navItems = [
-    { icon: LayoutDashboard, label: t("admin.sidebar.dashboard", "Dashboard"), path: "/admin/dashboard" },
-    { icon: Store, label: t("admin.sidebar.restaurants", "Restaurants"), path: "/admin/restaurants" },
-    { icon: ShoppingBag, label: t("admin.sidebar.orders", "Orders"), path: "/admin/orders" },
-    { icon: Truck, label: t("admin.sidebar.drivers", "Drivers"), path: "/admin/drivers" },
-    { icon: CreditCard, label: t("admin.sidebar.subscriptions", "Subscriptions"), path: "/admin/subscriptions" },
-    { icon: BarChart, label: t("admin.sidebar.analytics", "Analytics"), path: "/admin/analytics" },
-    { icon: Bell, label: t("admin.sidebar.notifications", "Notifications"), path: "/admin/notifications" },
-    { icon: Settings, label: t("admin.sidebar.settings", "Settings"), path: "/admin/settings" },
+    { icon: LayoutDashboard, label: "لوحة القيادة", path: "/admin/dashboard" },
+    { icon: Store, label: "المطاعم", path: "/admin/restaurants" },
+    { icon: Truck, label: "السائقون", path: "/admin/drivers" },
+    { icon: CreditCard, label: "الاشتراكات", path: "/admin/subscriptions" },
+    { icon: BarChart, label: "التحليلات", path: "/admin/analytics" },
+    { icon: Bell, label: "الإشعارات", path: "/admin/notifications" },
+    { icon: Settings, label: "الإعدادات", path: "/admin/settings" },
   ];
 
   const NavLinks = () => (
@@ -70,13 +62,13 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.username || 'Admin User'}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.role || 'Super Admin'}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email || user?.role || 'مدير النظام'}</p>
             </div>
           </div>
         </div>
         
         <div className="px-4 py-2">
-          <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">{t('admin.sidebar.menu', 'Main Menu')}</p>
+          <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-4 mb-2">القائمة الرئيسية</p>
         </div>
         <NavLinks />
         
@@ -91,7 +83,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             }}
           >
             <LogOut className="me-2 h-4 w-4" />
-            {t("admin.header.logout", "Logout")}
+            تسجيل الخروج
           </Button>
         </div>
       </aside>
@@ -107,7 +99,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side={i18n.language === 'ar' ? 'right' : 'left'} className="w-72 p-0 bg-sidebar border-sidebar-border text-sidebar-foreground">
+              <SheetContent side="right" className="w-72 p-0 bg-sidebar border-sidebar-border text-sidebar-foreground">
                 <div className="flex h-20 items-center px-6 border-b border-sidebar-border/50">
                   <span className="font-bold text-2xl tracking-tighter text-sidebar-foreground flex items-center gap-3">
                     <span className="text-white bg-primary w-8 h-8 rounded-lg flex items-center justify-center text-lg">T</span>
@@ -124,19 +116,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             
             <div className="hidden sm:block">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                {navItems.find(i => location.startsWith(i.path))?.label || "Dashboard"}
+                {navItems.find(i => location.startsWith(i.path))?.label || "لوحة القيادة"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {new Date().toLocaleDateString('ar-LY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="bg-card rounded-full p-1 shadow-sm border flex items-center">
-              <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground" onClick={toggleLanguage} title="Toggle Language">
-                <Languages className="h-4 w-4" />
-              </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 

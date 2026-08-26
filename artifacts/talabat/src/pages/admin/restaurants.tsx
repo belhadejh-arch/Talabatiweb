@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
 import { useListRestaurants, RestaurantStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, MoreHorizontal, Eye, FileEdit, Store } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { restaurantStatusLabel, subscriptionPlanLabel, subscriptionStatusLabel } from "@/lib/labels";
 
 export default function AdminRestaurants() {
-  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
@@ -48,10 +47,10 @@ export default function AdminRestaurants() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold tracking-tight">{t("admin.restaurants.title")}</h2>
+        <h2 className="text-2xl font-bold tracking-tight">المطاعم</h2>
         <Link href="/admin/restaurants/new" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
           <Plus className="mr-2 h-4 w-4" />
-          {t("admin.restaurants.add")}
+          إضافة مطعم
         </Link>
       </div>
 
@@ -62,7 +61,7 @@ export default function AdminRestaurants() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder={t("admin.restaurants.search")}
+                placeholder="البحث في المطاعم..."
                 className="w-full pl-9 bg-background/50 border-border"
                 value={search}
                 onChange={(e) => {
@@ -83,7 +82,7 @@ export default function AdminRestaurants() {
                   }}
                   className="whitespace-nowrap"
                 >
-                  {status === 'ALL' ? t("admin.restaurants.all") : t(`admin.restaurants.${status.toLowerCase()}`)}
+                  {status === 'ALL' ? "الكل" : ({ ACTIVE: "نشط", INACTIVE: "غير نشط", SUSPENDED: "موقوف" }[status] || status)}
                 </Button>
               ))}
             </div>
@@ -93,24 +92,24 @@ export default function AdminRestaurants() {
           <Table>
             <TableHeader>
               <TableRow className="border-border">
-                <TableHead>{t("admin.restaurants.name")}</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>{t("admin.restaurants.status")}</TableHead>
-                <TableHead>{t("admin.restaurants.plan")}</TableHead>
-                <TableHead className="text-right">{t("admin.restaurants.actions")}</TableHead>
+                <TableHead>الاسم</TableHead>
+                <TableHead>التواصل</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead>الخطة</TableHead>
+                <TableHead className="text-right">إجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    {t("common.loading")}
+                    جاري التحميل...
                   </TableCell>
                 </TableRow>
               ) : data?.data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No restaurants found
+                    لا توجد مطاعم
                   </TableCell>
                 </TableRow>
               ) : (
@@ -139,26 +138,26 @@ export default function AdminRestaurants() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getStatusColor(restaurant.status)}>
-                        {restaurant.status}
+                        {restaurantStatusLabel(restaurant.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {restaurant.subscription ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs font-semibold">{restaurant.subscription.plan}</span>
+                          <span className="text-xs font-semibold">{subscriptionPlanLabel(restaurant.subscription.plan)}</span>
                           <Badge variant="outline" className={`w-fit text-[10px] h-4 px-1 py-0 ${getSubColor(restaurant.subscription.status)}`}>
-                            {restaurant.subscription.status}
+                            {subscriptionStatusLabel(restaurant.subscription.status)}
                           </Badge>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No Plan</span>
+                        <span className="text-xs text-muted-foreground">لا توجد خطة</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                            <span className="sr-only">Open menu</span>
+                            <span className="sr-only">فتح القائمة</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -166,13 +165,13 @@ export default function AdminRestaurants() {
                           <Link href={`/admin/restaurants/${restaurant.id}`}>
                             <DropdownMenuItem className="cursor-pointer">
                               <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {t("admin.restaurants.view")}
+                              عرض التفاصيل
                             </DropdownMenuItem>
                           </Link>
                           <Link href={`/admin/restaurants/${restaurant.id}/menu`}>
                             <DropdownMenuItem className="cursor-pointer">
                               <FileEdit className="mr-2 h-4 w-4 text-muted-foreground" />
-                              Manage Menu
+                              إدارة القائمة
                             </DropdownMenuItem>
                           </Link>
                         </DropdownMenuContent>
@@ -193,10 +192,10 @@ export default function AdminRestaurants() {
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Previous
+                السابق
               </Button>
               <div className="text-sm font-medium">
-                Page {page} of {Math.ceil(data.total / limit)}
+                الصفحة {page} من {Math.ceil(data.total / limit)}
               </div>
               <Button
                 variant="outline"
@@ -204,7 +203,7 @@ export default function AdminRestaurants() {
                 onClick={() => setPage(p => p + 1)}
                 disabled={page >= Math.ceil(data.total / limit)}
               >
-                Next
+                التالي
               </Button>
             </div>
           )}

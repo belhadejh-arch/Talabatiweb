@@ -17,6 +17,8 @@ export interface LoginInput {
 export interface AdminUser {
   id: number;
   username: string;
+  /** @nullable */
+  email?: string | null;
   role: string;
 }
 
@@ -28,6 +30,12 @@ export interface PasswordChangeInput {
   currentPassword: string;
   /** @minLength 8 */
   newPassword: string;
+}
+
+export interface EmailChangeInput {
+  currentPassword: string;
+  /** @minLength 3 */
+  newEmail: string;
 }
 
 export type RestaurantStatus = typeof RestaurantStatus[keyof typeof RestaurantStatus];
@@ -190,6 +198,7 @@ export interface SubscriptionPatch {
   plan?: SubscriptionPatchPlan;
   status?: SubscriptionPatchStatus;
   extensionDays?: number;
+  renew?: boolean;
 }
 
 export interface SubscriptionListResponse {
@@ -312,6 +321,8 @@ export interface Driver {
   name: string;
   phone: string;
   /** @nullable */
+  address?: string | null;
+  /** @nullable */
   vehicleType?: string | null;
   /** @nullable */
   vehiclePlate?: string | null;
@@ -324,6 +335,7 @@ export interface DriverInput {
   /** @minLength 1 */
   name: string;
   phone: string;
+  address?: string;
   vehicleType?: string;
   vehiclePlate?: string;
   isActive?: boolean;
@@ -332,6 +344,8 @@ export interface DriverInput {
 export interface DriverPatch {
   name?: string;
   phone?: string;
+  /** @nullable */
+  address?: string | null;
   /** @nullable */
   vehicleType?: string | null;
   /** @nullable */

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/currency";
 
 export default function AdminRestaurantMenu() {
   const { id } = useParams();
@@ -40,25 +41,25 @@ export default function AdminRestaurantMenu() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Menu Editor</h2>
-            <p className="text-sm text-muted-foreground">{restaurant?.name || 'Loading...'}</p>
+            <h2 className="text-2xl font-bold tracking-tight">إدارة القائمة</h2>
+            <p className="text-sm text-muted-foreground">{restaurant?.name || 'جاري التحميل...'}</p>
           </div>
         </div>
         <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add Category
+          <Plus className="mr-2 h-4 w-4" /> إضافة قسم
         </Button>
       </div>
 
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Categories Sidebar */}
         <Card className="w-64 shrink-0 border-none shadow-sm flex flex-col">
-          <div className="p-4 border-b border-border font-semibold">Categories</div>
+          <div className="p-4 border-b border-border font-semibold">الأقسام</div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
               {loadingCategories ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">Loading...</div>
+                <div className="p-4 text-center text-sm text-muted-foreground">جاري التحميل...</div>
               ) : categories.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">No categories</div>
+                <div className="p-4 text-center text-sm text-muted-foreground">لا توجد أقسام</div>
               ) : (
                 categories.map(category => (
                   <button
@@ -68,7 +69,7 @@ export default function AdminRestaurantMenu() {
                   >
                     <div className="flex justify-between items-center">
                       <span>{category.name}</span>
-                      {!category.isAvailable && <Badge variant="secondary" className="text-[10px] h-4 px-1 py-0">Hidden</Badge>}
+                      {!category.isAvailable && <Badge variant="secondary" className="text-[10px] h-4 px-1 py-0">مخفي</Badge>}
                     </div>
                   </button>
                 ))
@@ -80,25 +81,25 @@ export default function AdminRestaurantMenu() {
         {/* Products Area */}
         <Card className="flex-1 border-none shadow-sm flex flex-col min-w-0">
           <div className="p-4 border-b border-border flex justify-between items-center bg-card/50">
-            <h3 className="font-semibold">{categories.find(c => c.id === activeCategory)?.name || 'Products'}</h3>
+            <h3 className="font-semibold">{categories.find(c => c.id === activeCategory)?.name || 'المنتجات'}</h3>
             <Button size="sm" variant="secondary" disabled={!activeCategory}>
-              <Plus className="mr-2 h-4 w-4" /> Add Product
+              <Plus className="mr-2 h-4 w-4" /> إضافة منتج
             </Button>
           </div>
           <ScrollArea className="flex-1 bg-secondary/10">
             <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
               {loadingProducts ? (
-                <div className="col-span-full p-8 text-center text-muted-foreground">Loading products...</div>
+                <div className="col-span-full p-8 text-center text-muted-foreground">جاري تحميل المنتجات...</div>
               ) : !activeCategory ? (
                 <div className="col-span-full p-12 text-center text-muted-foreground flex flex-col items-center">
                   <Package className="h-12 w-12 opacity-20 mb-4" />
-                  <p>Select a category to view products</p>
+                  <p>اختر قسماً لعرض المنتجات</p>
                 </div>
               ) : products.length === 0 ? (
                 <div className="col-span-full p-12 text-center text-muted-foreground flex flex-col items-center border-2 border-dashed border-border rounded-xl">
                   <Package className="h-12 w-12 opacity-20 mb-4" />
-                  <p>No products in this category</p>
-                  <Button variant="outline" className="mt-4">Add your first product</Button>
+                  <p>لا توجد منتجات في هذا القسم</p>
+                  <Button variant="outline" className="mt-4">إضافة أول منتج</Button>
                 </div>
               ) : (
                 products.map(product => (
@@ -117,15 +118,15 @@ export default function AdminRestaurantMenu() {
                           <MoreVertical className="h-4 w-4" />
                         </button>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">{product.description || 'No description'}</p>
+                      <p className="text-sm text-muted-foreground truncate">{product.description || 'لا يوجد وصف'}</p>
                       <div className="mt-auto pt-2 flex items-center justify-between">
-                        <span className="font-bold text-primary">${product.price.toFixed(2)}</span>
+                         <span className="font-bold text-primary">{formatCurrency(product.price)}</span>
                         <div className="flex items-center gap-2">
                           {product.addons && product.addons.length > 0 && (
-                            <Badge variant="outline" className="text-[10px] h-5">{product.addons.length} Add-ons</Badge>
+                            <Badge variant="outline" className="text-[10px] h-5">{product.addons.length} إضافات</Badge>
                           )}
                           {!product.isAvailable && (
-                            <Badge variant="secondary" className="text-[10px] h-5 bg-slate-500/10 text-slate-500 hover:bg-slate-500/20">Hidden</Badge>
+                            <Badge variant="secondary" className="text-[10px] h-5 bg-slate-500/10 text-slate-500 hover:bg-slate-500/20">مخفي</Badge>
                           )}
                         </div>
                       </div>

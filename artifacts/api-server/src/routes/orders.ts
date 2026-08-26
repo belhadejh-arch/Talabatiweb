@@ -193,7 +193,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
   // Create notification
   await db.insert(notificationsTable).values({
     type: "DRIVER_ASSIGNED",
-    message: `Driver "${driver.name}" assigned to order #${id}`,
+    message: `تم تعيين السائق "${driver.name}" للطلب #${id}`,
     relatedId: id,
     relatedType: "order",
   });
@@ -217,7 +217,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       items: itemsSummary,
-      total: `${parseFloat(order.totalAmount)} SAR`,
+      total: `${parseFloat(order.totalAmount).toFixed(2)} د.ل`,
       mapsUrl: order.mapsUrl,
       driverPhone: driver.phone,
     }).catch(() => {}); // fire and forget

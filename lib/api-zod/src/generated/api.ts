@@ -28,6 +28,7 @@ export const LoginResponse = zod.object({
   "user": zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "role": zod.string()
 })
 })
@@ -45,6 +46,7 @@ export const LogoutResponse = zod.unknown()
 export const GetMeResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
+  "email": zod.string().nullish(),
   "role": zod.string()
 })
 
@@ -62,6 +64,26 @@ export const ChangePasswordBody = zod.object({
 })
 
 export const ChangePasswordResponse = zod.unknown()
+
+
+/**
+ * @summary Change admin email
+ */
+export const changeEmailBodyNewEmailMin = 3;
+
+
+
+export const ChangeEmailBody = zod.object({
+  "currentPassword": zod.string(),
+  "newEmail": zod.string().min(changeEmailBodyNewEmailMin)
+})
+
+export const ChangeEmailResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "email": zod.string().nullish(),
+  "role": zod.string()
+})
 
 
 /**
@@ -325,7 +347,8 @@ export const UpdateSubscriptionParams = zod.object({
 export const UpdateSubscriptionBody = zod.object({
   "plan": zod.enum(['TRIAL', 'MONTHLY', 'YEARLY']).optional(),
   "status": zod.enum(['TRIAL', 'ACTIVE', 'EXPIRED', 'SUSPENDED', 'INACTIVE']).optional(),
-  "extensionDays": zod.number().optional()
+  "extensionDays": zod.number().optional(),
+  "renew": zod.boolean().optional()
 })
 
 export const UpdateSubscriptionResponse = zod.object({
@@ -678,6 +701,7 @@ export const ListDriversResponseItem = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -700,6 +724,7 @@ export const CreateDriverParams = zod.object({
 export const CreateDriverBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string(),
+  "address": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "vehiclePlate": zod.string().optional(),
   "isActive": zod.boolean().optional()
@@ -710,6 +735,7 @@ export const CreateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -728,6 +754,7 @@ export const UpdateDriverParams = zod.object({
 export const UpdateDriverBody = zod.object({
   "name": zod.string().optional(),
   "phone": zod.string().optional(),
+  "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean().optional()
@@ -738,6 +765,7 @@ export const UpdateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),

@@ -8,7 +8,7 @@ export const settingsTable = pgTable("settings", {
   whatsappApiKey: text("whatsapp_api_key"),
   whatsappPhoneId: text("whatsapp_phone_id"),
   whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
-  defaultCurrency: text("default_currency").notNull().default("SAR"),
+  defaultCurrency: text("default_currency").notNull().default("LYD"),
   mapsApiKey: text("maps_api_key"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

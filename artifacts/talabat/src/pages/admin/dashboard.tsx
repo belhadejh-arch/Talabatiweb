@@ -1,14 +1,12 @@
-import { useTranslation } from "react-i18next";
 import { useGetAnalyticsSummary, useGetOrdersOverTime, useGetRevenueOverTime, useGetTopRestaurants, getGetAnalyticsSummaryQueryKey, getGetOrdersOverTimeQueryKey, getGetRevenueOverTimeQueryKey, getGetTopRestaurantsQueryKey, useGetMe } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Store, ShoppingBag, DollarSign, Activity, TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/lib/currency";
 
 export default function AdminDashboard() {
-  const { t } = useTranslation();
-  
   const { data: user } = useGetMe();
   const { data: summary, isLoading: loadingSummary } = useGetAnalyticsSummary(undefined, { query: { queryKey: getGetAnalyticsSummaryQueryKey() } });
   const { data: ordersData } = useGetOrdersOverTime(undefined, { query: { queryKey: getGetOrdersOverTimeQueryKey() } });
@@ -17,15 +15,15 @@ export default function AdminDashboard() {
 
   const stats = [
     {
-      title: t("admin.dashboard.totalRevenue", "Total Revenue"),
-      value: `${t("common.currency", "$")}${summary?.totalRevenue?.toLocaleString() || 0}`,
+      title: "إجمالي الإيرادات",
+      value: formatCurrency(summary?.totalRevenue || 0),
       trend: "+12.5%",
       icon: DollarSign,
       color: "text-emerald-500",
       bgColor: "bg-emerald-500/10"
     },
     {
-      title: t("admin.dashboard.totalOrders", "Total Orders"),
+      title: "إجمالي الطلبات",
       value: summary?.totalOrders?.toLocaleString() || 0,
       trend: "+8.2%",
       icon: ShoppingBag,
@@ -33,7 +31,7 @@ export default function AdminDashboard() {
       bgColor: "bg-blue-500/10"
     },
     {
-      title: t("admin.dashboard.activeRestaurants", "Restaurants"),
+      title: "المطاعم النشطة",
       value: summary?.activeRestaurants?.toLocaleString() || 0,
       trend: "+2",
       icon: Store,
@@ -41,7 +39,7 @@ export default function AdminDashboard() {
       bgColor: "bg-primary/10"
     },
     {
-      title: t("admin.dashboard.activeDrivers", "Drivers"),
+      title: "السائقون النشطون",
       value: summary?.activeRestaurants ? Math.floor(summary.activeRestaurants * 2.5) : 0,
       trend: "-1",
       icon: Activity,
@@ -74,7 +72,7 @@ export default function AdminDashboard() {
                   <span className="text-3xl font-bold tracking-tight">{stat.value}</span>
                   <span className="text-xs font-medium text-emerald-500 flex items-center gap-1">
                     <TrendingUp className="h-3 w-3" />
-                    {stat.trend} from last month
+                    {stat.trend} عن الشهر الماضي
                   </span>
                 </div>
               )}
@@ -87,8 +85,8 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border border-border/50 shadow-sm rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold">{t("admin.dashboard.revenueOverTime", "Revenue Overview")}</CardTitle>
-            <CardDescription>Daily revenue generation across all branches</CardDescription>
+            <CardTitle className="text-lg font-semibold">الإيرادات بمرور الوقت</CardTitle>
+            <CardDescription>الإيرادات اليومية عبر جميع الفروع</CardDescription>
           </CardHeader>
           <CardContent className="h-[320px] pt-4">
             {revenueData ? (
@@ -102,7 +100,7 @@ export default function AdminDashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} dx={-10} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatCurrency} dx={-10} />
                   <RechartsTooltip 
                     contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
@@ -121,8 +119,8 @@ export default function AdminDashboard() {
 
         <Card className="border border-border/50 shadow-sm rounded-2xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold">{t("admin.dashboard.ordersOverTime", "Order Volume")}</CardTitle>
-            <CardDescription>Number of successful orders delivered</CardDescription>
+            <CardTitle className="text-lg font-semibold">الطلبات بمرور الوقت</CardTitle>
+            <CardDescription>عدد الطلبات الناجحة التي تم توصيلها</CardDescription>
           </CardHeader>
           <CardContent className="h-[320px] pt-4">
             {ordersData ? (
@@ -157,16 +155,16 @@ export default function AdminDashboard() {
       {/* Top Restaurants Table */}
       <Card className="border border-border/50 shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="bg-muted/30 border-b border-border/50">
-          <CardTitle className="text-lg font-semibold">{t("admin.dashboard.topRestaurants", "Top Performing Restaurants")}</CardTitle>
-          <CardDescription>Based on total sales volume and revenue</CardDescription>
+          <CardTitle className="text-lg font-semibold">أفضل المطاعم</CardTitle>
+          <CardDescription>حسب إجمالي حجم المبيعات والإيرادات</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-transparent hover:bg-transparent">
               <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="ps-6 font-semibold text-muted-foreground">{t("admin.restaurants.name", "Restaurant Name")}</TableHead>
-                <TableHead className="text-end font-semibold text-muted-foreground">{t("admin.dashboard.totalOrders", "Total Orders")}</TableHead>
-                <TableHead className="text-end pe-6 font-semibold text-muted-foreground">{t("admin.dashboard.totalRevenue", "Revenue")}</TableHead>
+                <TableHead className="ps-6 font-semibold text-muted-foreground">اسم المطعم</TableHead>
+                <TableHead className="text-end font-semibold text-muted-foreground">إجمالي الطلبات</TableHead>
+                <TableHead className="text-end pe-6 font-semibold text-muted-foreground">الإيرادات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,7 +184,7 @@ export default function AdminDashboard() {
                     </div>
                   </TableCell>
                   <TableCell className="text-end pe-6 py-4 font-bold text-emerald-600">
-                    {t("common.currency", "$")}{rest.totalRevenue.toLocaleString()}
+                    {formatCurrency(rest.totalRevenue)}
                   </TableCell>
                 </TableRow>
               ))}

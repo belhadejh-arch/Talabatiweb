@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: talabat-api
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: WHATSAPP_API_KEY
+        sync: false

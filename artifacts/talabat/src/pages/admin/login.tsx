@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,7 +15,6 @@ const loginSchema = z.object({
 });
 
 export default function AdminLogin() {
-  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const login = useLogin();
 
@@ -60,8 +58,8 @@ export default function AdminLogin() {
         </div>
 
         <CardHeader className="space-y-1 text-center pt-8 pb-6">
-          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">{t('admin.login.title', 'Welcome back!')}</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">{t('admin.login.subtitle', 'Sign in to continue to your dashboard')}</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">مرحباً بعودتك</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">تسجيل الدخول إلى مركز تحكم طلبات</CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-10">
           <Form {...form}>
@@ -71,7 +69,7 @@ export default function AdminLogin() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground/80">{t('admin.login.email', 'Username')}</FormLabel>
+                    <FormLabel className="text-foreground/80">البريد الإلكتروني أو اسم المستخدم</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="admin" 
@@ -90,7 +88,7 @@ export default function AdminLogin() {
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center">
-                      <FormLabel className="text-foreground/80">{t('admin.login.password', 'Password')}</FormLabel>
+                      <FormLabel className="text-foreground/80">كلمة المرور</FormLabel>
                     </div>
                     <FormControl>
                       <Input 
@@ -108,7 +106,7 @@ export default function AdminLogin() {
               
               {login.isError && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl text-center font-medium animate-in fade-in slide-in-from-top-2">
-                  {t('admin.login.error', 'Invalid credentials')}
+                  بيانات الاعتماد غير صالحة
                 </div>
               )}
               
@@ -121,10 +119,10 @@ export default function AdminLogin() {
                   {login.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {t('admin.login.signingIn', 'Signing In...')}
+                      جاري تسجيل الدخول...
                     </>
                   ) : (
-                    t('admin.login.submit', 'Login')
+                    "تسجيل الدخول"
                   )}
                 </Button>
               </div>

@@ -74,21 +74,33 @@ router.patch("/restaurants/:id/subscription", requireAuth, async (req, res): Pro
 
   const updates: Record<string, any> = {};
 
-  if (parsed.data.status) updates.status = parsed.data.status;
-
-  if (parsed.data.plan) {
-    const { startDate, expiryDate, status } = computeSubscriptionDates(parsed.data.plan);
-    updates.plan = parsed.data.plan;
+  if (parsed.data.renew) {
+    // Renew: reset the billing cycle to start today, keeping (or switching)
+    // the plan. Does not touch the restaurant or any of its data.
+    const planToUse = parsed.data.plan ?? current.plan;
+    const { startDate, expiryDate, status } = computeSubscriptionDates(planToUse);
+    updates.plan = planToUse;
     updates.startDate = startDate;
     updates.expiryDate = expiryDate;
-    if (!parsed.data.status) updates.status = status;
-  }
+    updates.status = parsed.data.status ?? status;
+  } else {
+    if (parsed.data.status) updates.status = parsed.data.status;
 
-  if (parsed.data.extensionDays) {
-    const currentExpiry = new Date(current.expiryDate);
-    currentExpiry.setDate(currentExpiry.getDate() + parsed.data.extensionDays);
-    updates.expiryDate = currentExpiry.toISOString().slice(0, 10);
-    if (!parsed.data.status) updates.status = "ACTIVE";
+    if (parsed.data.plan) {
+      // Upgrade / downgrade: switching plan restarts the billing cycle.
+      const { startDate, expiryDate, status } = computeSubscriptionDates(parsed.data.plan);
+      updates.plan = parsed.data.plan;
+      updates.startDate = startDate;
+      updates.expiryDate = expiryDate;
+      if (!parsed.data.status) updates.status = status;
+    }
+
+    if (parsed.data.extensionDays) {
+      const currentExpiry = new Date(current.expiryDate);
+      currentExpiry.setDate(currentExpiry.getDate() + parsed.data.extensionDays);
+      updates.expiryDate = currentExpiry.toISOString().slice(0, 10);
+      if (!parsed.data.status) updates.status = "ACTIVE";
+    }
   }
 
   const [updated] = await db

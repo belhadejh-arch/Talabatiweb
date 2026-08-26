@@ -1,4 +1,9 @@
+import { ReplitConnectors } from "@replit/connectors-sdk";
+import { db, settingsTable } from "@workspace/db";
 import { logger } from "./logger";
+
+const WHATSAPP_CONNECTOR = "whatsapp-business";
+const GRAPH_API_VERSION = "v23.0";
 
 interface WhatsAppMessagePayload {
   restaurantName: string;
@@ -11,11 +16,55 @@ interface WhatsAppMessagePayload {
   driverPhone: string;
 }
 
-export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<boolean> {
-  const { WHATSAPP_API_KEY, WHATSAPP_PHONE_ID } = process.env;
+/** True when running inside a Replit environment (dev workspace or a Replit deployment). */
+function isReplitRuntime(): boolean {
+  return !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL);
+}
 
-  if (!WHATSAPP_API_KEY || !WHATSAPP_PHONE_ID) {
-    logger.warn("WhatsApp not configured — skipping message send");
+/**
+ * Sends a WhatsApp Cloud API request.
+ *
+ * Inside Replit, requests go through the connected WhatsApp Business connector
+ * (no secret ever touches this codebase). Outside Replit (e.g. a backend
+ * deployed to Render), the connector proxy is unavailable, so we fall back to
+ * a directly configured long-lived token via the WHATSAPP_API_KEY secret.
+ */
+async function callWhatsAppApi(phoneNumberId: string, body: unknown): Promise<Response> {
+  const path = `/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+
+  if (isReplitRuntime()) {
+    const connectors = new ReplitConnectors();
+    return connectors.proxy(WHATSAPP_CONNECTOR, path, { method: "POST", body });
+  }
+
+  const token = process.env.WHATSAPP_API_KEY;
+  if (!token) {
+    throw new Error(
+      "WhatsApp is not configured for this runtime: no Replit connector available and WHATSAPP_API_KEY is not set",
+    );
+  }
+
+  return fetch(`https://graph.facebook.com${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<boolean> {
+  const [settings] = await db.select().from(settingsTable);
+
+  if (!settings?.whatsappEnabled) {
+    logger.warn("WhatsApp is disabled in settings — skipping message send");
+    return false;
+  }
+
+  const phoneNumberId = settings.whatsappPhoneId;
+  if (!phoneNumberId) {
+    logger.warn("WhatsApp phone number ID is not configured — skipping message send");
     return false;
   }
 
@@ -29,25 +78,16 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
 📍 موقع العميل: ${payload.mapsUrl}`;
 
   try {
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${WHATSAPP_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: payload.driverPhone,
-          type: "text",
-          text: { body: message },
-        }),
-      },
-    );
+    const response = await callWhatsAppApi(phoneNumberId, {
+      messaging_product: "whatsapp",
+      to: payload.driverPhone,
+      type: "text",
+      text: { body: message },
+    });
 
     if (!response.ok) {
-      logger.error({ status: response.status }, "WhatsApp API error");
+      const errorBody = await response.text().catch(() => "");
+      logger.error({ status: response.status, errorBody }, "WhatsApp API error");
       return false;
     }
 

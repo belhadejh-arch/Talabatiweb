@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import { useListSubscriptions } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { subscriptionPlanLabel, subscriptionStatusLabel } from "@/lib/labels";
 
 export default function AdminSubscriptions() {
-  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   
   const { data, isLoading } = useListSubscriptions({ page, limit: 15 });
@@ -24,7 +23,7 @@ export default function AdminSubscriptions() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">{t("admin.sidebar.subscriptions")}</h2>
+        <h2 className="text-2xl font-bold tracking-tight">الاشتراكات</h2>
       </div>
 
       <Card className="border-none shadow-sm">
@@ -32,35 +31,35 @@ export default function AdminSubscriptions() {
           <Table>
             <TableHeader>
               <TableRow className="border-border">
-                <TableHead>Restaurant ID</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>Expiry Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>رقم المطعم</TableHead>
+                <TableHead>الخطة</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead>تاريخ البدء</TableHead>
+                <TableHead>تاريخ الانتهاء</TableHead>
+                <TableHead className="text-right">الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Loading...</TableCell>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">جارٍ التحميل...</TableCell>
                 </TableRow>
               ) : !data?.data?.length ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No subscriptions found</TableCell>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">لا توجد اشتراكات</TableCell>
                 </TableRow>
               ) : (
                 data.data.map(sub => (
                   <TableRow key={sub.id} className="border-border">
-                    <TableCell className="font-medium">Rest #{sub.restaurantId}</TableCell>
-                    <TableCell className="font-semibold">{sub.plan}</TableCell>
+                    <TableCell className="font-medium">مطعم #{sub.restaurantId}</TableCell>
+                    <TableCell className="font-semibold">{subscriptionPlanLabel(sub.plan)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={getStatusColor(sub.status)}>{sub.status}</Badge>
+                      <Badge variant="outline" className={getStatusColor(sub.status)}>{subscriptionStatusLabel(sub.status)}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{new Date(sub.startDate).toLocaleDateString()}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{new Date(sub.expiryDate).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm">Renew</Button>
+                      <Button variant="outline" size="sm">تجديد</Button>
                     </TableCell>
                   </TableRow>
                 ))

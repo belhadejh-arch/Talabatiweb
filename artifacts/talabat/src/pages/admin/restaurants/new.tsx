@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,7 +27,6 @@ const formSchema = z.object({
 });
 
 export default function AdminRestaurantNew() {
-  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createRestaurant = useCreateRestaurant();
@@ -70,7 +68,7 @@ export default function AdminRestaurantNew() {
         <Link href="/admin/restaurants" className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h2 className="text-2xl font-bold tracking-tight">{t("admin.restaurants.add")}</h2>
+        <h2 className="text-2xl font-bold tracking-tight">إضافة مطعم</h2>
       </div>
 
       <Card className="border-none shadow-sm">
@@ -80,8 +78,8 @@ export default function AdminRestaurantNew() {
               <Store className="h-6 w-6" />
             </div>
             <div>
-              <CardTitle>Restaurant Information</CardTitle>
-              <CardDescription>Enter the details for the new restaurant.</CardDescription>
+              <CardTitle>معلومات المطعم</CardTitle>
+              <CardDescription>أدخل تفاصيل المطعم الجديد.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -94,9 +92,9 @@ export default function AdminRestaurantNew() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Restaurant Name *</FormLabel>
+                      <FormLabel>اسم المطعم *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Al Baik" {...field} />
+                        <Input placeholder="مثال: مطعم الأصالة" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -107,11 +105,11 @@ export default function AdminRestaurantNew() {
                   name="slug"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>URL Slug *</FormLabel>
+                      <FormLabel>الرابط المختصر *</FormLabel>
                       <FormControl>
                         <div className="flex items-center">
                           <span className="flex items-center h-10 px-3 bg-muted border border-r-0 border-input rounded-l-md text-sm text-muted-foreground">talabat.app/</span>
-                          <Input className="rounded-l-none" placeholder="al-baik" {...field} />
+                          <Input className="rounded-l-none" placeholder="al-asala" {...field} />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -124,9 +122,9 @@ export default function AdminRestaurantNew() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number *</FormLabel>
+                      <FormLabel>رقم الهاتف *</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="+966 50 000 0000" {...field} />
+                        <Input type="tel" placeholder="+218 ..." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -137,9 +135,9 @@ export default function AdminRestaurantNew() {
                   name="whatsappNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>WhatsApp Number</FormLabel>
+                      <FormLabel>رقم واتساب</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="+966 50 000 0000" {...field} />
+                        <Input type="tel" placeholder="+218 ..." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -151,9 +149,9 @@ export default function AdminRestaurantNew() {
                   name="address"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Full Address *</FormLabel>
+                      <FormLabel>العنوان الكامل *</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="123 Main St, City, Country" className="resize-none" {...field} />
+                        <Textarea placeholder="الشارع، الحي، المدينة" className="resize-none" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -165,9 +163,9 @@ export default function AdminRestaurantNew() {
                   name="description"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>الوصف</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Brief description of the restaurant" className="resize-none" {...field} />
+                        <Textarea placeholder="وصف مختصر عن المطعم" className="resize-none" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -179,17 +177,17 @@ export default function AdminRestaurantNew() {
                   name="subscriptionPlan"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2 max-w-sm">
-                      <FormLabel>Initial Subscription Plan *</FormLabel>
+                      <FormLabel>خطة الاشتراك الأولية *</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a plan" />
+                            <SelectValue placeholder="اختر خطة" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={RestaurantInputSubscriptionPlan.TRIAL}>14-Day Trial</SelectItem>
-                          <SelectItem value={RestaurantInputSubscriptionPlan.MONTHLY}>Monthly Pro</SelectItem>
-                          <SelectItem value={RestaurantInputSubscriptionPlan.YEARLY}>Yearly Pro</SelectItem>
+                          <SelectItem value={RestaurantInputSubscriptionPlan.TRIAL}>تجربة مجانية لمدة 7 أيام</SelectItem>
+                          <SelectItem value={RestaurantInputSubscriptionPlan.MONTHLY}>اشتراك شهري</SelectItem>
+                          <SelectItem value={RestaurantInputSubscriptionPlan.YEARLY}>اشتراك سنوي</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -200,10 +198,10 @@ export default function AdminRestaurantNew() {
 
               <div className="flex justify-end gap-4 border-t border-border pt-6">
                 <Link href="/admin/restaurants" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
-                  {t("common.cancel")}
+                  إلغاء
                 </Link>
                 <Button type="submit" disabled={createRestaurant.isPending}>
-                  {createRestaurant.isPending ? t("common.loading") : t("common.save")}
+                  {createRestaurant.isPending ? "جاري الحفظ..." : "حفظ"}
                 </Button>
               </div>
             </form>

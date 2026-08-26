@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useTranslation } from "react-i18next";
 import { useGetPublicMenu, getGetPublicMenuQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,21 +8,21 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MapPin, Phone, Info, Plus, Minus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { Separator } from "@/components/ui/separator";
+import { formatCurrency } from "@/lib/currency";
 
 export default function PublicRestaurant() {
   const { slug } = useParams<{ slug: string }>();
-  const { t } = useTranslation();
   const { data: menuData, isLoading } = useGetPublicMenu(slug, { query: { queryKey: getGetPublicMenuQueryKey(slug), enabled: !!slug } });
   
   const { items, addItem, removeItem, updateQuantity, total, itemCount } = useCart();
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center text-muted-foreground">{t("common.loading")}</div>;
+    return <div className="flex h-screen items-center justify-center text-muted-foreground">جاري التحميل...</div>;
   }
 
   if (!menuData) {
-    return <div className="flex h-screen items-center justify-center text-muted-foreground">Restaurant not found.</div>;
+    return <div className="flex h-screen items-center justify-center text-muted-foreground">المطعم غير موجود.</div>;
   }
 
   const { restaurant, categories } = menuData;
@@ -92,9 +91,9 @@ export default function PublicRestaurant() {
                           <h4 className="font-semibold text-lg">{product.name}</h4>
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-4 mt-1">{product.description}</p>
                           <div className="mt-auto flex items-center justify-between">
-                            <span className="font-bold text-primary">{t("common.currency")}{product.price.toFixed(2)}</span>
+                             <span className="font-bold text-primary">{formatCurrency(product.price)}</span>
                             <Button size="sm" onClick={() => addItem(product, 1)}>
-                              <Plus className="h-4 w-4 mr-1" /> Add
+                              <Plus className="h-4 w-4 mr-1" /> إضافة
                             </Button>
                           </div>
                         </div>
@@ -118,7 +117,7 @@ export default function PublicRestaurant() {
             <Card className="border-none shadow-lg">
               <div className="p-4 bg-primary text-primary-foreground rounded-t-xl flex items-center justify-between">
                 <h3 className="font-bold flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5" /> {t("public.cart.title")}
+                   <ShoppingBag className="h-5 w-5" /> طلبك
                 </h3>
                 <Badge variant="secondary" className="bg-primary-foreground text-primary hover:bg-primary-foreground">{itemCount}</Badge>
               </div>
@@ -126,7 +125,7 @@ export default function PublicRestaurant() {
                 {items.length === 0 ? (
                   <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                     <ShoppingBag className="h-12 w-12 opacity-20 mb-4" />
-                    <p>{t("public.cart.empty")}</p>
+                     <p>سلة التسوق فارغة</p>
                   </div>
                 ) : (
                   <div className="flex flex-col max-h-[calc(100vh-16rem)]">
@@ -142,9 +141,9 @@ export default function PublicRestaurant() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold truncate pr-2">{item.product.name}</p>
                               {item.selectedAddonIds.length > 0 && (
-                                <p className="text-xs text-muted-foreground line-clamp-1">With add-ons</p>
+                                <p className="text-xs text-muted-foreground line-clamp-1">مع إضافات</p>
                               )}
-                              <p className="text-sm font-medium text-primary mt-1">{t("common.currency")}{(item.price * item.quantity).toFixed(2)}</p>
+                               <p className="text-sm font-medium text-primary mt-1">{formatCurrency(item.price * item.quantity)}</p>
                             </div>
                           </div>
                         ))}
@@ -152,11 +151,11 @@ export default function PublicRestaurant() {
                     </ScrollArea>
                     <div className="p-4 border-t border-border bg-card/50">
                       <div className="flex justify-between items-center mb-4">
-                        <span className="font-medium">{t("public.cart.total")}</span>
-                        <span className="font-bold text-lg">{t("common.currency")}{total.toFixed(2)}</span>
+                         <span className="font-medium">الإجمالي</span>
+                         <span className="font-bold text-lg">{formatCurrency(total)}</span>
                       </div>
                       <Link href={`/${slug}/checkout`}>
-                        <Button className="w-full h-12 text-base font-semibold shadow-md">{t("public.cart.checkout")}</Button>
+                         <Button className="w-full h-12 text-base font-semibold shadow-md">متابعة الدفع</Button>
                       </Link>
                     </div>
                   </div>
@@ -172,7 +171,7 @@ export default function PublicRestaurant() {
             <Link href={`/${slug}/checkout`}>
               <Button className="w-full h-14 text-base font-semibold shadow-xl flex justify-between px-6 bg-primary hover:bg-primary/90">
                 <span className="flex items-center gap-2"><Badge variant="secondary" className="bg-primary-foreground text-primary">{itemCount}</Badge> Items</span>
-                <span>{t("public.cart.checkout")} • {t("common.currency")}{total.toFixed(2)}</span>
+                 <span>متابعة الدفع • {formatCurrency(total)}</span>
               </Button>
             </Link>
           </div>

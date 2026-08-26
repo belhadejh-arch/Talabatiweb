@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import { useListNotifications, useMarkAllNotificationsRead, useMarkNotificationRead } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 export default function AdminNotifications() {
-  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   
@@ -49,14 +47,14 @@ export default function AdminNotifications() {
             <Bell className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">{t("admin.sidebar.notifications")}</h2>
-            <p className="text-sm text-muted-foreground">Manage platform alerts</p>
+            <h2 className="text-2xl font-bold tracking-tight">الإشعارات</h2>
+            <p className="text-sm text-muted-foreground">إدارة تنبيهات المنصة</p>
           </div>
         </div>
         
         {data?.unreadCount ? (
           <Button variant="outline" onClick={handleMarkAllRead} disabled={markAllRead.isPending}>
-            <Check className="mr-2 h-4 w-4" /> Mark all read
+            <Check className="mr-2 h-4 w-4" /> تعليم الكل كمقروء
           </Button>
         ) : null}
       </div>
@@ -65,11 +63,11 @@ export default function AdminNotifications() {
         <CardContent className="p-0">
           <div className="divide-y divide-border">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              <div className="p-8 text-center text-muted-foreground">جارٍ التحميل...</div>
             ) : data?.data.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                 <Bell className="h-12 w-12 opacity-20 mb-4" />
-                <p>No notifications</p>
+                <p>لا توجد إشعارات</p>
               </div>
             ) : (
               data?.data.map((notification) => (
@@ -105,9 +103,9 @@ export default function AdminNotifications() {
           
           {data && data.total > 20 && (
             <div className="flex items-center justify-between p-4 border-t border-border">
-              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
-              <div className="text-sm font-medium">Page {page} of {Math.ceil(data.total / 20)}</div>
-              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(data.total / 20)}>Next</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>السابق</Button>
+              <div className="text-sm font-medium">صفحة {page} من {Math.ceil(data.total / 20)}</div>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(data.total / 20)}>التالي</Button>
             </div>
           )}
         </CardContent>

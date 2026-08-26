@@ -97,6 +97,25 @@ paths:
         "200":
           description: Password changed
 
+  /auth/change-email:
+    patch:
+      operationId: changeEmail
+      tags: [auth]
+      summary: Change admin email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailChangeInput"
+      responses:
+        "200":
+          description: Email changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+
   # ── Restaurants ──────────────────────────────────────────────────────────────
   /restaurants:
     get:
@@ -1106,6 +1125,7 @@ components:
       properties:
         id: { type: number }
         username: { type: string }
+        email: { type: ["string", "null"] }
         role: { type: string }
 
     PasswordChangeInput:
@@ -1114,6 +1134,13 @@ components:
       properties:
         currentPassword: { type: string }
         newPassword: { type: string, minLength: 8 }
+
+    EmailChangeInput:
+      type: object
+      required: [currentPassword, newEmail]
+      properties:
+        currentPassword: { type: string }
+        newEmail: { type: string, minLength: 3 }
 
     # ── Restaurant ──────────────────────────────────────────────────────────────
     Restaurant:
@@ -1221,6 +1248,7 @@ components:
           type: string
           enum: [TRIAL, ACTIVE, EXPIRED, SUSPENDED, INACTIVE]
         extensionDays: { type: number }
+        renew: { type: boolean }
 
     SubscriptionListResponse:
       type: object
@@ -1352,6 +1380,7 @@ components:
         restaurantId: { type: number }
         name: { type: string }
         phone: { type: string }
+        address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
         isActive: { type: boolean }
@@ -1364,6 +1393,7 @@ components:
       properties:
         name: { type: string, minLength: 1 }
         phone: { type: string }
+        address: { type: string }
         vehicleType: { type: string }
         vehiclePlate: { type: string }
         isActive: { type: boolean }
@@ -1373,6 +1403,7 @@ components:
       properties:
         name: { type: string }
         phone: { type: string }
+        address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
         isActive: { type: boolean }

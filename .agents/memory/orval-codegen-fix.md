@@ -16,3 +16,10 @@ In `lib/api-spec/orval.config.ts`, do NOT include the `schemas` option in the Zo
 orval --config ./orval.config.ts && printf '...' > ../../lib/api-zod/src/index.ts && pnpm -w run typecheck:libs
 ```
 The printf resets index.ts to only `export * from "./generated/api"` after each Orval run.
+
+## Avoid `format: email` with pinned zod v3
+Do not use `format: email` on a `type: string` OpenAPI schema. Orval emits `zod.email()` for it, which does not exist on the pinned zod v3 (that API is zod v4+), breaking the generated Zod schemas.
+
+**Why:** Silent version-mismatch — the generated code looks correct but fails to compile/import because `zod.email()` isn't a v3 method.
+
+**How to apply:** Use `type: string, minLength: n` (optionally with a regex `pattern`) for email-like fields instead of `format: email`.

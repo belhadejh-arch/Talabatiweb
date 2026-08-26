@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import { 
   useGetAnalyticsSummary, 
   useGetOrdersOverTime, 
@@ -15,9 +14,9 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, Users, ShoppingCart, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/lib/currency";
 
 export default function AdminAnalytics() {
-  const { t } = useTranslation();
   const [period, setPeriod] = useState<any>('month');
 
   const { data: summary, isLoading: loadingSummary } = useGetAnalyticsSummary({ period });
@@ -33,20 +32,20 @@ export default function AdminAnalytics() {
       {/* Header & Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card p-4 sm:p-6 rounded-2xl border border-border/50 shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Platform Analytics</h2>
-          <p className="text-sm text-muted-foreground mt-1">Deep dive into your performance metrics</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">تحليلات المنصة</h2>
+          <p className="text-sm text-muted-foreground mt-1">تعمّق في مؤشرات الأداء</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Time Period:</span>
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">الفترة الزمنية:</span>
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-full sm:w-[180px] bg-background border-border/50 rounded-xl h-11">
-              <SelectValue placeholder="Select period" />
+              <SelectValue placeholder="اختر الفترة" />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-border/50">
-              <SelectItem value="today" className="rounded-lg">Today</SelectItem>
-              <SelectItem value="week" className="rounded-lg">Last 7 Days</SelectItem>
-              <SelectItem value="month" className="rounded-lg">Last 30 Days</SelectItem>
-              <SelectItem value="year" className="rounded-lg">This Year</SelectItem>
+              <SelectItem value="today" className="rounded-lg">اليوم</SelectItem>
+              <SelectItem value="week" className="rounded-lg">آخر 7 أيام</SelectItem>
+              <SelectItem value="month" className="rounded-lg">آخر 30 يومًا</SelectItem>
+              <SelectItem value="year" className="rounded-lg">هذه السنة</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -58,9 +57,9 @@ export default function AdminAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between space-x-4">
               <div className="flex flex-col space-y-2">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Revenue</span>
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">إجمالي الإيرادات</span>
                 {loadingSummary ? <Skeleton className="h-8 w-24 rounded-lg" /> : (
-                  <span className="text-2xl font-bold tracking-tight">{t("common.currency", "$")}{summary?.totalRevenue?.toLocaleString() || 0}</span>
+                  <span className="text-2xl font-bold tracking-tight">{formatCurrency(summary?.totalRevenue || 0)}</span>
                 )}
               </div>
               <div className="p-3.5 bg-primary/10 rounded-2xl text-primary"><DollarSign className="h-6 w-6" /></div>
@@ -71,7 +70,7 @@ export default function AdminAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between space-x-4">
               <div className="flex flex-col space-y-2">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Orders</span>
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">إجمالي الطلبات</span>
                 {loadingSummary ? <Skeleton className="h-8 w-20 rounded-lg" /> : (
                   <span className="text-2xl font-bold tracking-tight">{summary?.totalOrders?.toLocaleString() || 0}</span>
                 )}
@@ -84,9 +83,9 @@ export default function AdminAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between space-x-4">
               <div className="flex flex-col space-y-2">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Avg. Order Value</span>
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">متوسط قيمة الطلب</span>
                 {loadingSummary ? <Skeleton className="h-8 w-20 rounded-lg" /> : (
-                  <span className="text-2xl font-bold tracking-tight">{t("common.currency", "$")}{summary?.averageOrderValue?.toLocaleString() || 0}</span>
+                  <span className="text-2xl font-bold tracking-tight">{formatCurrency(summary?.averageOrderValue || 0)}</span>
                 )}
               </div>
               <div className="p-3.5 bg-emerald-500/10 rounded-2xl text-emerald-500"><TrendingUp className="h-6 w-6" /></div>
@@ -97,7 +96,7 @@ export default function AdminAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between space-x-4">
               <div className="flex flex-col space-y-2">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Restaurants</span>
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">المطاعم النشطة</span>
                 {loadingSummary ? <Skeleton className="h-8 w-16 rounded-lg" /> : (
                   <span className="text-2xl font-bold tracking-tight">{summary?.activeRestaurants?.toLocaleString() || 0}</span>
                 )}
@@ -112,8 +111,8 @@ export default function AdminAnalytics() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border border-border/50 shadow-sm rounded-2xl">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Revenue Trend</CardTitle>
-            <CardDescription>Financial performance over selected period</CardDescription>
+            <CardTitle className="text-lg font-semibold">اتجاه الإيرادات</CardTitle>
+            <CardDescription>الأداء المالي خلال الفترة المحددة</CardDescription>
           </CardHeader>
           <CardContent className="h-[340px]">
             {revenueData ? (
@@ -127,7 +126,7 @@ export default function AdminAnalytics() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} dx={-10} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatCurrency} dx={-10} />
                   <RechartsTooltip 
                     contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '12px' }} 
                     itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
@@ -141,8 +140,8 @@ export default function AdminAnalytics() {
 
         <Card className="border border-border/50 shadow-sm rounded-2xl">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Peak Hours</CardTitle>
-            <CardDescription>Order volume distribution by time of day</CardDescription>
+            <CardTitle className="text-lg font-semibold">ساعات الذروة</CardTitle>
+            <CardDescription>توزيع حجم الطلبات حسب وقت اليوم</CardDescription>
           </CardHeader>
           <CardContent className="h-[340px]">
             {peakHours ? (
@@ -167,16 +166,16 @@ export default function AdminAnalytics() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border border-border/50 shadow-sm rounded-2xl overflow-hidden">
           <CardHeader className="bg-muted/30 border-b border-border/50">
-            <CardTitle className="text-lg font-semibold">Top Performing Restaurants</CardTitle>
-            <CardDescription>Based on revenue generated</CardDescription>
+            <CardTitle className="text-lg font-semibold">أفضل المطاعم أداءً</CardTitle>
+            <CardDescription>حسب الإيرادات المحققة</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader className="bg-transparent">
                 <TableRow className="border-border/50">
-                  <TableHead className="ps-6 font-semibold">Restaurant</TableHead>
-                  <TableHead className="text-end font-semibold">Orders</TableHead>
-                  <TableHead className="text-end pe-6 font-semibold">Revenue</TableHead>
+                  <TableHead className="ps-6 font-semibold">المطعم</TableHead>
+                  <TableHead className="text-end font-semibold">الطلبات</TableHead>
+                  <TableHead className="text-end pe-6 font-semibold">الإيرادات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -188,7 +187,7 @@ export default function AdminAnalytics() {
                         {rest.totalOrders}
                       </span>
                     </TableCell>
-                    <TableCell className="text-end pe-6 py-4 text-emerald-600 font-bold">{t("common.currency", "$")}{rest.totalRevenue.toLocaleString()}</TableCell>
+                    <TableCell className="text-end pe-6 py-4 text-emerald-600 font-bold">{formatCurrency(rest.totalRevenue)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -198,16 +197,16 @@ export default function AdminAnalytics() {
 
         <Card className="border border-border/50 shadow-sm rounded-2xl overflow-hidden">
           <CardHeader className="bg-muted/30 border-b border-border/50">
-            <CardTitle className="text-lg font-semibold">Top Selling Products</CardTitle>
-            <CardDescription>Across all restaurants</CardDescription>
+            <CardTitle className="text-lg font-semibold">الأكثر مبيعًا من المنتجات</CardTitle>
+            <CardDescription>عبر جميع المطاعم</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader className="bg-transparent">
                 <TableRow className="border-border/50">
-                  <TableHead className="ps-6 font-semibold">Product</TableHead>
-                  <TableHead className="font-semibold">Restaurant</TableHead>
-                  <TableHead className="text-end pe-6 font-semibold">Sold</TableHead>
+                  <TableHead className="ps-6 font-semibold">المنتج</TableHead>
+                  <TableHead className="font-semibold">المطعم</TableHead>
+                  <TableHead className="text-end pe-6 font-semibold">الكمية المباعة</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

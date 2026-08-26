@@ -11,10 +11,12 @@ import {
   orderItemAddonsTable,
   orderStatusHistoryTable,
   notificationsTable,
+  driversTable,
 } from "@workspace/db";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { PlaceOrderBody } from "@workspace/api-zod";
 import { isSubscriptionActive } from "../lib/subscriptions";
+import { sendWhatsAppToDriver } from "../lib/whatsapp";
 
 const router: IRouter = Router();
 
@@ -281,15 +283,59 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   // Notification for admin
   await db.insert(notificationsTable).values({
     type: "NEW_ORDER",
-    message: `New order #${order.id} from ${restaurant.name} — ${customerInfo.customerName}`,
+    message: `طلب جديد #${order.id} من ${restaurant.name} — ${customerInfo.customerName}`,
     relatedId: order.id,
     relatedType: "order",
   });
 
+  // Auto-assign the restaurant's driver (one driver per restaurant) and
+  // notify them on WhatsApp automatically — no manual admin step required.
+  const [driver] = await db
+    .select()
+    .from(driversTable)
+    .where(and(eq(driversTable.restaurantId, restaurant.id), eq(driversTable.isActive, true)))
+    .orderBy(asc(driversTable.id))
+    .limit(1);
+
+  if (driver) {
+    await db.update(ordersTable).set({ driverId: driver.id }).where(eq(ordersTable.id, order.id));
+    await db
+      .update(driversTable)
+      .set({ totalDeliveries: driver.totalDeliveries + 1 })
+      .where(eq(driversTable.id, driver.id));
+
+    await db.insert(notificationsTable).values({
+      type: "DRIVER_ASSIGNED",
+      message: `تم تعيين السائق "${driver.name}" للطلب #${order.id}`,
+      relatedId: order.id,
+      relatedType: "order",
+    });
+
+    const itemsSummary = lineItems.map((li) => `${li.productName} x${li.quantity}`).join(", ");
+
+    sendWhatsAppToDriver({
+      restaurantName: restaurant.name,
+      orderId: order.id,
+      customerName: customerInfo.customerName,
+      customerPhone: customerInfo.customerPhone,
+      items: itemsSummary,
+      total: `${totalAmount.toFixed(2)} د.ل`,
+      mapsUrl,
+      driverPhone: driver.phone,
+    }).catch(() => {}); // fire and forget — order creation must not fail on WhatsApp errors
+  } else {
+    await db.insert(notificationsTable).values({
+      type: "NO_DRIVER",
+      message: `لا يوجد سائق متاح لمطعم "${restaurant.name}" لتوصيل الطلب #${order.id}`,
+      relatedId: order.id,
+      relatedType: "order",
+    });
+  }
+
   res.status(201).json({
     orderId: order.id,
     status: "NEW",
-    message: "Order placed successfully",
+    message: "تم إنشاء الطلب بنجاح",
   });
 });
 

@@ -106,7 +106,7 @@ router.post("/restaurants", requireAuth, async (req, res): Promise<void> => {
   // Create notification
   await db.insert(notificationsTable).values({
     type: "NEW_RESTAURANT",
-    message: `New restaurant "${restaurant.name}" was created`,
+    message: `تم إنشاء مطعم جديد "${restaurant.name}"`,
     relatedId: restaurant.id,
     relatedType: "restaurant",
   });
