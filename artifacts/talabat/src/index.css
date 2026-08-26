@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -66,7 +67,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* LIGHT MODE */
+/* LIGHT MODE - ADMIN / DEFAULT */
 :root {
   --button-outline: rgba(0, 0, 0, 0.1);
   --badge-outline: rgba(0, 0, 0, 0.05);
@@ -74,14 +75,14 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 204 30% 96%;       /* Light blue-gray canvas */
-  --foreground: 200 40% 10%;       /* Deep text */
-  --card: 0 0% 100%;               /* White cards */
+  --background: 204 30% 96%;       
+  --foreground: 200 40% 10%;       
+  --card: 0 0% 100%;               
   --card-foreground: 200 40% 10%;
   --popover: 0 0% 100%;
   --popover-foreground: 200 40% 10%;
   
-  --primary: 235 85% 65%;          /* Vibrant Indigo */
+  --primary: 235 85% 65%;          
   --primary-foreground: 0 0% 100%;
   
   --secondary: 204 30% 92%;
@@ -106,7 +107,6 @@
   --chart-4: 35 90% 55%;
   --chart-5: 280 70% 60%;
 
-  /* Dark Teal Sidebar */
   --sidebar: 205 36% 22%;
   --sidebar-foreground: 204 30% 96%;
   --sidebar-border: 205 36% 18%;
@@ -116,7 +116,7 @@
   --sidebar-accent-foreground: 204 30% 96%;
   --sidebar-ring: 235 85% 65%;
 
-  --app-font-sans: 'Changa', sans-serif;
+  --app-font-sans: 'Tajawal', 'Outfit', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: 1rem;
@@ -182,6 +182,41 @@
   --sidebar-accent-foreground: 204 30% 96%;
 }
 
+/* 
+  STOREFRONT APP THEME
+  A dark, moody, appetizing palette for the mobile-first customer view.
+*/
+.storefront {
+  --background: 0 0% 6%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 98%;
+  
+  /* Vibrant appetizing orange/red as primary */
+  --primary: 15 95% 55%; 
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 0 0% 98%;
+  
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 65%;
+  
+  --accent: 15 95% 55%;
+  --accent-foreground: 0 0% 100%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --border: 0 0% 16%;
+  --input: 0 0% 16%;
+  --ring: 15 95% 55%;
+
+  --radius: 1.25rem;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -191,7 +226,15 @@
   }
 }
 
-/* Custom utilities for RTL / LTR layout spacing if needed */
 .hover-elevate {
   @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
 }
+
+/* Custom dark mode map tiles */
+.leaflet-layer,
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out,
+.leaflet-control-attribution {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
