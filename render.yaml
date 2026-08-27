@@ -3,17 +3,39 @@ services:
     name: talabat-api
     runtime: node
     plan: starter
+    region: frankfurt
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run build
-    startCommand: pnpm --filter @workspace/api-server run start
+    buildCommand: corepack enable && corepack prepare pnpm@10 --activate && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    healthCheckPath: /health
     envVars:
+      - key: NODE_VERSION
+        value: 24.13.0
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: talabat-db
+          property: connectionString
       - key: SESSION_SECRET
-        sync: false
+        generateValue: true
       - key: FRONTEND_URL
         sync: false
-      - key: WHATSAPP_API_KEY
+      - key: WhatsApp_API_Secret
         sync: false
+      - key: WHATSAPP_PHONE_ID
+        sync: false
+      - key: DEFAULT_OBJECT_STORAGE_BUCKET_ID
+        sync: false
+      - key: PUBLIC_OBJECT_SEARCH_PATHS
+        sync: false
+      - key: PRIVATE_OBJECT_DIR
+        sync: false
+
+databases:
+  - name: talabat-db
+    plan: starter
+    region: frankfurt
+    postgresMajorVersion: "16"
