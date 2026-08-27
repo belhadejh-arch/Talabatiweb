@@ -17,8 +17,8 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 |---|---|---|
 | `DATABASE_URL` | api-server | Postgres connection string |
 | `SESSION_SECRET` (or `AUTH_SECRET`) | api-server | Express session signing secret |
-| `FRONTEND_URL` | api-server | Restricts CORS + enables cross-site cookies (`SameSite=None`) when frontend/backend are on different domains. Omit only for same-origin (Replit) deploys |
-| `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel + Render). Leave unset for same-origin deploys — requests default to relative `/api/...` |
+| `FRONTEND_URL` | api-server | Restricts CORS + enables cross-site cookies (`SameSite=None`) when frontend/backend are on different domains. Required when the frontend is deployed to Vercel (see `DEPLOYMENT.md`); omit for same-origin (Replit-only) deploys |
+| `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel, with the backend staying on Replit — see `DEPLOYMENT.md`). Leave unset for same-origin deploys — requests default to relative `/api/...` |
 | `WhatsApp_API_Secret` or `WHATSAPP_API_KEY` | api-server | Long-lived Meta WhatsApp Cloud API token. When unset, sending falls back to the Replit WhatsApp Business connector (Replit runtime only) |
 | `WHATSAPP_PHONE_ID` | api-server | Fallback WhatsApp Cloud API phone number ID, used only when Settings → WhatsApp phone ID (DB) is empty |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
@@ -74,3 +74,4 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
 - See the `object-storage` skill for the Replit Object Storage API surface reused by the image upload pipeline
+- See `DEPLOYMENT.md` for the split-deployment setup (frontend on Vercel, backend + image storage on Replit) — image uploads require the api-server to run on Replit because object storage auth is Replit-sidecar-based, not portable

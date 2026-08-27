@@ -1,61 +1,51 @@
-# نشر TALABAT — Vercel (الواجهة) + Render (الخادم)
+# نشر TALABAT: Backend على Replit + Frontend على Vercel
 
-هذا المشروع أحادي الريبو (monorepo) بإدارة pnpm. عند النشر خارج Replit، الواجهة
-الأمامية (`artifacts/talabat`) والخادم (`artifacts/api-server`) يعملان على نطاقين
-مختلفين، لذا يجب ضبط CORS وملفات تعريف الارتباط عبر النطاقات (already done in code).
+هذا التوثيق يشرح كيفية نشر الواجهة الأمامية (`artifacts/talabat`) على Vercel بينما يبقى الـ Backend (`artifacts/api-server`) وقاعدة البيانات ونظام تخزين الصور على استضافة Replit.
 
-## 1) الخادم على Render
+> **لماذا هذا التقسيم؟** رفع الصور (ضغط + تحويل WebP + تخزين) يعتمد على Replit Object Storage، والذي يتطلب الاتصال بخدمة داخلية خاصة بـ Replit (sidecar auth) — لا يعمل خارج بيئة Replit. لذلك يبقى الـ Backend على Replit، بينما الواجهة (React/Vite) يمكن نشرها في أي مكان لأنها تتحدث مع الـ API عبر HTTP فقط.
 
-أنشئ خدمة **Web Service** جديدة على Render وأشر إلى هذا الريبو.
+## الخطوة 1 — نشر الـ Backend على Replit
 
-- **Root Directory:** اتركه فارغًا (جذر المستودع) — الأوامر أدناه تُشغَّل من الجذر لأن pnpm workspace يحتاج التثبيت من الجذر.
-- **Build Command:**
-  ```
-  corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run build
-  ```
-- **Start Command:**
-  ```
-  pnpm --filter @workspace/api-server run start
-  ```
-- **Environment Variables (Render → Environment):**
-  | المتغير | القيمة |
-  | --- | --- |
-  | `DATABASE_URL` | رابط قاعدة بيانات Postgres (يمكن إنشاؤها كخدمة Render Postgres منفصلة، أو استخدام نفس قاعدة بيانات Replit) |
-  | `SESSION_SECRET` | نص عشوائي طويل وسري لتوقيع الجلسات |
-  | `FRONTEND_URL` | رابط الواجهة الأمامية على Vercel، مثل `https://talabat.vercel.app` (بدون شرطة مائلة في النهاية) |
-  | `NODE_ENV` | `production` |
-  | `WHATSAPP_API_KEY` | **مطلوب فقط على Render.** رمز وصول طويل الأمد من Meta (System User Token) بصلاحية `whatsapp_business_messaging`. داخل Replit يُستخدم موصل WhatsApp Business المتصل تلقائيًا، لكن هذا الموصل غير متاح خارج بيئة Replit، لذا خارج Replit يعتمد الخادم على هذا المتغير مباشرة. |
-  | `PORT` | يضبطها Render تلقائيًا — لا تحدّدها يدويًا |
+1. من لوحة Replit اضغط **Publish** لنشر المشروع (ينشر كل الـ artifacts، بما فيها `api-server`، تحت نفس النطاق).
+2. بعد نجاح النشر، احصل على رابط الإنتاج (مثال: `https://your-app.replit.app`). الـ API يكون متاحاً على `https://your-app.replit.app/api/...` وفحص الصحة على `https://your-app.replit.app/health`.
+3. تأكد أن قاعدة البيانات (`DATABASE_URL`) ومتغيرات تخزين الكائنات (`DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`) مُهيأة بالفعل — هي كذلك في هذا المشروع.
 
-  ملاحظة: معرّف رقم الهاتف (`phone_number_id`) لا يُضبط كمتغير بيئة — يُدخله المشرف من صفحة الإعدادات داخل التطبيق (يُخزَّن في قاعدة البيانات).
+## الخطوة 2 — إنشاء مشروع Vercel للواجهة فقط
 
-## 2) الواجهة الأمامية على Vercel
+1. في Vercel، أنشئ مشروعاً جديداً واربطه بنفس مستودع الكود (GitHub/GitLab وغيره — إن لم يكن المشروع مرتبطاً بمستودع Git بعد، فعّل ذلك من إعدادات Replit أولاً).
+2. في **Project Settings → General → Root Directory** اختر: `artifacts/talabat`
+3. ملف `artifacts/talabat/vercel.json` (موجود بالفعل في المشروع) يضبط أوامر البناء تلقائياً:
+   - Build Command: `pnpm --filter @workspace/talabat run build`
+   - Output Directory: `dist/public`
+   - إعادة توجيه كل المسارات إلى `index.html` (SPA routing عبر Wouter)
+4. Vercel يكتشف `pnpm-workspace.yaml` في جذر المستودع تلقائياً وينفّذ `pnpm install` من الجذر — لا حاجة لتعديل يدوي.
 
-أنشئ مشروع Vercel جديد يشير إلى هذا الريبو.
+## الخطوة 3 — متغيرات البيئة على Vercel
 
-- **Root Directory:** `artifacts/talabat`
-- **Build Command (Override):**
-  ```
-  cd ../.. && corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @workspace/talabat run build
-  ```
-- **Output Directory (Override):** `dist/public`
-- **Install Command:** اتركه فارغًا/افتراضيًا (يتم التثبيت ضمن Build Command أعلاه لأن pnpm workspace يحتاج التثبيت من جذر المستودع)
-- **Environment Variables:**
-  | المتغير | القيمة |
-  | --- | --- |
-  | `VITE_API_URL` | رابط خادم Render الكامل، مثل `https://talabat-api.onrender.com` (بدون شرطة مائلة في النهاية) |
-  | `PORT` | أي رقم، مثل `3000` — غير مُستخدم فعليًا في الإنتاج، لكن ملف vite.config.ts يتطلب وجوده وقت البناء |
-  | `BASE_PATH` | `/` |
+في **Project Settings → Environment Variables** أضف:
 
-## 3) بعد النشر
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | رابط الإنتاج من الخطوة 1، بدون `/api` في النهاية (مثال: `https://your-app.replit.app`) |
+| `PORT` | `3000` (قيمة وهمية فقط — يتطلبها ملف `vite.config.ts` عند البناء، غير مستخدمة فعلياً لأن Vercel يخدم ملفات ثابتة) |
+| `BASE_PATH` | `/` |
 
-1. افتح رابط Vercel وسجّل الدخول كمشرف — تأكد أن تسجيل الدخول يعمل (هذا يتحقق من عمل الجلسات عبر النطاقات المختلفة).
-2. من صفحة الإعدادات، أدخل معرّف رقم واتساب (Phone Number ID) وفعّل الإرسال.
-3. أنشئ مطعمًا تجريبيًا، أضف سائقًا، وضع طلبًا من رابط المتجر العام للتأكد من وصول رسالة واتساب للسائق.
+أعد النشر (Redeploy) بعد إضافة المتغيرات.
 
-## ملاحظات معمارية
+## الخطوة 4 — ربط CORS وجلسة تسجيل الدخول (نطاقان مختلفان)
 
-- الخادم يقرأ `PORT` من البيئة إلزاميًا (`artifacts/api-server/src/index.ts`) — يتوافق مباشرة مع طريقة عمل Render.
-- CORS مضبوط عبر `FRONTEND_URL` في `artifacts/api-server/src/app.ts`.
-- ملف تعريف ارتباط الجلسة يستخدم `SameSite=None; Secure` تلقائيًا عند `NODE_ENV=production` للسماح بعمل الجلسات عبر نطاقين مختلفين (Vercel + Render).
-- بديل: يمكن نشر كل من الواجهة والخادم كنشر واحد على Replit (نفس الأصل، بدون تعقيد CORS/الجلسات عبر النطاقات) إن رغبتم بتبسيط الإعداد لاحقًا.
+بما أن الواجهة (Vercel) والـ Backend (Replit) على نطاقين مختلفين، يجب ضبط:
+
+1. على الـ Backend (Replit)، أضف السر/المتغير `FRONTEND_URL` بقيمة نطاق Vercel الكامل (مثال: `https://talabat.vercel.app`) — هذا يفعّل CORS الصحيح وإعدادات كوكيز الجلسة (`SameSite=None; Secure`) اللازمة لتسجيل دخول الأدمن عبر النطاقين. أعد تشغيل/نشر الـ Backend بعد إضافته.
+2. تحقق أن `NODE_ENV=production` مضبوط على نشر Replit (مضبوط تلقائياً عبر إعدادات النشر الحالية).
+
+## الخطوة 5 — التحقق النهائي
+
+- افتح `https://your-app.replit.app/health` — يجب أن يعيد `{"status":"ok"}`
+- افتح موقع Vercel، سجّل دخول كأدمن (`admin` / `admin123` أو الحساب الفعلي)، وتأكد من نجاح تسجيل الدخول (الكوكيز تُحفظ عبر النطاقين)
+- ارفع صورة منتج من لوحة التحكم وتأكد من ظهورها
+- افتح متجر مطعم عبر الرابط العام (`/{slug}`) على نطاق Vercel وأتمم طلباً تجريبياً كاملاً (سلة → GPS → تأكيد)
+
+## ملاحظة حول قاعدة بيانات منفصلة
+
+إذا أردت لاحقاً فصل قاعدة البيانات عن Replit (مثلاً Postgres على Render/Neon/Supabase)، يكفي تحديث `DATABASE_URL` على نشر Replit، ثم تشغيل `pnpm --filter @workspace/db run push` لدفع المخطط، و`pnpm --filter @workspace/db run seed` لإنشاء حساب الأدمن التجريبي — لا حاجة لأي تعديل في الكود.
