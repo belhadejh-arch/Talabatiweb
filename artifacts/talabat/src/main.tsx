@@ -6,11 +6,15 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 
-// When the frontend is deployed separately from the backend (e.g. Vercel +
-// Render), point API calls at the remote backend. Same-origin dev/deploys
-// (Replit) leave this unset and calls stay relative ("/api/...").
-if (import.meta.env.VITE_API_URL) {
-  setBaseUrl(import.meta.env.VITE_API_URL);
+// Production is hosted separately from the API on Render. Keep VITE_API_URL
+// configurable for other deployments, but use the live API as the production
+// default so a missing Vercel environment variable cannot silently break auth.
+const apiUrl = import.meta.env.VITE_API_URL || (
+  import.meta.env.PROD ? 'https://talabatiweb.onrender.com' : null
+);
+
+if (apiUrl) {
+  setBaseUrl(apiUrl);
 }
 
 createRoot(document.getElementById('root')!, {
