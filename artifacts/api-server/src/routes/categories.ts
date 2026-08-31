@@ -8,7 +8,7 @@ import {
   DeleteCategoryParams,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { deleteStoredImage } from "../lib/imageUpload";
+import { deleteDatabaseStoredImage, deleteStoredImage } from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -70,6 +70,7 @@ router.patch("/categories/:id", requireAuth, async (req, res): Promise<void> => 
     existing.imageUrl !== category.imageUrl
   ) {
     void deleteStoredImage(existing.imageUrl);
+    void deleteDatabaseStoredImage(existing.imageUrl);
   }
 
   res.json(category);
@@ -83,7 +84,10 @@ router.delete("/categories/:id", requireAuth, async (req, res): Promise<void> =>
 
   const [existing] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, id));
   await db.delete(categoriesTable).where(eq(categoriesTable.id, id));
-  if (existing?.imageUrl) void deleteStoredImage(existing.imageUrl);
+  if (existing?.imageUrl) {
+    void deleteStoredImage(existing.imageUrl);
+    void deleteDatabaseStoredImage(existing.imageUrl);
+  }
   res.sendStatus(204);
 });
 

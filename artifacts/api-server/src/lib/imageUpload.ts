@@ -2,12 +2,17 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { objectStorageClient, ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
+import {
+  deleteDatabaseImage,
+  saveDatabaseImage,
+} from "./databaseImageStorage";
 
 const objectStorageService = new ObjectStorageService();
 
 // Public URL prefix under which uploaded images are served back to clients.
 // Kept as a constant so we can recognize (and later delete) our own objects.
 export const PUBLIC_IMAGE_URL_PREFIX = "/api/storage/public-objects/";
+export const DATABASE_IMAGE_URL_PREFIX = "/api/storage/db-images/";
 
 function parseObjectPath(path: string): { bucketName: string; objectName: string } {
   if (!path.startsWith("/")) path = `/${path}`;
@@ -58,17 +63,39 @@ export async function processAndStoreImage(
   }
 
   const objectPath = `${folder}/${randomUUID()}.webp`;
-  const searchPaths = objectStorageService.getPublicObjectSearchPaths();
-  const fullPath = `${searchPaths[0]}/${objectPath}`;
-  const { bucketName, objectName } = parseObjectPath(fullPath);
+  const canUseReplitObjectStorage = Boolean(
+    process.env.PUBLIC_OBJECT_SEARCH_PATHS &&
+      (process.env.REPL_ID ||
+        process.env.REPLIT_DEPLOYMENT ||
+        process.env.REPLIT_DEV_DOMAIN ||
+        process.env.REPLIT_DOMAINS),
+  );
 
-  const file = objectStorageClient.bucket(bucketName).file(objectName);
-  await file.save(processed, {
-    contentType: "image/webp",
-    metadata: { cacheControl: "public, max-age=31536000, immutable" },
-  });
+  if (canUseReplitObjectStorage) {
+    try {
+      const searchPaths = objectStorageService.getPublicObjectSearchPaths();
+      const fullPath = `${searchPaths[0]}/${objectPath}`;
+      const { bucketName, objectName } = parseObjectPath(fullPath);
 
-  return { url: `${PUBLIC_IMAGE_URL_PREFIX}${objectPath}`, objectPath };
+      const file = objectStorageClient.bucket(bucketName).file(objectName);
+      await file.save(processed, {
+        contentType: "image/webp",
+        metadata: { cacheControl: "public, max-age=31536000, immutable" },
+      });
+
+      return { url: `${PUBLIC_IMAGE_URL_PREFIX}${objectPath}`, objectPath };
+    } catch (error) {
+      // A sidecar or bucket outage must not make the public Render API
+      // unusable. The processed bytes are safe to persist in the fallback.
+      logger.warn({ err: error, folder }, "Object Storage unavailable; using database image storage");
+    }
+  }
+
+  const databaseImageId = await saveDatabaseImage(processed, "image/webp", folder);
+  return {
+    url: `${DATABASE_IMAGE_URL_PREFIX}${databaseImageId}`,
+    objectPath: databaseImageId,
+  };
 }
 
 /**
@@ -88,5 +115,19 @@ export async function deleteStoredImage(url: string | null | undefined): Promise
     await objectStorageClient.bucket(bucketName).file(objectName).delete({ ignoreNotFound: true });
   } catch (err) {
     logger.warn({ err, url }, "Failed to delete stored image (non-blocking)");
+  }
+}
+
+/**
+ * Deletes a database-backed image. Kept separate from deleteStoredImage so
+ * legacy Object Storage URLs retain their existing best-effort behavior.
+ */
+export async function deleteDatabaseStoredImage(url: string | null | undefined): Promise<void> {
+  if (!url || !url.startsWith(DATABASE_IMAGE_URL_PREFIX)) return;
+
+  try {
+    await deleteDatabaseImage(url.slice(DATABASE_IMAGE_URL_PREFIX.length));
+  } catch (err) {
+    logger.warn({ err, url }, "Failed to delete database image (non-blocking)");
   }
 }

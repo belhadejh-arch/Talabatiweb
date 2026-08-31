@@ -1,7 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
 import { requireAuth } from "../middlewares/auth";
-import { processAndStoreImage, deleteStoredImage, InvalidImageError, type ImageFolder } from "../lib/imageUpload";
+import {
+  processAndStoreImage,
+  deleteStoredImage,
+  deleteDatabaseStoredImage,
+  InvalidImageError,
+  type ImageFolder,
+} from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -71,6 +77,7 @@ router.post(
 router.delete("/uploads/image", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const url = typeof req.body?.url === "string" ? req.body.url : undefined;
   await deleteStoredImage(url);
+  await deleteDatabaseStoredImage(url);
   res.sendStatus(204);
 });
 

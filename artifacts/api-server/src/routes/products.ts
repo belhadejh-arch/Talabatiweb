@@ -7,7 +7,7 @@ import {
   ListProductsQueryParams,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { deleteStoredImage } from "../lib/imageUpload";
+import { deleteDatabaseStoredImage, deleteStoredImage } from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -127,6 +127,7 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
     existing.imageUrl !== product.imageUrl
   ) {
     void deleteStoredImage(existing.imageUrl);
+    void deleteDatabaseStoredImage(existing.imageUrl);
   }
 
   const addons = await db.select().from(addonsTable).where(eq(addonsTable.productId, id));
@@ -151,7 +152,10 @@ router.delete("/products/:id", requireAuth, async (req, res): Promise<void> => {
 
   const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id));
   await db.delete(productsTable).where(eq(productsTable.id, id));
-  if (existing?.imageUrl) void deleteStoredImage(existing.imageUrl);
+  if (existing?.imageUrl) {
+    void deleteStoredImage(existing.imageUrl);
+    void deleteDatabaseStoredImage(existing.imageUrl);
+  }
   res.sendStatus(204);
 });
 
