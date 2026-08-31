@@ -122,18 +122,18 @@ export default function AdminRestaurantDetail() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+      <div className="flex flex-col items-stretch md:flex-row md:items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/admin/restaurants">
             <ArrowLeft />
           </Link>
-          <h2 className="text-2xl font-bold">{restaurant.name}</h2>
+          <h2 className="min-w-0 truncate text-lg sm:text-2xl font-bold">{restaurant.name}</h2>
           <Badge variant="outline" className={STATUS_COLOR[restaurant.status] ?? ""}>
             {restaurantStatusLabel(restaurant.status)}
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-3 md:flex items-center gap-2">
           {Object.values(RestaurantStatus).map((status) => (
             <Button
               key={status}
@@ -158,22 +158,22 @@ export default function AdminRestaurantDetail() {
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">أضف الأقسام والمنتجات (مع الصور والأحجام والإضافات)، وتابع طلبات هذا المطعم من مكان واحد.</p>
           <Link href={`/admin/restaurants/${restaurantId}/menu`}>
-            <Button size="lg" data-testid="button-manage-menu">➕ إضافة قائمة الطعام</Button>
+              <Button size="lg" className="w-full sm:w-auto" data-testid="button-manage-menu">➕ إضافة قائمة الطعام</Button>
           </Link>
           <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-2">
             <p className="text-sm font-medium">رابط متجر المطعم العام (يفتح قائمة هذا المطعم فقط)</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <code className="text-sm bg-background border border-border rounded-md px-3 py-2 flex-1 min-w-[200px]" data-testid="text-store-url">
+            <div className="flex items-stretch gap-2 flex-wrap">
+              <code className="text-sm break-all bg-background border border-border rounded-md px-3 py-2 flex-1 min-w-0 w-full sm:min-w-[200px]" data-testid="text-store-url">
                 {storeUrl}
               </code>
-              <Button variant="outline" onClick={copyLink} data-testid="button-copy-link">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={copyLink} data-testid="button-copy-link">
                 <Copy className="ml-2 h-4 w-4" /> 🔗 نسخ الرابط
               </Button>
-              <Button variant="outline" onClick={shareLink} data-testid="button-share-link">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={shareLink} data-testid="button-share-link">
                 <Share2 className="ml-2 h-4 w-4" /> 📤 مشاركة الرابط
               </Button>
               <a href={storeUrl} target="_blank" rel="noreferrer">
-                <Button variant="outline" data-testid="button-open-link">
+                <Button variant="outline" className="w-full sm:w-auto" data-testid="button-open-link">
                   <ExternalLink className="ml-2 h-4 w-4" /> 👁️ معاينة قائمة الطلبات
                 </Button>
               </a>
@@ -183,10 +183,10 @@ export default function AdminRestaurantDetail() {
       </Card>
 
       <Tabs defaultValue="details">
-        <TabsList>
-          <TabsTrigger value="details">بيانات المطعم</TabsTrigger>
-          <TabsTrigger value="orders">الطلبات</TabsTrigger>
-          <TabsTrigger value="subscription">العضوية</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsTrigger className="px-2 py-2.5 text-xs sm:text-sm" value="details">بيانات المطعم</TabsTrigger>
+          <TabsTrigger className="px-2 py-2.5 text-xs sm:text-sm" value="orders">الطلبات</TabsTrigger>
+          <TabsTrigger className="px-2 py-2.5 text-xs sm:text-sm" value="subscription">العضوية</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -251,7 +251,7 @@ export default function AdminRestaurantDetail() {
                   الوصف
                   <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </label>
-                <Button type="submit" disabled={updateRestaurant.isPending} data-testid="button-save-restaurant">
+                  <Button type="submit" className="w-full sm:w-auto" disabled={updateRestaurant.isPending} data-testid="button-save-restaurant">
                   حفظ التعديلات
                 </Button>
               </form>

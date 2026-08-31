@@ -68,7 +68,7 @@ export default function PublicRestaurant() {
   const displayCategory = activeCategory || (categories.length > 0 ? categories[0].id : null);
 
   const cartDrawerContent = (
-    <DrawerContent className="storefront dark h-[85vh] max-h-[85vh] rounded-t-3xl border-border/10 bg-background flex flex-col after:!bg-background">
+    <DrawerContent className="storefront dark h-[85dvh] max-h-[85dvh] rounded-t-3xl border-border/10 bg-background flex flex-col after:!bg-background">
       <DrawerHeader className="border-b border-border/10 pb-4">
         <div className="flex items-center justify-between">
           <DrawerTitle className="text-2xl font-bold flex items-center gap-2">
@@ -157,10 +157,10 @@ export default function PublicRestaurant() {
   );
 
   return (
-    <div className="flex-1 w-full bg-background relative pb-28 min-h-screen">
+    <div className="flex-1 min-w-0 w-full bg-background relative pb-36 min-h-screen">
       
       {/* Floating Compact Header (Visible on scroll) */}
-      <div className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 md:max-w-[480px] md:mx-auto ${scrolled ? 'bg-background/90 backdrop-blur-md shadow-sm translate-y-0 py-3 px-4' : '-translate-y-full opacity-0'}`}>
+      <div className={`fixed top-0 inset-x-0 z-40 max-w-[480px] mx-auto transition-all duration-300 ${scrolled ? 'bg-background/90 backdrop-blur-md shadow-sm translate-y-0 py-3 px-4' : '-translate-y-full opacity-0'}`}>
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center border border-primary/20 shrink-0">
             {restaurant.logoUrl ? (
@@ -183,9 +183,9 @@ export default function PublicRestaurant() {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         
         {/* Info overlay */}
-        <div className="absolute bottom-0 w-full px-5 pb-6">
-          <div className="flex items-end gap-5">
-            <div className="h-20 w-20 md:h-24 md:w-24 rounded-2xl bg-card border-2 border-border/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl relative z-10">
+        <div className="absolute bottom-0 w-full px-4 sm:px-5 pb-5 sm:pb-6">
+          <div className="flex items-end gap-3 sm:gap-5">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 rounded-2xl bg-card border-2 border-border/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl relative z-10">
               {restaurant.logoUrl ? (
                 <img src={getAssetUrl(restaurant.logoUrl)} alt={restaurant.name} className="h-full w-full object-cover" />
               ) : (
@@ -193,9 +193,10 @@ export default function PublicRestaurant() {
               )}
             </div>
             <div className="flex-1 pb-1">
-              <h1 className="text-3xl font-black tracking-tight text-foreground mb-1 shadow-black drop-shadow-sm">{restaurant.name}</h1>
-              <div className="flex items-center gap-3 text-sm text-foreground/80 font-medium">
-                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" /> {restaurant.address}</span>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1 shadow-black drop-shadow-sm">{restaurant.name}</h1>
+              <div className="flex items-start gap-1.5 text-xs sm:text-sm text-foreground/80 font-medium">
+                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                <span className="min-w-0 break-words line-clamp-2">{restaurant.address}</span>
               </div>
             </div>
           </div>
@@ -214,14 +215,14 @@ export default function PublicRestaurant() {
         )}
 
         {/* Categories Nav (Sticky) */}
-        <div className="sticky top-0 md:top-[64px] z-30 bg-background/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 mb-6 shadow-sm shadow-background">
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 mb-6 shadow-sm shadow-background">
           <ScrollArea className="w-full whitespace-nowrap" dir="rtl">
             <div className="flex gap-2.5 pb-1">
               {categories.map((category) => (
                 <Button
                   key={category.id}
                   variant={displayCategory === category.id ? "default" : "outline"}
-                  className={`rounded-full px-6 py-5 text-sm font-bold border-2 transition-all ${
+                    className={`rounded-full px-4 sm:px-6 py-4 sm:py-5 text-xs sm:text-sm font-bold border-2 transition-all ${
                     displayCategory === category.id 
                       ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105" 
                       : "bg-secondary/40 text-foreground border-transparent hover:border-border/30 hover:bg-secondary"
@@ -246,7 +247,7 @@ export default function PublicRestaurant() {
                 <span className="text-sm font-bold text-muted-foreground bg-secondary px-3 py-1 rounded-full">{category.products.length}</span>
               </div>
               
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {category.products.map((product) => {
                   const hasSizes = product.sizes && product.sizes.length > 0;
                   const minSizePrice = hasSizes ? Math.min(...product.sizes!.map((s) => s.price)) : product.price;
@@ -259,7 +260,7 @@ export default function PublicRestaurant() {
                       data-testid={`card-product-${product.id}`}
                     >
                       {/* Product Image taking top half */}
-                      <div className="w-full aspect-[4/3] bg-secondary relative overflow-hidden">
+                       <div className="w-full aspect-[16/10] sm:aspect-[4/3] bg-secondary relative overflow-hidden">
                         {product.imageUrl ? (
                           <img 
                             src={getAssetUrl(product.imageUrl)} 
@@ -310,11 +311,11 @@ export default function PublicRestaurant() {
 
       {/* Floating Mobile Cart Bar */}
       {items.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 md:max-w-[480px] md:mx-auto">
+        <div className="fixed bottom-0 inset-x-0 z-50 max-w-[480px] mx-auto">
           {/* Fading background behind floating bar */}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent -top-12 bottom-0 pointer-events-none" />
           
-          <div className="relative p-4 pb-6 animate-in slide-in-from-bottom-full duration-300">
+           <div className="relative p-3 sm:p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-full duration-300">
             <Drawer open={isCartOpen} onOpenChange={setIsCartOpen}>
               <DrawerTrigger asChild>
                 <Button 

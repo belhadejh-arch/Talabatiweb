@@ -68,7 +68,7 @@ export function ProductOptionsDialog({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="storefront dark h-[92vh] max-h-[92vh] rounded-t-3xl bg-background border-border/10 outline-none flex flex-col after:!bg-background" data-testid="dialog-product-options">
+      <DrawerContent className="storefront dark h-[92dvh] max-h-[92dvh] rounded-t-3xl bg-background border-border/10 outline-none flex flex-col after:!bg-background" data-testid="dialog-product-options">
         <div className="absolute right-4 top-4 z-50">
           <DrawerClose asChild>
             <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md border-none">
@@ -80,7 +80,7 @@ export function ProductOptionsDialog({
         <ScrollArea className="flex-1 w-full overflow-y-auto">
           <div className="flex flex-col pb-56">
             {/* Hero Image */}
-            <div className="w-full relative h-[35vh] min-h-[250px] bg-secondary flex items-center justify-center shrink-0">
+            <div className="w-full relative h-[30vh] min-h-[210px] sm:h-[35vh] sm:min-h-[250px] bg-secondary flex items-center justify-center shrink-0">
               {product.imageUrl ? (
                 <img 
                   src={getAssetUrl(product.imageUrl)} 
@@ -95,10 +95,10 @@ export function ProductOptionsDialog({
             </div>
 
             {/* Content Body */}
-            <div className="px-6 pt-4 space-y-8 relative z-10 -mt-6">
+            <div className="px-4 sm:px-6 pt-4 space-y-6 sm:space-y-8 relative z-10 -mt-6">
               
               <DrawerHeader className="px-0 pt-0 pb-2 text-right">
-                <DrawerTitle className="text-3xl font-bold tracking-tight mb-2 text-foreground">{product.name}</DrawerTitle>
+                <DrawerTitle className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-foreground">{product.name}</DrawerTitle>
                 {product.description && (
                   <p className="text-muted-foreground leading-relaxed text-sm">{product.description}</p>
                 )}
@@ -116,7 +116,7 @@ export function ProductOptionsDialog({
                           key={size.id}
                           type="button"
                           onClick={() => setSelectedSizeId(size.id)}
-                          className={`relative flex items-center gap-3 rounded-2xl border-2 px-5 py-4 text-right transition-all duration-200 flex-1 min-w-[140px] overflow-hidden group ${
+                           className={`relative flex items-center gap-3 rounded-2xl border-2 px-4 sm:px-5 py-3.5 sm:py-4 text-right transition-all duration-200 flex-1 min-w-[min(140px,100%)] overflow-hidden group ${
                             isSelected 
                               ? "border-primary bg-primary/10 shadow-sm" 
                               : "border-border/40 bg-secondary/30 hover:border-border"
@@ -149,11 +149,11 @@ export function ProductOptionsDialog({
                     {availableAddons.map((addon) => {
                       const isChecked = selectedAddonIds.includes(addon.id);
                       return (
-                        <button
+                         <button
                           key={addon.id}
                           type="button"
                           onClick={() => toggleAddon(addon.id)}
-                          className={`flex items-center gap-4 rounded-2xl p-4 transition-all duration-200 border-2 text-right ${
+                           className={`flex items-center gap-3 sm:gap-4 rounded-2xl p-3 sm:p-4 transition-all duration-200 border-2 text-right ${
                             isChecked 
                               ? "border-primary/50 bg-primary/5" 
                               : "border-border/20 bg-secondary/20 hover:bg-secondary/40"
@@ -185,7 +185,7 @@ export function ProductOptionsDialog({
         </ScrollArea>
 
         {/* Fixed Bottom Bar */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 pt-6 bg-gradient-to-t from-background via-background/95 to-transparent z-20">
+         <div className="absolute bottom-0 inset-x-0 p-3 sm:p-4 pt-6 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background/95 to-transparent z-20">
           <div className="flex flex-col gap-4 max-w-[480px] mx-auto">
             {/* Quantity Stepper */}
             <div className="flex items-center justify-center gap-6 mb-2">

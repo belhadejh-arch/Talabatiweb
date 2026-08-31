@@ -233,20 +233,20 @@ export default function AdminRestaurantMenu() {
   const storeUrl = restaurant ? `${window.location.origin}/${restaurant.slug}` : "";
 
   return (
-    <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col">
-      <div className="flex items-center justify-between shrink-0 flex-wrap gap-3">
-        <div className="flex items-center gap-4">
+    <div className="space-y-4 sm:space-y-6 min-h-[calc(100dvh-8rem)] flex flex-col">
+      <div className="flex items-start justify-between shrink-0 flex-wrap gap-3">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Link href={`/admin/restaurants/${restaurantId}`} className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">🍔 إدارة قائمة الطعام</h2>
-            <p className="text-sm text-muted-foreground">{restaurant?.name || "جاري التحميل..."}</p>
+            <h2 className="text-lg sm:text-2xl font-bold tracking-tight">🍔 إدارة قائمة الطعام</h2>
+            <p className="text-sm text-muted-foreground truncate">{restaurant?.name || "جاري التحميل..."}</p>
           </div>
         </div>
         {restaurant && (
-          <div className="flex items-center gap-2">
-            <code className="text-xs bg-secondary px-2 py-1.5 rounded-md truncate max-w-[220px]">{storeUrl}</code>
+          <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
+            <code className="min-w-0 max-w-full sm:max-w-[220px] text-xs bg-secondary px-2 py-1.5 rounded-md truncate">{storeUrl}</code>
             <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(storeUrl)}>
               <Copy className="ml-1 h-3.5 w-3.5" /> نسخ الرابط
             </Button>
@@ -255,10 +255,10 @@ export default function AdminRestaurantMenu() {
         )}
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
         {/* Categories Sidebar */}
-        <Card className="w-72 shrink-0 border-none shadow-sm flex flex-col">
-          <div className="p-4 border-b border-border flex items-center justify-between">
+        <Card className="w-full lg:w-72 lg:h-full shrink-0 border-none shadow-sm flex flex-col min-h-0">
+          <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between">
             <span className="font-semibold">الأقسام</span>
             <Button size="sm" variant="ghost" onClick={() => { resetCategoryForm(); setShowCategoryForm(true); }}>
               <Plus className="h-4 w-4" />
@@ -282,15 +282,15 @@ export default function AdminRestaurantMenu() {
             </form>
           )}
 
-          <ScrollArea className="flex-1">
-            <div className="p-2 space-y-1">
+          <ScrollArea className="max-h-52 lg:max-h-none lg:flex-1">
+            <div className="p-2 flex gap-2 overflow-x-auto lg:block lg:space-y-1">
               {loadingCategories ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">جاري التحميل...</div>
               ) : categories.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">لا توجد أقسام. أضف قسماً للبدء.</div>
               ) : (
                 categories.map((category) => (
-                  <div key={category.id} className={`w-full rounded-md text-sm font-medium transition-colors flex items-center justify-between gap-1 pr-1 ${activeCategory === category.id ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-foreground"}`}>
+                  <div key={category.id} className={`w-[11rem] shrink-0 lg:w-full rounded-md text-sm font-medium transition-colors flex items-center justify-between gap-1 pr-1 ${activeCategory === category.id ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-foreground"}`}>
                     <button onClick={() => setSelectedCategoryId(category.id)} className="flex-1 text-right px-3 py-2.5 min-w-0">
                       <div className="flex justify-between items-center gap-2">
                         <span className="truncate">{category.name}</span>
@@ -308,9 +308,9 @@ export default function AdminRestaurantMenu() {
 
         {/* Products Area */}
         <Card className="flex-1 border-none shadow-sm flex flex-col min-w-0">
-          <div className="p-4 border-b border-border flex justify-between items-center bg-card/50">
+          <div className="p-3 sm:p-4 border-b border-border flex flex-wrap gap-3 justify-between items-center bg-card/50">
             <h3 className="font-semibold">{categories.find((c) => c.id === activeCategory)?.name || "المنتجات"}</h3>
-            <Button size="sm" variant="secondary" disabled={!activeCategory} onClick={() => { resetProductForm(); setShowProductForm(true); }}>
+            <Button size="sm" className="w-full sm:w-auto" variant="secondary" disabled={!activeCategory} onClick={() => { resetProductForm(); setShowProductForm(true); }}>
               <Plus className="ml-2 h-4 w-4" /> إضافة منتج
             </Button>
           </div>
@@ -334,7 +334,7 @@ export default function AdminRestaurantMenu() {
           )}
 
           <ScrollArea className="flex-1 bg-secondary/10">
-            <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="p-3 sm:p-4 grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
               {loadingProducts ? (
                 <div className="col-span-full p-8 text-center text-muted-foreground">جاري تحميل المنتجات...</div>
               ) : !activeCategory ? (
@@ -351,8 +351,8 @@ export default function AdminRestaurantMenu() {
               ) : (
                 products.map((product) => (
                   <div key={product.id} className="bg-card border border-border rounded-xl p-3 flex flex-col gap-3 hover-elevate transition-all">
-                    <div className="flex gap-4">
-                      <div className="h-20 w-20 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                     <div className="flex gap-3 sm:gap-4">
+                       <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-md bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
                         {product.imageUrl ? (
                           <img src={getAssetUrl(product.imageUrl)} alt={product.name} className="h-full w-full object-cover" />
                         ) : (
@@ -360,8 +360,8 @@ export default function AdminRestaurantMenu() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0 flex flex-col">
-                        <div className="flex justify-between items-start gap-2">
-                          <h4 className="font-semibold truncate pr-2">{product.name}</h4>
+                         <div className="flex justify-between items-start gap-1">
+                           <h4 className="font-semibold min-w-0 truncate pr-1">{product.name}</h4>
                           <div className="flex items-center gap-1 shrink-0">
                             <button onClick={() => startEditProduct(product)} className="text-muted-foreground hover:text-foreground transition-colors p-1"><Pencil className="h-4 w-4" /></button>
                             <button onClick={() => removeProduct(product.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1"><Trash2 className="h-4 w-4" /></button>
@@ -370,7 +370,7 @@ export default function AdminRestaurantMenu() {
                         <p className="text-sm text-muted-foreground truncate">{product.description || "لا يوجد وصف"}</p>
                         <div className="mt-auto pt-2 flex items-center justify-between flex-wrap gap-2">
                           <span className="font-bold text-primary">{formatCurrency(product.price)}</span>
-                          <div className="flex items-center gap-2">
+                           <div className="flex items-center gap-1.5 flex-wrap justify-end">
                             {product.stockQuantity != null && (
                               <Badge variant="outline" className="text-[10px] h-5">الكمية: {product.stockQuantity}</Badge>
                             )}
@@ -396,8 +396,8 @@ export default function AdminRestaurantMenu() {
                       {expandedSizesProductId === product.id && (
                         <div className="mt-2 space-y-2">
                           {(product.sizes ?? []).map((size) => (
-                            <div key={size.id} className="flex items-center justify-between text-sm bg-secondary/30 rounded-md px-2 py-1.5">
-                              <span>{size.name} — {formatCurrency(size.price)}{!size.isAvailable && " (مخفي)"}</span>
+                             <div key={size.id} className="flex items-center justify-between gap-2 text-sm bg-secondary/30 rounded-md px-2 py-1.5">
+                               <span className="min-w-0 truncate">{size.name} — {formatCurrency(size.price)}{!size.isAvailable && " (مخفي)"}</span>
                               <div className="flex items-center gap-1">
                                 <button onClick={() => { setEditingSizeId(size.id); setSizeForm({ name: size.name, nameAr: size.nameAr || "", price: String(size.price), sortOrder: String(size.sortOrder), isAvailable: size.isAvailable }); }}><Pencil className="h-3.5 w-3.5" /></button>
                                 <button onClick={() => removeSize(size.id)}><Trash2 className="h-3.5 w-3.5" /></button>
@@ -406,7 +406,7 @@ export default function AdminRestaurantMenu() {
                           ))}
                           <form onSubmit={(e) => submitSize(e, product.id)} className="flex items-center gap-2 flex-wrap">
                             <Input placeholder="اسم الحجم (مثال: كبير)" className="h-8 flex-1 min-w-[100px]" value={sizeForm.name} onChange={(e) => setSizeForm({ ...sizeForm, name: e.target.value })} required data-testid="input-size-name" />
-                            <Input type="number" step="0.01" min="0" placeholder="السعر الكامل" className="h-8 w-28" value={sizeForm.price} onChange={(e) => setSizeForm({ ...sizeForm, price: e.target.value })} required data-testid="input-size-price" />
+                             <Input type="number" step="0.01" min="0" placeholder="السعر الكامل" className="h-8 w-full sm:w-28" value={sizeForm.price} onChange={(e) => setSizeForm({ ...sizeForm, price: e.target.value })} required data-testid="input-size-price" />
                             <Button size="sm" type="submit" className="h-8" data-testid="button-submit-size">{editingSizeId ? "حفظ" : "إضافة"}</Button>
                             {editingSizeId && <Button size="sm" type="button" variant="outline" className="h-8" onClick={resetSizeForm}>إلغاء</Button>}
                           </form>
@@ -426,8 +426,8 @@ export default function AdminRestaurantMenu() {
                       {expandedAddonsProductId === product.id && (
                         <div className="mt-2 space-y-2">
                           {(product.addons ?? []).map((addon) => (
-                            <div key={addon.id} className="flex items-center justify-between text-sm bg-secondary/30 rounded-md px-2 py-1.5">
-                              <span>{addon.name} — {formatCurrency(addon.price)}{!addon.isAvailable && " (مخفي)"}</span>
+                             <div key={addon.id} className="flex items-center justify-between gap-2 text-sm bg-secondary/30 rounded-md px-2 py-1.5">
+                               <span className="min-w-0 truncate">{addon.name} — {formatCurrency(addon.price)}{!addon.isAvailable && " (مخفي)"}</span>
                               <div className="flex items-center gap-1">
                                 <button onClick={() => { setEditingAddonId(addon.id); setAddonForm({ name: addon.name, nameAr: addon.nameAr || "", price: String(addon.price), isAvailable: addon.isAvailable }); }}><Pencil className="h-3.5 w-3.5" /></button>
                                 <button onClick={() => removeAddon(addon.id)}><Trash2 className="h-3.5 w-3.5" /></button>
@@ -436,7 +436,7 @@ export default function AdminRestaurantMenu() {
                           ))}
                           <form onSubmit={(e) => submitAddon(e, product.id)} className="flex items-center gap-2 flex-wrap">
                             <Input placeholder="اسم الإضافة" className="h-8 flex-1 min-w-[100px]" value={addonForm.name} onChange={(e) => setAddonForm({ ...addonForm, name: e.target.value })} required />
-                            <Input type="number" step="0.01" min="0" placeholder="السعر" className="h-8 w-24" value={addonForm.price} onChange={(e) => setAddonForm({ ...addonForm, price: e.target.value })} />
+                             <Input type="number" step="0.01" min="0" placeholder="السعر" className="h-8 w-full sm:w-24" value={addonForm.price} onChange={(e) => setAddonForm({ ...addonForm, price: e.target.value })} />
                             <Button size="sm" type="submit" className="h-8">{editingAddonId ? "حفظ" : "إضافة"}</Button>
                             {editingAddonId && <Button size="sm" type="button" variant="outline" className="h-8" onClick={resetAddonForm}>إلغاء</Button>}
                           </form>

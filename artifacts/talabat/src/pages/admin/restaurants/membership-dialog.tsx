@@ -71,7 +71,7 @@ export function MembershipDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Button size="lg" onClick={() => setOpen(true)} data-testid="button-edit-membership">
+      <Button size="lg" className="w-full sm:w-auto" onClick={() => setOpen(true)} data-testid="button-edit-membership">
         🏪 تعديل عضوية المطعم
       </Button>
       <DialogContent className="max-w-lg">
@@ -112,7 +112,7 @@ export function MembershipDialog({
 
             <div className="space-y-2">
               <Label>اختر الخطة</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {([
                   [SubscriptionPatchPlan.TRIAL, "تجريبي (٧ أيام)"],
                   [SubscriptionPatchPlan.MONTHLY, "شهري"],
@@ -135,10 +135,10 @@ export function MembershipDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                className="gap-2 justify-start"
+                className="w-full gap-2 justify-start"
                 onClick={() =>
                   setPending({
                     description: `تجديد الاشتراك بخطة ${subscriptionPlanLabel(plan)} بدءاً من اليوم`,
@@ -151,7 +151,7 @@ export function MembershipDialog({
               </Button>
               <Button
                 variant="outline"
-                className="gap-2 justify-start"
+                className="w-full gap-2 justify-start"
                 onClick={() =>
                   setPending({
                     description: `تغيير الخطة إلى ${subscriptionPlanLabel(plan)} (تبدأ دورة فوترة جديدة من اليوم)`,
@@ -162,17 +162,17 @@ export function MembershipDialog({
               >
                 <RefreshCw className="h-4 w-4" /> تغيير الخطة
               </Button>
-              <div className="col-span-2 flex items-center gap-2">
+              <div className="sm:col-span-2 flex items-center gap-2">
                 <Input
                   type="number"
                   min="1"
                   value={extensionDays}
                   onChange={(e) => setExtensionDays(e.target.value)}
-                  className="w-24"
+                  className="w-24 shrink-0"
                 />
                 <Button
                   variant="outline"
-                  className="gap-2 flex-1 justify-start"
+                  className="flex-1 gap-2 justify-start"
                   onClick={() =>
                     setPending({
                       description: `تمديد الاشتراك ${extensionDays} يوماً إضافياً`,
@@ -186,7 +186,7 @@ export function MembershipDialog({
               </div>
               <Button
                 variant="outline"
-                className="gap-2 justify-start text-emerald-600 border-emerald-600/30 hover:bg-emerald-500/10"
+                className="w-full gap-2 justify-start text-emerald-600 border-emerald-600/30 hover:bg-emerald-500/10"
                 onClick={() =>
                   setPending({
                     description: "تفعيل الاشتراك (السماح للمطعم باستقبال الطلبات)",
@@ -199,7 +199,7 @@ export function MembershipDialog({
               </Button>
               <Button
                 variant="outline"
-                className="gap-2 justify-start text-destructive border-destructive/30 hover:bg-destructive/10"
+                className="w-full gap-2 justify-start text-destructive border-destructive/30 hover:bg-destructive/10"
                 onClick={() =>
                   setPending({
                     description: "إيقاف الاشتراك (سيتوقف المطعم عن استقبال الطلبات)",

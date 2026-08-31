@@ -91,12 +91,12 @@ export default function AdminRestaurantNew() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-4">
+    <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-2 sm:gap-4">
         <Link href="/admin/restaurants" className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h2 className="text-2xl font-bold tracking-tight">إضافة مطعم</h2>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">إضافة مطعم</h2>
       </div>
 
       <Card className="border-none shadow-sm">
@@ -111,7 +111,7 @@ export default function AdminRestaurantNew() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+         <CardContent className="px-4 pt-5 sm:p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -225,11 +225,11 @@ export default function AdminRestaurantNew() {
                 />
               </div>
 
-              <div className="flex justify-end gap-4 border-t border-border pt-6">
-                <Link href="/admin/restaurants" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-4 border-t border-border pt-6">
+                 <Link href="/admin/restaurants" className="inline-flex w-full sm:w-auto items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
                   إلغاء
                 </Link>
-                <Button type="submit" disabled={createRestaurant.isPending}>
+                 <Button className="w-full sm:w-auto" type="submit" disabled={createRestaurant.isPending}>
                   {createRestaurant.isPending ? "جاري الحفظ..." : "حفظ"}
                 </Button>
               </div>

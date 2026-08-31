@@ -155,7 +155,7 @@ export default function PublicCheckout() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-28 relative">
+    <div className="min-h-screen bg-background pb-44 relative">
       {/* Sleek Header */}
       <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border/10">
         <div className="px-4 h-16 flex items-center gap-4">
@@ -245,7 +245,7 @@ export default function PublicCheckout() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <div className="h-[250px] w-full bg-secondary/50">
+                     <div className="h-[220px] sm:h-[250px] w-full bg-secondary/50">
                       <MapContainer center={mapPosition || fallbackPosition} zoom={15} style={{ height: '100%', width: '100%' }} key={mapPosition ? `${mapPosition.lat}-${mapPosition.lng}` : "fallback"}>
                         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://carto.com/">CARTO</a>' />
                         <LocationMarker position={mapPosition} setPosition={setMapPosition} />
@@ -286,10 +286,10 @@ export default function PublicCheckout() {
       </div>
 
       {/* Sticky Order Summary Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 md:max-w-[480px] md:mx-auto">
+      <div className="fixed bottom-0 inset-x-0 z-40 max-w-[480px] mx-auto">
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 to-transparent -top-12 bottom-0 pointer-events-none" />
         
-        <div className="relative p-5 pt-0 bg-background/95 backdrop-blur border-t border-border/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+        <div className="relative p-4 sm:p-5 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background/95 backdrop-blur border-t border-border/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
           <div className="w-12 h-1.5 bg-border/40 rounded-full mx-auto mb-5" />
           
           <div className="space-y-3 mb-5 px-2">
@@ -301,7 +301,7 @@ export default function PublicCheckout() {
                <span>رسوم التوصيل</span>
                <span>{formatCurrency(deliveryFee)}</span>
             </div>
-            <div className="flex justify-between font-black text-xl pt-3 border-t border-border/20 text-foreground">
+             <div className="flex justify-between gap-3 font-black text-lg sm:text-xl pt-3 border-t border-border/20 text-foreground">
                <span>الإجمالي</span>
                <span className="text-primary">{formatCurrency(total + deliveryFee)}</span>
             </div>

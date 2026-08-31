@@ -30,10 +30,10 @@ export default function AdminDrivers() {
     const mutation = editingId ? update.mutate({ id: editingId, data }, { onSuccess: invalidate }) : create.mutate({ id: restaurantId, data }, { onSuccess: invalidate });
     void mutation;
   };
-  return <div className="space-y-6">
-    <h2 className="text-2xl font-bold">إدارة السائقين</h2>
+  return <div className="space-y-4 sm:space-y-6">
+    <h2 className="text-xl sm:text-2xl font-bold">إدارة السائقين</h2>
     <Card><CardHeader><CardTitle>{editingId ? "تعديل سائق" : "إضافة سائق"}</CardTitle></CardHeader><CardContent>
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
+      <form onSubmit={submit} className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <Input placeholder="الاسم" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
         <Input placeholder="رقم واتساب" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
         <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
@@ -41,7 +41,7 @@ export default function AdminDrivers() {
           <option value="">اختر المطعم</option>{restaurants?.data.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} /> نشط</label>
-        <div className="flex gap-2"><Button type="submit" disabled={create.isPending || update.isPending}>حفظ</Button>{editingId && <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(empty); }}>إلغاء</Button>}</div>
+        <div className="flex flex-col sm:flex-row gap-2"><Button className="w-full sm:w-auto" type="submit" disabled={create.isPending || update.isPending}>حفظ</Button>{editingId && <Button className="w-full sm:w-auto" type="button" variant="outline" onClick={() => { setEditingId(null); setForm(empty); }}>إلغاء</Button>}</div>
       </form>
     </CardContent></Card>
     <Card><CardHeader><CardTitle>السائقون</CardTitle></CardHeader><CardContent>
@@ -54,6 +54,6 @@ export default function AdminDrivers() {
         </TableCell></TableRow>)}
       </TableBody></Table>}
     </CardContent></Card>
-    {selectedDriverId && <Card><CardHeader><CardTitle>طلبات السائق</CardTitle></CardHeader><CardContent><Button variant="ghost" onClick={() => setSelectedDriverId(null)}>إغلاق</Button><Table><TableHeader><TableRow><TableHead>رقم الطلب</TableHead><TableHead>المطعم</TableHead><TableHead>العميل</TableHead><TableHead>الإجمالي</TableHead><TableHead>الحالة</TableHead><TableHead>التاريخ</TableHead></TableRow></TableHeader><TableBody>{orders?.data.map(o => <TableRow key={o.id}><TableCell>#{o.id}</TableCell><TableCell>{o.restaurantName}</TableCell><TableCell>{o.customerName}</TableCell><TableCell>{formatCurrency(o.totalAmount)}</TableCell><TableCell>{orderStatusLabel(o.status)}</TableCell><TableCell>{new Date(o.createdAt).toLocaleDateString("ar-LY")}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>}
+     {selectedDriverId && <Card><CardHeader><CardTitle>طلبات السائق</CardTitle></CardHeader><CardContent className="space-y-3"><Button variant="ghost" onClick={() => setSelectedDriverId(null)}>إغلاق</Button><Table><TableHeader><TableRow><TableHead>رقم الطلب</TableHead><TableHead>المطعم</TableHead><TableHead>العميل</TableHead><TableHead>الإجمالي</TableHead><TableHead>الحالة</TableHead><TableHead>التاريخ</TableHead></TableRow></TableHeader><TableBody>{orders?.data.map(o => <TableRow key={o.id}><TableCell>#{o.id}</TableCell><TableCell>{o.restaurantName}</TableCell><TableCell>{o.customerName}</TableCell><TableCell>{formatCurrency(o.totalAmount)}</TableCell><TableCell>{orderStatusLabel(o.status)}</TableCell><TableCell>{new Date(o.createdAt).toLocaleDateString("ar-LY")}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>}
   </div>;
 }

@@ -88,7 +88,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg font-semibold">الإيرادات بمرور الوقت</CardTitle>
             <CardDescription>الإيرادات اليومية عبر جميع الفروع</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] pt-4">
+          <CardContent className="h-[260px] sm:h-[320px] pt-4">
             {revenueData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg font-semibold">الطلبات بمرور الوقت</CardTitle>
             <CardDescription>عدد الطلبات الناجحة التي تم توصيلها</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] pt-4">
+          <CardContent className="h-[260px] sm:h-[320px] pt-4">
             {ordersData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={ordersData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

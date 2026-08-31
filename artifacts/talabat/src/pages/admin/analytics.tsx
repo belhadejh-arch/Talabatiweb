@@ -114,7 +114,7 @@ export default function AdminAnalytics() {
             <CardTitle className="text-lg font-semibold">اتجاه الإيرادات</CardTitle>
             <CardDescription>الأداء المالي خلال الفترة المحددة</CardDescription>
           </CardHeader>
-          <CardContent className="h-[340px]">
+           <CardContent className="h-[280px] sm:h-[340px]">
             {revenueData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -143,7 +143,7 @@ export default function AdminAnalytics() {
             <CardTitle className="text-lg font-semibold">ساعات الذروة</CardTitle>
             <CardDescription>توزيع حجم الطلبات حسب وقت اليوم</CardDescription>
           </CardHeader>
-          <CardContent className="h-[340px]">
+           <CardContent className="h-[280px] sm:h-[340px]">
             {peakHours ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={peakHours} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
