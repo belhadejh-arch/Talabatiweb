@@ -76,7 +76,7 @@ export default function PublicCheckout() {
 
   const orderType = form.watch("orderType");
   const [mapPosition, setMapPosition] = useState<L.LatLng | null>(null);
-  const [locationStatus, setLocationStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "unavailable">("idle");
+  const [locationStatus, setLocationStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "unavailable" | "manual">("idle");
   const fallbackPosition: [number, number] = [32.8872, 13.1913];
 
   const requestLocation = () => {
@@ -113,6 +113,14 @@ export default function PublicCheckout() {
     }
   };
 
+  const enableManualLocation = () => {
+    setMapPosition(null);
+    setLocationStatus("manual");
+    form.setValue("latitude", undefined);
+    form.setValue("longitude", undefined);
+    form.clearErrors(["latitude", "longitude"]);
+  };
+
   useEffect(() => {
     if (items.length === 0 && !orderPlaced) {
       setLocation(`/${slug}`);
@@ -146,10 +154,19 @@ export default function PublicCheckout() {
         setOrderPlaced(true);
         clearCart();
       },
-      onError: () => {
-        toast.error("حدث خطأ ما، يرجى المحاولة مرة أخرى.");
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : "حدث خطأ ما، يرجى المحاولة مرة أخرى.";
+        toast.error(message);
       }
     });
+  };
+
+  const onInvalid = (errors: typeof form.formState.errors) => {
+    if (orderType === "DELIVERY" && (errors.latitude || errors.longitude)) {
+      toast.error("يرجى تحديد موقع التوصيل قبل تأكيد الطلب.");
+      return;
+    }
+    toast.error("يرجى إكمال البيانات المطلوبة قبل التأكيد.");
   };
 
   if (orderPlaced) {
@@ -194,7 +211,7 @@ export default function PublicCheckout() {
 
       <div className="px-4 py-6 space-y-8">
         <Form {...form}>
-          <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-8">
 
             {/* Order type */}
             <div className="space-y-4">
@@ -278,7 +295,7 @@ export default function PublicCheckout() {
               </h3>
               
               <div className={`bg-card rounded-3xl overflow-hidden border transition-all duration-300 ${form.formState.errors.latitude ? "border-destructive shadow-[0_0_0_1px_rgba(255,0,0,0.2)]" : "border-border/10 shadow-sm"}`}>
-                {locationStatus !== "granted" ? (
+                {locationStatus !== "granted" && locationStatus !== "manual" ? (
                   <div className="p-8 text-center space-y-5 bg-secondary/20">
                     <div className="h-16 w-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-2">
                       <MapPin className="h-8 w-8" />
@@ -296,13 +313,23 @@ export default function PublicCheckout() {
                       {locationStatus === "requesting" ? "جاري تحديد الموقع..." : "📍 السماح باستخدام موقعي"}
                     </Button>
 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={enableManualLocation}
+                      disabled={locationStatus === "requesting"}
+                      className="w-full h-12 rounded-xl text-base font-bold"
+                    >
+                      اختيار الموقع يدويًا على الخريطة
+                    </Button>
+
                     {(locationStatus === "denied" || locationStatus === "unavailable") && (
                       <div className="flex items-start gap-3 text-sm text-destructive bg-destructive/10 rounded-xl p-4 text-right mt-4">
                         <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
                         <span className="leading-relaxed font-medium">
-                          {locationStatus === "unavailable"
-                            ? "متصفحك لا يدعم تحديد الموقع. لا يمكن إتمام الطلب بدون موقع."
-                            : "تم رفض إذن الموقع أو تعذّر تحديده. يرجى السماح بالوصول إلى الموقع من إعدادات المتصفح ثم إعادة المحاولة — لا يمكن تأكيد الطلب بدون تحديد موقعك."}
+                           {locationStatus === "unavailable"
+                             ? "متصفحك لا يدعم تحديد الموقع. يمكنك اختيار الموقع يدويًا على الخريطة."
+                             : "تم رفض إذن الموقع أو تعذّر تحديده. يمكنك السماح من إعدادات المتصفح أو اختيار الموقع يدويًا على الخريطة."}
                         </span>
                       </div>
                     )}
@@ -315,9 +342,9 @@ export default function PublicCheckout() {
                         <LocationMarker position={mapPosition} setPosition={setMapPosition} />
                       </MapContainer>
                     </div>
-                    <div className="p-4 bg-secondary/10 border-t border-border/10 text-xs text-muted-foreground font-medium flex items-center justify-between">
-                      <span>تم تحديد موقعك</span>
-                      <span className="bg-secondary px-2 py-1 rounded-md text-foreground">اسحب الدبوس للتعديل</span>
+                     <div className="p-4 bg-secondary/10 border-t border-border/10 text-xs text-muted-foreground font-medium flex items-center justify-between gap-3">
+                       <span>{mapPosition ? "تم تحديد موقعك" : "انقر على الخريطة لتحديد موقع التوصيل"}</span>
+                       <span className="bg-secondary px-2 py-1 rounded-md text-foreground shrink-0">انقر أو اسحب الدبوس</span>
                     </div>
                   </div>
                 )}
@@ -392,7 +419,7 @@ export default function PublicCheckout() {
               <Button
                 type="submit"
                 className="w-full h-16 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-transform active:scale-[0.98]"
-                 disabled={placeOrder.isPending || (orderType === "DELIVERY" && locationStatus !== "granted")}
+                 disabled={placeOrder.isPending}
               >
                  {placeOrder.isPending ? "جاري الإرسال..." : orderType === "DELIVERY" ? "🚚 تأكيد التوصيل" : "🏪 تأكيد الحجز"}
               </Button>
