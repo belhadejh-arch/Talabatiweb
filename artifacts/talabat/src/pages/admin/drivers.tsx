@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/lib/currency";
 import { orderStatusLabel } from "@/lib/labels";
 
-type DriverForm = { name: string; phone: string; telegramChatId: string; address: string; restaurantId: string; isActive: boolean };
-const empty: DriverForm = { name: "", phone: "", telegramChatId: "", address: "", restaurantId: "", isActive: true };
+type DriverForm = { name: string; phone: string; address: string; restaurantId: string; isActive: boolean };
+const empty: DriverForm = { name: "", phone: "", address: "", restaurantId: "", isActive: true };
 
 export default function AdminDrivers() {
   const [form, setForm] = useState<DriverForm>(empty);
@@ -50,7 +50,6 @@ export default function AdminDrivers() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!restaurantId) return;
-    const telegramChatId = form.telegramChatId.trim();
     const commonData = {
       name: form.name,
       phone: form.phone,
@@ -58,8 +57,8 @@ export default function AdminDrivers() {
       isActive: form.isActive,
     };
     const mutation = editingId
-      ? update.mutate({ id: editingId, data: { ...commonData, telegramChatId: telegramChatId || null } }, { onSuccess: invalidate })
-      : create.mutate({ id: restaurantId, data: { ...commonData, telegramChatId: telegramChatId || undefined } }, { onSuccess: invalidate });
+      ? update.mutate({ id: editingId, data: commonData }, { onSuccess: invalidate })
+      : create.mutate({ id: restaurantId, data: commonData }, { onSuccess: invalidate });
     void mutation;
   };
   return <div className="space-y-4 sm:space-y-6">
@@ -68,9 +67,9 @@ export default function AdminDrivers() {
       <form onSubmit={submit} className="grid gap-3 sm:gap-4 md:grid-cols-2">
         <Input placeholder="الاسم واللقب" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
         <Input placeholder="رقم واتساب" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
-        <div className="space-y-1">
-          <Input placeholder="Telegram Chat ID" value={form.telegramChatId} onChange={e => setForm({ ...form, telegramChatId: e.target.value })} />
-          <p className="text-xs text-muted-foreground">افتح البوت وأرسل /start، ثم اجلب المحادثة الأخيرة أو الصق Chat ID يدويًا. الطلب الجديد يختار تلقائيًا سائقًا نشطًا مرتبطًا بـ Telegram أولًا.</p>
+        <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">ربط Telegram تلقائيًا</p>
+          <p>بعد حفظ السائق، استخدم رابط الربط الظاهر في جدول السائقين. سيفتح السائق البوت ويرسل /start، وسيُحفظ Chat ID تلقائيًا في PostgreSQL.</p>
         </div>
         <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
         <select className="h-10 rounded-md border bg-background px-3" value={form.restaurantId} onChange={e => setForm({ ...form, restaurantId: e.target.value })} required>
@@ -85,8 +84,8 @@ export default function AdminDrivers() {
         {recentChats.length > 0 && <div className="md:col-span-2 rounded-md border p-3 space-y-2">
           <p className="text-sm font-medium">اختر محادثة لربطها بالسائق:</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {recentChats.map(chat => <Button key={chat.chatId} type="button" variant="outline" className="justify-between" onClick={() => setForm({ ...form, telegramChatId: chat.chatId })}>
-              <span>{chat.title}{chat.username ? ` (${chat.username})` : ""}</span><span dir="ltr">{chat.chatId}</span>
+            {recentChats.map(chat => <Button key={chat.chatId} type="button" variant="outline" className="justify-between" onClick={() => navigator.clipboard?.writeText(chat.chatId)}>
+              <span>{chat.title}{chat.username ? ` (${chat.username})` : ""}</span><span dir="ltr">نسخ {chat.chatId}</span>
             </Button>)}
           </div>
         </div>}
@@ -98,7 +97,7 @@ export default function AdminDrivers() {
     <Card><CardHeader><CardTitle>السائقون</CardTitle></CardHeader><CardContent>
        {!restaurantId ? <p className="text-muted-foreground">اختر مطعماً لعرض سائقيه.</p> : <Table><TableHeader><TableRow><TableHead>الاسم</TableHead><TableHead>رقم واتساب</TableHead><TableHead>Telegram</TableHead><TableHead>العنوان</TableHead><TableHead>الحالة</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader><TableBody>
          {drivers.map(driver => <TableRow key={driver.id}><TableCell>{driver.name}</TableCell><TableCell>{driver.phone}</TableCell><TableCell><div className="space-y-1"><span className={driver.telegramChatId ? "text-green-600" : "text-muted-foreground"}>{driver.telegramChatId ? "متصل" : "غير متصل"}</span>{driver.telegramChatId && <span className="block text-xs text-muted-foreground" dir="ltr">{driver.telegramChatId}</span>}{telegramStatus?.bot?.username && <a className="block text-xs text-primary underline" href={`https://t.me/${telegramStatus.bot.username}?start=driver_${driver.id}`} target="_blank" rel="noreferrer">رابط الربط</a>}</div></TableCell><TableCell>{driver.address || "—"}</TableCell><TableCell>{driver.isActive ? "نشط" : "معطّل"}</TableCell><TableCell className="flex gap-2">
-           <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, telegramChatId: driver.telegramChatId || "", address: driver.address || "", restaurantId: String(driver.restaurantId), isActive: driver.isActive }); }}>تعديل</Button>
+            <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, address: driver.address || "", restaurantId: String(driver.restaurantId), isActive: driver.isActive }); }}>تعديل</Button>
           <Button size="sm" variant="outline" onClick={() => update.mutate({ id: driver.id, data: { isActive: !driver.isActive } }, { onSuccess: invalidate })}>{driver.isActive ? "تعطيل" : "تفعيل"}</Button>
           <Button size="sm" variant="outline" onClick={() => setSelectedDriverId(driver.id)}>طلباته</Button>
           <Button size="sm" variant="destructive" onClick={() => { if (confirm("حذف السائق نهائياً؟")) remove.mutate({ id: driver.id }, { onSuccess: invalidate }); }}>حذف</Button>

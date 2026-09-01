@@ -1,5 +1,6 @@
 import {
   db,
+  pool,
   driversTable,
   ordersTable,
   orderItemsTable,
@@ -23,6 +24,9 @@ import {
 const ACTIVE = "ACTIVE";
 const INACTIVE = "INACTIVE";
 const START_LINK_PREFIX = "driver_";
+// One Telegram getUpdates consumer per database. This protects against the
+// Replit preview and a second API process polling the same bot concurrently.
+const TELEGRAM_POLL_LOCK_KEY = 71420391;
 
 const driverKeyboard = {
   keyboard: [
@@ -237,6 +241,7 @@ async function handleOrderAction(update: TelegramUpdate): Promise<void> {
 
   const eligible = driver
     && order
+    && (!callback.message || String(callback.message.chat.id) === id)
     && driver.isActive
     && driver.status === ACTIVE
     && driver.restaurantId === order.restaurantId
@@ -257,14 +262,40 @@ async function handleOrderAction(update: TelegramUpdate): Promise<void> {
       await answerTelegramCallbackQuery(callback.id, "هذا الطلب لم يعد قابلًا للقبول.", true);
       return;
     }
-    await db.update(ordersTable).set({ status: "ACCEPTED" }).where(eq(ordersTable.id, orderId));
+    const [updatedOrder] = await db
+      .update(ordersTable)
+      .set({ status: "ACCEPTED" })
+      .where(and(
+        eq(ordersTable.id, orderId),
+        eq(ordersTable.driverId, driver.id),
+        eq(ordersTable.restaurantId, driver.restaurantId),
+        eq(ordersTable.status, order.status),
+      ))
+      .returning({ id: ordersTable.id });
+    if (!updatedOrder) {
+      await answerTelegramCallbackQuery(callback.id, "هذا الطلب تم تحديثه من جهة أخرى.", true);
+      return;
+    }
     await db.insert(orderStatusHistoryTable).values({
       orderId,
       status: "ACCEPTED",
       note: `تم قبول الطلب من السائق ${driver.name} عبر Telegram`,
     });
   } else {
-    await db.update(ordersTable).set({ driverId: null, status: "NEW" }).where(eq(ordersTable.id, orderId));
+    const [updatedOrder] = await db
+      .update(ordersTable)
+      .set({ driverId: null, status: "NEW" })
+      .where(and(
+        eq(ordersTable.id, orderId),
+        eq(ordersTable.driverId, driver.id),
+        eq(ordersTable.restaurantId, driver.restaurantId),
+        eq(ordersTable.status, order.status),
+      ))
+      .returning({ id: ordersTable.id });
+    if (!updatedOrder) {
+      await answerTelegramCallbackQuery(callback.id, "هذا الطلب تم تحديثه من جهة أخرى.", true);
+      return;
+    }
     await db.insert(orderStatusHistoryTable).values({
       orderId,
       status: "NEW",
@@ -286,30 +317,74 @@ async function processUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) await handleOrderAction(update);
 }
 
-async function pollTelegram(): Promise<void> {
+async function acquirePollingLock() {
+  const client = await pool.connect();
   try {
-    await ensureTelegramSchema();
-    await setTelegramCommands();
-    logger.info("Telegram driver bot polling started");
+    const result = await client.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [TELEGRAM_POLL_LOCK_KEY],
+    );
+    if (result.rows[0]?.locked) return client;
   } catch (error) {
-    logger.error({ err: error }, "Telegram bot failed to initialize");
+    client.release();
+    throw error;
+  }
+
+  client.release();
+  return null;
+}
+
+async function pollTelegram(): Promise<void> {
+  const lockClient = await acquirePollingLock();
+  if (!lockClient) {
+    logger.warn("Telegram polling is already owned by another API process");
     return;
   }
 
-  while (true) {
+  try {
     try {
-      const updates = await getTelegramUpdates(nextUpdateOffset, 25);
-      for (const update of updates) {
-        nextUpdateOffset = Math.max(nextUpdateOffset, update.update_id + 1);
-        try {
-          await processUpdate(update);
-        } catch (error) {
-          logger.error({ err: error, updateId: update.update_id }, "Telegram update processing failed");
-        }
-      }
+      await ensureTelegramSchema();
+      await setTelegramCommands();
+      logger.info("Telegram driver bot polling started");
     } catch (error) {
-      logger.error({ err: error }, "Telegram polling failed");
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      logger.error({ err: error }, "Telegram bot failed to initialize");
+      return;
+    }
+
+    let conflictReported = false;
+    while (true) {
+      try {
+        const updates = await getTelegramUpdates(nextUpdateOffset, 25);
+        conflictReported = false;
+        for (const update of updates) {
+          nextUpdateOffset = Math.max(nextUpdateOffset, update.update_id + 1);
+          try {
+            await processUpdate(update);
+          } catch (error) {
+            logger.error({ err: error, updateId: update.update_id }, "Telegram update processing failed");
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.startsWith("Conflict: terminated by other getUpdates request")) {
+          if (!conflictReported) {
+            logger.error(
+              "Telegram rejected polling because another bot instance is using getUpdates; retrying in 30 seconds",
+            );
+            conflictReported = true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+          continue;
+        }
+        logger.error({ err: error }, "Telegram polling failed");
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+    }
+  } finally {
+    try {
+      await lockClient.query("SELECT pg_advisory_unlock($1)", [TELEGRAM_POLL_LOCK_KEY]);
+    } finally {
+      lockClient.release();
     }
   }
 }

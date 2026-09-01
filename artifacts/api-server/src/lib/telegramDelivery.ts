@@ -114,7 +114,9 @@ export async function notifyDriverOnAllChannels(
   const [telegramResult, whatsappResult] = await Promise.all([
     sendTelegramToDriver({
       ...payload,
-      telegramChatId: driver.telegramChatId,
+      // Use the freshly-read database record. A driver may have completed a
+      // new deep-link pairing after the order was selected.
+      telegramChatId: currentDriver.telegramChatId,
     }),
     sendWhatsAppToDriver({
       ...payload,
