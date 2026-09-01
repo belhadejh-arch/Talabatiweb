@@ -14,7 +14,7 @@ import {
   notificationsTable,
   driversTable,
 } from "@workspace/db";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { PlaceOrderBody } from "@workspace/api-zod";
 import { isSubscriptionActive } from "../lib/subscriptions";
 import { safeNotifyDriverOnAllChannels } from "../lib/telegramDelivery";
@@ -340,7 +340,13 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     .select()
     .from(driversTable)
     .where(and(eq(driversTable.restaurantId, restaurant.id), eq(driversTable.isActive, true)))
-    .orderBy(asc(driversTable.id))
+    // Prefer a driver who can actually receive Telegram notifications. This
+    // prevents an older active driver without a Chat ID from silently
+    // capturing every new order before a linked driver.
+    .orderBy(
+      sql`CASE WHEN ${driversTable.telegramChatId} IS NOT NULL AND ${driversTable.telegramChatId} <> '' THEN 0 ELSE 1 END`,
+      asc(driversTable.id),
+    )
     .limit(1);
 
   if (driver) {

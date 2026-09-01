@@ -70,7 +70,7 @@ export default function AdminDrivers() {
         <Input placeholder="رقم واتساب" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
         <div className="space-y-1">
           <Input placeholder="Telegram Chat ID" value={form.telegramChatId} onChange={e => setForm({ ...form, telegramChatId: e.target.value })} />
-          <p className="text-xs text-muted-foreground">افتح البوت وأرسل /start، ثم اجلب المحادثة الأخيرة أو الصق Chat ID يدويًا.</p>
+          <p className="text-xs text-muted-foreground">افتح البوت وأرسل /start، ثم اجلب المحادثة الأخيرة أو الصق Chat ID يدويًا. الطلب الجديد يختار تلقائيًا سائقًا نشطًا مرتبطًا بـ Telegram أولًا.</p>
         </div>
         <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
         <select className="h-10 rounded-md border bg-background px-3" value={form.restaurantId} onChange={e => setForm({ ...form, restaurantId: e.target.value })} required>

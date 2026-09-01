@@ -7,4 +7,4 @@ Telegram Chat IDs cannot be inferred from a driver's phone or name. The driver m
 
 **Why:** Telegram requires the user to initiate the chat before the bot can send a direct message, and multiple drivers may share the same display name.
 
-**How to apply:** Link the Chat ID to the selected driver record (including its restaurant), send Telegram and WhatsApp independently after order persistence, and record `SENT` or `FAILED` separately so one channel never blocks order creation.
+**How to apply:** Link the Chat ID to the selected driver record (including its restaurant), prefer an active linked driver during automatic dispatch, send Telegram and WhatsApp independently after order persistence, and record `SENT` or `FAILED` separately so one channel never blocks order creation.
