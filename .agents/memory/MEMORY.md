@@ -6,5 +6,6 @@
 - [Replit connectors-sdk / Object Storage runtime constraint](replit-connectors-runtime.md) — both only work inside a Replit runtime; external deploys (Render/Vercel) need a raw API-key fallback or to keep that piece on Replit
 - [Portable image storage](portable-image-storage.md) — external API hosts need a persistent PostgreSQL fallback when Replit Object Storage sidecar auth is unavailable
 - [TALABAT WhatsApp send gate](talabat-whatsapp-settings-gate.md) — sends no-op unless settings.whatsappEnabled+whatsappPhoneId are set, even with a direct token configured
+- [Telegram driver linking](telegram-delivery.md) — getUpdates stays empty until a driver sends /start; link the resulting Chat ID to the restaurant-scoped driver
 - [TALABAT product sizes vs addons](talabat-product-sizes.md) — sizes are exclusive/replace base price, addons are additive; cart id must encode both or combos collide
 - [pnpm workspace lib typecheck](pnpm-workspace-lib-typecheck.md) — editing lib/* package source needs a `tsc -p lib/<pkg>/tsconfig.json` rebuild or consumers typecheck against stale dist/*.d.ts

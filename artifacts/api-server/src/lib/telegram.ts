@@ -10,6 +10,7 @@ export type TelegramSendResult = {
 export type TelegramOrderPayload = {
   restaurantName: string;
   orderId: number;
+  customerName: string;
   customerPhone: string;
   items: string;
   total: string;
@@ -50,6 +51,7 @@ export async function sendTelegramToDriver(payload: TelegramOrderPayload): Promi
 
 🏪 المطعم: ${payload.restaurantName}
 📦 الطلب: #${payload.orderId}
+👤 العميل: ${payload.customerName}
 📞 الهاتف: ${payload.customerPhone}
 
 🍔 الطلب:
