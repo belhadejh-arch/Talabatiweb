@@ -190,7 +190,27 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   const parsed = PlaceOrderBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
-  const { items: orderItems, latitude, longitude, ...customerInfo } = parsed.data;
+  const { items: orderItems, orderType, latitude, longitude, ...customerInfo } = parsed.data;
+  const isDelivery = orderType === "DELIVERY";
+
+  if (isDelivery) {
+    if (
+      latitude == null ||
+      longitude == null ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      res.status(400).json({ error: "A valid delivery location is required" });
+      return;
+    }
+  } else if (latitude != null || longitude != null) {
+    res.status(400).json({ error: "Reservation orders do not accept a delivery location" });
+    return;
+  }
 
   // Validate products and compute totals
   const productIds = orderItems.map((i) => i.productId);
@@ -262,8 +282,8 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     });
   }
 
-  const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-  const deliveryFee = parseFloat(restaurant.deliveryFee);
+  const mapsUrl = isDelivery ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
+  const deliveryFee = isDelivery ? parseFloat(restaurant.deliveryFee) : 0;
   const subtotal = totalAmount;
   const grandTotal = subtotal + deliveryFee;
 
@@ -272,11 +292,12 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     .insert(ordersTable)
     .values({
       restaurantId: restaurant.id,
+      orderType,
       customerName: customerInfo.customerName,
       customerPhone: customerInfo.customerPhone,
       notes: customerInfo.notes ?? null,
-      latitude,
-      longitude,
+      latitude: isDelivery ? latitude : null,
+      longitude: isDelivery ? longitude : null,
       mapsUrl,
       subtotal: String(subtotal.toFixed(2)),
       deliveryFee: String(deliveryFee.toFixed(2)),

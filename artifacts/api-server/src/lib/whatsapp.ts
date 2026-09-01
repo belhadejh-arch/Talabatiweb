@@ -8,11 +8,12 @@ const GRAPH_API_VERSION = "v23.0";
 interface WhatsAppMessagePayload {
   restaurantName: string;
   orderId: number;
+  orderType: string;
   customerName: string;
   customerPhone: string;
   items: string;
   total: string;
-  mapsUrl: string;
+  mapsUrl: string | null;
   driverPhone: string;
 }
 
@@ -81,10 +82,27 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
     return { success: false, errorMessage: "WhatsApp phone number ID is not configured" };
   }
 
-  const message = `🚨 طلب توصيل جديد
+  const message = payload.orderType === "RESERVATION"
+    ? `🏪 حجز طلب جديد
 
 🏪 المطعم: ${payload.restaurantName}
 📦 الطلب: #${payload.orderId}
+👤 الزبون: ${payload.customerName}
+📞 الهاتف: ${payload.customerPhone}
+
+🍔 الطلب:
+${payload.items}
+
+💰 الإجمالي:
+${payload.total}
+
+نوع الطلب:
+🏪 حجز`
+    : `🚨 طلب توصيل جديد
+
+🏪 المطعم: ${payload.restaurantName}
+📦 الطلب: #${payload.orderId}
+👤 العميل: ${payload.customerName}
 📞 الهاتف: ${payload.customerPhone}
 
 🍔 الطلب:

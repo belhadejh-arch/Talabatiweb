@@ -473,6 +473,14 @@ export interface DeliveryMessageLog {
   sentAt: string;
 }
 
+export type OrderOrderType = typeof OrderOrderType[keyof typeof OrderOrderType];
+
+
+export const OrderOrderType = {
+  DELIVERY: 'DELIVERY',
+  RESERVATION: 'RESERVATION',
+} as const;
+
 export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
 
@@ -490,13 +498,17 @@ export interface Order {
   id: number;
   restaurantId: number;
   restaurantName?: string;
+  orderType: OrderOrderType;
   customerName: string;
   customerPhone: string;
   /** @nullable */
   notes?: string | null;
-  latitude?: number;
-  longitude?: number;
-  mapsUrl?: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  mapsUrl?: string | null;
   subtotal?: number;
   deliveryFee?: number;
   totalAmount: number;
@@ -507,6 +519,14 @@ export interface Order {
   driverName?: string | null;
   createdAt: string;
 }
+
+export type OrderDetailOrderType = typeof OrderDetailOrderType[keyof typeof OrderDetailOrderType];
+
+
+export const OrderDetailOrderType = {
+  DELIVERY: 'DELIVERY',
+  RESERVATION: 'RESERVATION',
+} as const;
 
 export type OrderDetailStatus = typeof OrderDetailStatus[keyof typeof OrderDetailStatus];
 
@@ -552,13 +572,17 @@ export interface OrderDetail {
   id: number;
   restaurantId: number;
   restaurantName?: string;
+  orderType: OrderDetailOrderType;
   customerName: string;
   customerPhone: string;
   /** @nullable */
   notes?: string | null;
-  latitude?: number;
-  longitude?: number;
-  mapsUrl?: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  mapsUrl?: string | null;
   subtotal?: number;
   deliveryFee?: number;
   totalAmount: number;
@@ -605,6 +629,14 @@ export interface OrderConfirmation {
   message?: string;
 }
 
+export type OrderInputOrderType = typeof OrderInputOrderType[keyof typeof OrderInputOrderType];
+
+
+export const OrderInputOrderType = {
+  DELIVERY: 'DELIVERY',
+  RESERVATION: 'RESERVATION',
+} as const;
+
 export interface OrderItemInput {
   productId: number;
   /** @minimum 1 */
@@ -619,8 +651,11 @@ export interface OrderInput {
   customerName: string;
   customerPhone: string;
   notes?: string;
-  latitude: number;
-  longitude: number;
+  orderType: OrderInputOrderType;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
   /** @minItems 1 */
   items: OrderItemInput[];
 }

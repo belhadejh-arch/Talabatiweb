@@ -47,6 +47,7 @@ async function notifyAssignedDriver(orderId: number, driverId: number): Promise<
     restaurantName: restaurant.name,
     restaurantId: restaurant.id,
     orderId: order.id,
+    orderType: order.orderType,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     items: items.map((item) => `${item.name}${item.sizeName ? ` (${item.sizeName})` : ""} x${item.quantity}`).join(", ") || "—",

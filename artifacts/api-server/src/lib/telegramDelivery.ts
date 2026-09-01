@@ -13,11 +13,12 @@ export type DriverDeliveryPayload = {
   restaurantName: string;
   restaurantId: number;
   orderId: number;
+  orderType: string;
   customerName: string;
   customerPhone: string;
   items: string;
   total: string;
-  mapsUrl: string;
+  mapsUrl: string | null;
   driverPhone: string;
   telegramChatId: string | null;
 };

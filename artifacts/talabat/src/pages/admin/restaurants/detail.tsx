@@ -284,6 +284,7 @@ export default function AdminRestaurantDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>العميل</TableHead>
+                    <TableHead>النوع</TableHead>
                     <TableHead>الإجمالي</TableHead>
                     <TableHead>الحالة</TableHead>
                     <TableHead>السائق</TableHead>
@@ -294,6 +295,11 @@ export default function AdminRestaurantDetail() {
                   {orders?.data.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>{order.customerName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {order.orderType === "RESERVATION" ? "🏪 حجز" : "🚚 توصيل"}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
                       <TableCell>
                         <select

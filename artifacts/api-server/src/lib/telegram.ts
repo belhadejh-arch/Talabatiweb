@@ -11,11 +11,12 @@ export type TelegramSendResult = {
 export type TelegramOrderPayload = {
   restaurantName: string;
   orderId: number;
+  orderType: string;
   customerName: string;
   customerPhone: string;
   items: string;
   total: string;
-  mapsUrl: string;
+  mapsUrl: string | null;
   telegramChatId: string | null;
 };
 
@@ -132,7 +133,23 @@ export async function sendTelegramToDriver(payload: TelegramOrderPayload): Promi
     return { success: false, errorMessage: "TELEGRAM_BOT_TOKEN is not configured" };
   }
 
-  const message = `🚨 طلب توصيل جديد
+  const message = payload.orderType === "RESERVATION"
+    ? `🏪 حجز طلب جديد
+
+🏪 المطعم: ${payload.restaurantName}
+📦 الطلب: #${payload.orderId}
+👤 الزبون: ${payload.customerName}
+📞 الهاتف: ${payload.customerPhone}
+
+🍔 الطلب:
+${payload.items}
+
+💰 الإجمالي:
+${payload.total}
+
+نوع الطلب:
+🏪 حجز`
+    : `🚨 طلب توصيل جديد
 
 🏪 المطعم: ${payload.restaurantName}
 📦 الطلب: #${payload.orderId}
@@ -147,7 +164,6 @@ ${payload.total}
 
 📍 موقع العميل:
 ${payload.mapsUrl}`;
-
   try {
     await telegramRequest("sendMessage", {
       chat_id: chatId,
@@ -159,7 +175,9 @@ ${payload.mapsUrl}`;
             { text: "✅ قبول الطلب", callback_data: `order_accept:${payload.orderId}` },
             { text: "❌ رفض الطلب", callback_data: `order_reject:${payload.orderId}` },
           ],
-          [{ text: "📍 فتح الموقع", url: payload.mapsUrl }],
+          ...(payload.orderType === "DELIVERY" && payload.mapsUrl
+            ? [[{ text: "📍 فتح الموقع", url: payload.mapsUrl }]]
+            : []),
         ],
       },
     });

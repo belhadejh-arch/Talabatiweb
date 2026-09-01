@@ -62,7 +62,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 ## Product
 
 - **Admin dashboard**: manage restaurants, menu (categories/products/sizes/addons with image upload), drivers, orders, analytics, and platform settings (incl. WhatsApp configuration).
-- **Public storefront** (`/{slug}`): mobile-first dark-themed menu browsing, cart, and checkout with mandatory GPS location capture — order confirmation is blocked until the browser reports a location.
+- **Public storefront** (`/{slug}`): mobile-first dark-themed menu browsing, cart, and checkout with explicit delivery/reservation selection. Delivery requires GPS location capture; reservations only request customer contact details and never collect location data.
 - **Delivery dispatch**: on order confirmation, the assigned active driver (restaurant-scoped) receives Telegram and WhatsApp messages with order details and a clickable Google Maps link to the customer. Telegram includes accept/reject/location buttons.
 
 ## User preferences

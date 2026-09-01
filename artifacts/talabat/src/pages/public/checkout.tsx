@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/use-cart";
-import { ArrowRight, MapPin, CheckCircle2, LocateFixed, AlertTriangle, Receipt } from "lucide-react";
+import { ArrowRight, MapPin, CheckCircle2, AlertTriangle, Receipt, Truck, Store, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -28,11 +28,20 @@ const DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const checkoutSchema = z.object({
+  orderType: z.enum(["DELIVERY", "RESERVATION"]),
   customerName: z.string().min(2, "الاسم مطلوب"),
   customerPhone: z.string().min(5, "رقم الهاتف مطلوب"),
   notes: z.string().optional(),
-  latitude: z.number({ required_error: "يرجى تحديد الموقع على الخريطة" }),
-  longitude: z.number({ required_error: "يرجى تحديد الموقع على الخريطة" }),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+}).superRefine((values, ctx) => {
+  if (values.orderType !== "DELIVERY") return;
+  if (values.latitude == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["latitude"], message: "يرجى تحديد الموقع على الخريطة" });
+  }
+  if (values.longitude == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["longitude"], message: "يرجى تحديد الموقع على الخريطة" });
+  }
 });
 
 function LocationMarker({ position, setPosition }: { position: L.LatLng | null, setPosition: (pos: L.LatLng) => void }) {
@@ -61,9 +70,11 @@ export default function PublicCheckout() {
       customerName: "",
       customerPhone: "",
       notes: "",
+      orderType: "DELIVERY",
     }
   });
 
+  const orderType = form.watch("orderType");
   const [mapPosition, setMapPosition] = useState<L.LatLng | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "unavailable">("idle");
   const fallbackPosition: [number, number] = [32.8872, 13.1913];
@@ -92,6 +103,16 @@ export default function PublicCheckout() {
     }
   }, [mapPosition, form]);
 
+  const selectOrderType = (nextType: "DELIVERY" | "RESERVATION") => {
+    form.setValue("orderType", nextType, { shouldValidate: true });
+    if (nextType === "RESERVATION") {
+      setMapPosition(null);
+      setLocationStatus("idle");
+      form.setValue("latitude", undefined);
+      form.setValue("longitude", undefined);
+    }
+  };
+
   useEffect(() => {
     if (items.length === 0 && !orderPlaced) {
       setLocation(`/${slug}`);
@@ -108,12 +129,17 @@ export default function PublicCheckout() {
       selectedSizeId: item.selectedSizeId ?? undefined,
     }));
 
+    const orderData = {
+      ...values,
+      ...(values.orderType === "DELIVERY"
+        ? { latitude: values.latitude, longitude: values.longitude }
+        : {}),
+      items: orderItems,
+    };
+
     placeOrder.mutate({ 
       slug, 
-      data: {
-        ...values,
-        items: orderItems
-      } 
+      data: orderData,
     }, {
       onSuccess: (res) => {
         setOrderId(res.orderId);
@@ -169,6 +195,44 @@ export default function PublicCheckout() {
       <div className="px-4 py-6 space-y-8">
         <Form {...form}>
           <form id="checkout-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+
+            {/* Order type */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="font-bold text-lg text-foreground">طريقة استلام الطلب</h2>
+                <p className="text-sm text-muted-foreground mt-1">اختر الطريقة المناسبة قبل إكمال بياناتك</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3" dir="rtl">
+                <button
+                  type="button"
+                  onClick={() => selectOrderType("DELIVERY")}
+                  className={`min-h-[116px] rounded-2xl border-2 p-4 text-right transition-all ${
+                    orderType === "DELIVERY"
+                      ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                      : "border-border/30 bg-card hover:border-primary/40"
+                  }`}
+                  aria-pressed={orderType === "DELIVERY"}
+                >
+                  <Truck className={`h-7 w-7 mb-3 ${orderType === "DELIVERY" ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="block font-black text-base">🚚 توصيل</span>
+                  <span className="block text-xs text-muted-foreground mt-1">إلى موقعك الحالي</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectOrderType("RESERVATION")}
+                  className={`min-h-[116px] rounded-2xl border-2 p-4 text-right transition-all ${
+                    orderType === "RESERVATION"
+                      ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                      : "border-border/30 bg-card hover:border-primary/40"
+                  }`}
+                  aria-pressed={orderType === "RESERVATION"}
+                >
+                  <Store className={`h-7 w-7 mb-3 ${orderType === "RESERVATION" ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="block font-black text-base">🏪 حجز</span>
+                  <span className="block text-xs text-muted-foreground mt-1">استلام من المطعم</span>
+                </button>
+              </div>
+            </div>
             
             {/* Contact Details */}
             <div className="space-y-4">
@@ -206,8 +270,8 @@ export default function PublicCheckout() {
               </div>
             </div>
 
-            {/* Location */}
-            <div className="space-y-4">
+            {/* Location — delivery only */}
+            {orderType === "DELIVERY" && <div className="space-y-4">
               <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
                 <span className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><MapPin className="h-4 w-4" /></span>
                 موقع التوصيل
@@ -261,10 +325,10 @@ export default function PublicCheckout() {
               {form.formState.errors.latitude && (
                 <p className="text-sm font-bold text-destructive px-2">يرجى تحديد موقع التوصيل على الخريطة</p>
               )}
-            </div>
+            </div>}
 
             {/* Notes */}
-            <div className="space-y-4">
+            {orderType === "DELIVERY" && <div className="space-y-4">
               <div className="bg-card rounded-3xl p-5 border border-border/10 shadow-sm">
                 <FormField
                   control={form.control}
@@ -280,7 +344,29 @@ export default function PublicCheckout() {
                   )}
                 />
               </div>
-            </div>
+            </div>}
+
+            {/* Reservation order details */}
+            {orderType === "RESERVATION" && (
+              <div className="space-y-4">
+                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                  <span className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><ShoppingBag className="h-4 w-4" /></span>
+                  تفاصيل الحجز
+                </h3>
+                <div className="bg-card rounded-3xl p-5 border border-border/10 shadow-sm space-y-3">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium text-foreground">{item.product.name}</span>
+                      <span className="text-muted-foreground shrink-0">× {item.quantity}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between border-t border-border/20 pt-4 font-black">
+                    <span>الإجمالي</span>
+                    <span className="text-primary">{formatCurrency(total)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </Form>
       </div>
@@ -299,11 +385,11 @@ export default function PublicCheckout() {
             </div>
             <div className="flex justify-between text-muted-foreground text-sm font-medium">
                <span>رسوم التوصيل</span>
-               <span>{formatCurrency(deliveryFee)}</span>
+               <span>{orderType === "DELIVERY" ? formatCurrency(deliveryFee) : "—"}</span>
             </div>
              <div className="flex justify-between gap-3 font-black text-lg sm:text-xl pt-3 border-t border-border/20 text-foreground">
                <span>الإجمالي</span>
-               <span className="text-primary">{formatCurrency(total + deliveryFee)}</span>
+                <span className="text-primary">{formatCurrency(total + (orderType === "DELIVERY" ? deliveryFee : 0))}</span>
             </div>
           </div>
 
@@ -311,9 +397,9 @@ export default function PublicCheckout() {
             type="submit" 
             form="checkout-form" 
             className="w-full h-16 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-transform active:scale-[0.98]"
-            disabled={placeOrder.isPending || locationStatus !== "granted"}
+             disabled={placeOrder.isPending || (orderType === "DELIVERY" && locationStatus !== "granted")}
           >
-             {placeOrder.isPending ? "جاري الإرسال..." : "🛒 إتمام الطلب"}
+             {placeOrder.isPending ? "جاري الإرسال..." : orderType === "DELIVERY" ? "🚚 تأكيد التوصيل" : "🏪 تأكيد الحجز"}
           </Button>
         </div>
       </div>

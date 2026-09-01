@@ -994,7 +994,7 @@ paths:
     post:
       operationId: placeOrder
       tags: [public]
-      summary: Place a delivery order (guest checkout)
+      summary: Place a delivery or reservation order (guest checkout)
       parameters:
         - name: slug
           in: path
@@ -1691,17 +1691,18 @@ components:
     # ── Order ───────────────────────────────────────────────────────────────────
     Order:
       type: object
-      required: [id, restaurantId, customerName, customerPhone, totalAmount, status, createdAt]
+      required: [id, restaurantId, orderType, customerName, customerPhone, totalAmount, status, createdAt]
       properties:
         id: { type: number }
         restaurantId: { type: number }
         restaurantName: { type: string }
+        orderType: { type: string, enum: [DELIVERY, RESERVATION] }
         customerName: { type: string }
         customerPhone: { type: string }
         notes: { type: ["string", "null"] }
-        latitude: { type: number }
-        longitude: { type: number }
-        mapsUrl: { type: string }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        mapsUrl: { type: ["string", "null"] }
         subtotal: { type: number }
         deliveryFee: { type: number }
         totalAmount: { type: number }
@@ -1714,17 +1715,18 @@ components:
 
     OrderDetail:
       type: object
-      required: [id, restaurantId, customerName, customerPhone, totalAmount, status, items, statusHistory, createdAt]
+      required: [id, restaurantId, orderType, customerName, customerPhone, totalAmount, status, items, statusHistory, createdAt]
       properties:
         id: { type: number }
         restaurantId: { type: number }
         restaurantName: { type: string }
+        orderType: { type: string, enum: [DELIVERY, RESERVATION] }
         customerName: { type: string }
         customerPhone: { type: string }
         notes: { type: ["string", "null"] }
-        latitude: { type: number }
-        longitude: { type: number }
-        mapsUrl: { type: string }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        mapsUrl: { type: ["string", "null"] }
         subtotal: { type: number }
         deliveryFee: { type: number }
         totalAmount: { type: number }
@@ -1809,13 +1811,14 @@ components:
     # ── Order Input (public guest checkout) ──────────────────────────────────────
     OrderInput:
       type: object
-      required: [customerName, customerPhone, latitude, longitude, items]
+      required: [customerName, customerPhone, orderType, items]
       properties:
         customerName: { type: string, minLength: 1 }
         customerPhone: { type: string }
         notes: { type: string }
-        latitude: { type: number }
-        longitude: { type: number }
+        orderType: { type: string, enum: [DELIVERY, RESERVATION] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
         items:
           type: array
           minItems: 1
