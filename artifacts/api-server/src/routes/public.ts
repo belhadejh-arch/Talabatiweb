@@ -355,27 +355,37 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     relatedType: "order",
   });
 
-  // The order is already durable at this point. Dispatching and channel
-  // notifications must not hold the customer's checkout request open.
-  void dispatchNextDriverForOrder(order.id)
-    .then(async (assignment) => {
-      if (!assignment.assigned) {
-        await db.insert(notificationsTable).values({
-          type: "NO_DRIVER",
-          message: `لا يوجد سائق ACTIVE متاح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
-          relatedId: order.id,
-          relatedType: "order",
-        });
-      }
-    })
-    .catch((error) => {
-      logger.error({ err: error, orderId: order.id }, "Failed to dispatch newly-created order");
-    });
+  // The order is durable before dispatch starts. Wait for the assignment and
+  // channel send attempt so the confirmation means the driver was notified
+  // (or the response clearly explains that no eligible driver was available).
+  let dispatchMessage = "تم إنشاء الطلب بنجاح";
+  try {
+    const assignment = await dispatchNextDriverForOrder(order.id);
+    if (assignment.assigned) {
+      const channelSent = assignment.notification
+        ? assignment.notification.telegram.success || assignment.notification.whatsapp.success
+        : false;
+      dispatchMessage = channelSent
+        ? "تم إنشاء الطلب وإرساله إلى السائق بنجاح"
+        : "تم إنشاء الطلب، لكن تعذر إرسال الإشعار للسائق. راجع إعدادات Telegram أو WhatsApp.";
+    } else {
+      dispatchMessage = "تم إنشاء الطلب، وسيتم إرساله للسائق عند توفر سائق نشط ومهيأ.";
+      await db.insert(notificationsTable).values({
+        type: "NO_DRIVER",
+        message: `لا يوجد سائق ACTIVE ومهيأ بقناة إرسال لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
+        relatedId: order.id,
+        relatedType: "order",
+      });
+    }
+  } catch (error) {
+    logger.error({ err: error, orderId: order.id }, "Failed to dispatch newly-created order");
+    dispatchMessage = "تم إنشاء الطلب، وسيُعاد إرسال الإشعار للسائق تلقائيًا.";
+  }
 
   res.status(201).json({
     orderId: order.id,
     status: "NEW",
-    message: "تم إنشاء الطلب بنجاح",
+    message: dispatchMessage,
   });
 });
 

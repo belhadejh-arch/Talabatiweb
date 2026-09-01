@@ -9,6 +9,11 @@ const TABLE_NAME = "delivery_message_logs";
 
 export type DeliveryChannel = "TELEGRAM" | "WHATSAPP";
 
+export type DriverDeliveryResults = {
+  telegram: TelegramSendResult;
+  whatsapp: WhatsAppSendResult;
+};
+
 export type DriverDeliveryPayload = {
   restaurantName: string;
   restaurantId: number;
@@ -107,7 +112,7 @@ async function logDeliveryResult(
 export async function notifyDriverOnAllChannels(
   driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
-): Promise<void> {
+): Promise<DriverDeliveryResults> {
   const [currentDriver] = await db.select().from(driversTable).where(eq(driversTable.id, driver.id));
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, payload.orderId));
   const eligible =
@@ -128,7 +133,7 @@ export async function notifyDriverOnAllChannels(
       logDeliveryResult(payload.orderId, driver.id, "TELEGRAM", result),
       logDeliveryResult(payload.orderId, driver.id, "WHATSAPP", result),
     ]);
-    return;
+    return { telegram: result, whatsapp: result };
   }
 
   const [telegramResult, whatsappResult] = await Promise.all([
@@ -148,15 +153,18 @@ export async function notifyDriverOnAllChannels(
     logDeliveryResult(payload.orderId, driver.id, "TELEGRAM", telegramResult),
     logDeliveryResult(payload.orderId, driver.id, "WHATSAPP", whatsappResult),
   ]);
+
+  return { telegram: telegramResult, whatsapp: whatsappResult };
 }
 
 export async function safeNotifyDriverOnAllChannels(
   driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
-): Promise<void> {
+): Promise<DriverDeliveryResults | null> {
   try {
-    await notifyDriverOnAllChannels(driver, payload);
+    return await notifyDriverOnAllChannels(driver, payload);
   } catch (error) {
     logger.error({ err: error, orderId: payload.orderId, driverId: driver.id }, "Failed to record delivery channel results");
+    return null;
   }
 }

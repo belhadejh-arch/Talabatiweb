@@ -9,13 +9,13 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-import { ensureTelegramSchema, safeNotifyDriverOnAllChannels } from "./telegramDelivery";
+import { ensureTelegramSchema, safeNotifyDriverOnAllChannels, type DriverDeliveryResults } from "./telegramDelivery";
 
 const DEFAULT_TIMEOUT_SECONDS = 180;
 const DISPATCH_INTERVAL_MS = 10_000;
 
 type DispatchResult =
-  | { assigned: true; orderId: number; driverId: number }
+  | { assigned: true; orderId: number; driverId: number; notification: DriverDeliveryResults | null }
   | { assigned: false; reason: "not_pending" | "no_driver" };
 
 async function getTimeoutSeconds(): Promise<number> {
@@ -24,16 +24,37 @@ async function getTimeoutSeconds(): Promise<number> {
   return Math.max(30, Math.min(86_400, Number(value) || DEFAULT_TIMEOUT_SECONDS));
 }
 
-async function notifyAssignedDriver(orderId: number, driverId: number): Promise<void> {
+async function isWhatsAppDispatchConfigured(): Promise<boolean> {
+  const [settings] = await db
+    .select({
+      whatsappEnabled: settingsTable.whatsappEnabled,
+      whatsappPhoneId: settingsTable.whatsappPhoneId,
+    })
+    .from(settingsTable)
+    .limit(1);
+
+  return Boolean(
+    settings?.whatsappEnabled &&
+    (settings.whatsappPhoneId?.trim() || process.env.WHATSAPP_PHONE_ID?.trim()),
+  );
+}
+
+function driverChannelFilter(whatsappConfigured: boolean): string {
+  const telegram = "d.telegram_chat_id IS NOT NULL AND d.telegram_chat_id <> ''";
+  const whatsapp = "d.phone IS NOT NULL AND TRIM(d.phone) <> ''";
+  return whatsappConfigured ? `(${telegram} OR ${whatsapp})` : `(${telegram})`;
+}
+
+async function notifyAssignedDriver(orderId: number, driverId: number): Promise<DriverDeliveryResults | null> {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
-  if (!order) return;
+  if (!order) return null;
 
   const [restaurant] = await db
     .select({ id: restaurantsTable.id, name: restaurantsTable.name })
     .from(restaurantsTable)
     .where(eq(restaurantsTable.id, order.restaurantId))
     .limit(1);
-  if (!restaurant) return;
+  if (!restaurant) return null;
 
   const items = await db
     .select({ name: orderItemsTable.productName, quantity: orderItemsTable.quantity, sizeName: orderItemsTable.sizeName })
@@ -41,9 +62,9 @@ async function notifyAssignedDriver(orderId: number, driverId: number): Promise<
     .where(eq(orderItemsTable.orderId, orderId));
 
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, driverId)).limit(1);
-  if (!driver) return;
+  if (!driver) return null;
 
-  await safeNotifyDriverOnAllChannels(driver, {
+  return safeNotifyDriverOnAllChannels(driver, {
     restaurantName: restaurant.name,
     restaurantId: restaurant.id,
     orderId: order.id,
@@ -62,6 +83,7 @@ async function notifyAssignedDriver(orderId: number, driverId: number): Promise<
  */
 export async function dispatchNextDriverForOrder(orderId: number): Promise<DispatchResult> {
   const timeoutSeconds = await getTimeoutSeconds();
+  const whatsappConfigured = await isWhatsAppDispatchConfigured();
   const client = await pool.connect();
 
   try {
@@ -87,8 +109,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
        WHERE d.restaurant_id = $1
          AND d.is_active = true
          AND d.status = 'ACTIVE'
-         AND d.telegram_chat_id IS NOT NULL
-         AND d.telegram_chat_id <> ''
+          AND ${driverChannelFilter(whatsappConfigured)}
          AND NOT EXISTS (
            SELECT 1 FROM order_driver_attempts a
            WHERE a.order_id = $2 AND a.driver_id = d.id
@@ -121,10 +142,8 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     await client.query("COMMIT");
 
-    void notifyAssignedDriver(order.id, driver.id).catch((error) => {
-      logger.error({ err: error, orderId: order.id, driverId: driver.id }, "Failed to notify assigned driver");
-    });
-    return { assigned: true, orderId: order.id, driverId: driver.id };
+    const notification = await notifyAssignedDriver(order.id, driver.id);
+    return { assigned: true, orderId: order.id, driverId: driver.id, notification };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -215,6 +234,7 @@ export async function respondToOrderAttempt(
 
 export async function assignSpecificDriverForOrder(orderId: number, driverId: number): Promise<boolean> {
   const timeoutSeconds = await getTimeoutSeconds();
+  const whatsappConfigured = await isWhatsAppDispatchConfigured();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -232,7 +252,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       `SELECT id FROM drivers
        WHERE id = $1 AND restaurant_id = $2
          AND is_active = true AND status = 'ACTIVE'
-         AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> ''
+          AND ${driverChannelFilter(whatsappConfigured).replaceAll("d.", "")}
        FOR UPDATE`,
       [driverId, order.restaurant_id],
     );
@@ -270,9 +290,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     await client.query("COMMIT");
 
-    void notifyAssignedDriver(orderId, driverId).catch((error) => {
-      logger.error({ err: error, orderId, driverId }, "Failed to notify manually assigned driver");
-    });
+    await notifyAssignedDriver(orderId, driverId);
     return true;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
