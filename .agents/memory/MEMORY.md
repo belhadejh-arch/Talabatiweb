@@ -9,3 +9,4 @@
 - [Telegram driver linking](telegram-delivery.md) — getUpdates stays empty until a driver sends /start; link the resulting Chat ID to the restaurant-scoped driver
 - [TALABAT product sizes vs addons](talabat-product-sizes.md) — sizes are exclusive/replace base price, addons are additive; cart id must encode both or combos collide
 - [pnpm workspace lib typecheck](pnpm-workspace-lib-typecheck.md) — editing lib/* package source needs a `tsc -p lib/<pkg>/tsconfig.json` rebuild or consumers typecheck against stale dist/*.d.ts
+- [Drizzle schema drift](drizzle-schema-drift.md) — when push requires an interactive conflict choice, use targeted reviewed DDL for additive runtime tables/columns instead of force-pushing the whole schema

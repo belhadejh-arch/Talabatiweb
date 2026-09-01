@@ -9,11 +9,11 @@ export const driversTable = pgTable("drivers", {
   name: text("name").notNull(),
   phone: text("phone").notNull(),
   telegramChatId: text("telegram_chat_id"),
-  status: text("status").notNull().default("ACTIVE"),
+  status: text("status").notNull().default("INACTIVE"),
   address: text("address"),
   vehicleType: text("vehicle_type"),
   vehiclePlate: text("vehicle_plate"),
-  isActive: boolean("is_active").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(false),
   totalDeliveries: integer("total_deliveries").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

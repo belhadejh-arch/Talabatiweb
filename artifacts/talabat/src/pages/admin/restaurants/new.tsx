@@ -13,14 +13,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Store } from "lucide-react";
 import { Link } from "wouter";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Name is required" }),
   slug: z.string().min(1, { message: "Slug is required" }).regex(/^[a-z0-9-]+$/, "Only lowercase letters, numbers, and hyphens"),
   phone: z.string().min(5, { message: "Phone is required" }),
   address: z.string().min(5, { message: "Address is required" }),
-  logoUrl: z.string().url().optional().or(z.literal("")),
-  coverUrl: z.string().url().optional().or(z.literal("")),
+  logoUrl: z.string().optional(),
+  coverUrl: z.string().optional(),
   description: z.string().optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/i, "Must be a valid hex color").optional().or(z.literal("")),
   whatsappNumber: z.string().optional(),
@@ -167,6 +168,33 @@ export default function AdminRestaurantNew() {
                       <FormLabel>رقم واتساب</FormLabel>
                       <FormControl>
                         <Input type="tel" placeholder="+218 ..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="logoUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>شعار المطعم</FormLabel>
+                      <FormControl>
+                        <ImageUpload value={field.value || ""} onChange={field.onChange} folder="restaurants" label="ارفع شعار المطعم" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="coverUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>غلاف المطعم</FormLabel>
+                      <FormControl>
+                        <ImageUpload value={field.value || ""} onChange={field.onChange} folder="restaurants" label="ارفع غلاف المطعم" className="md:min-h-[148px]" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const settingsTable = pgTable("settings", {
   whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
   defaultCurrency: text("default_currency").notNull().default("LYD"),
   mapsApiKey: text("maps_api_key"),
+  driverResponseTimeoutSeconds: integer("driver_response_timeout_seconds").notNull().default(180),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

@@ -12,12 +12,11 @@ import {
   orderItemAddonsTable,
   orderStatusHistoryTable,
   notificationsTable,
-  driversTable,
 } from "@workspace/db";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { PlaceOrderBody } from "@workspace/api-zod";
 import { isSubscriptionActive } from "../lib/subscriptions";
-import { safeNotifyDriverOnAllChannels } from "../lib/telegramDelivery";
+import { dispatchNextDriverForOrder } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
 
@@ -334,57 +333,11 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     relatedType: "order",
   });
 
-  // Auto-assign an active driver belonging to this restaurant and notify
-  // them on both configured delivery channels.
-  const [driver] = await db
-    .select()
-    .from(driversTable)
-    .where(and(
-      eq(driversTable.restaurantId, restaurant.id),
-      eq(driversTable.isActive, true),
-      eq(driversTable.status, "ACTIVE"),
-    ))
-    // Prefer a driver who can actually receive Telegram notifications. This
-    // prevents an older active driver without a Chat ID from silently
-    // capturing every new order before a linked driver.
-    .orderBy(
-      sql`CASE WHEN ${driversTable.telegramChatId} IS NOT NULL AND ${driversTable.telegramChatId} <> '' THEN 0 ELSE 1 END`,
-      asc(driversTable.id),
-    )
-    .limit(1);
-
-  if (driver) {
-    await db.update(ordersTable).set({ driverId: driver.id }).where(eq(ordersTable.id, order.id));
-    await db
-      .update(driversTable)
-      .set({ totalDeliveries: driver.totalDeliveries + 1 })
-      .where(eq(driversTable.id, driver.id));
-
-    await db.insert(notificationsTable).values({
-      type: "DRIVER_ASSIGNED",
-      message: `تم تعيين السائق "${driver.name}" للطلب #${order.id}`,
-      relatedId: order.id,
-      relatedType: "order",
-    });
-
-    const itemsSummary = lineItems
-      .map((li) => `${li.productName}${li.sizeName ? ` (${li.sizeName})` : ""} x${li.quantity}`)
-      .join(", ");
-
-    void safeNotifyDriverOnAllChannels(driver, {
-      restaurantName: restaurant.name,
-      restaurantId: restaurant.id,
-      orderId: order.id,
-      customerName: customerInfo.customerName,
-      customerPhone: customerInfo.customerPhone,
-      items: itemsSummary,
-      total: `${grandTotal.toFixed(2)} د.ل`,
-      mapsUrl,
-    });
-  } else {
+  const assignment = await dispatchNextDriverForOrder(order.id);
+  if (!assignment.assigned) {
     await db.insert(notificationsTable).values({
       type: "NO_DRIVER",
-      message: `لا يوجد سائق متاح لمطعم "${restaurant.name}" لتوصيل الطلب #${order.id}`,
+      message: `لا يوجد سائق ACTIVE متاح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
       relatedId: order.id,
       relatedType: "order",
     });

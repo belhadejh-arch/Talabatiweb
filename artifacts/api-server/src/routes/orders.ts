@@ -17,7 +17,7 @@ import {
   AssignDriverBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { safeNotifyDriverOnAllChannels } from "../lib/telegramDelivery";
+import { assignSpecificDriverForOrder } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
 
@@ -180,6 +180,14 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     note: parsed.data.note ?? null,
   });
 
+  if (parsed.data.status === "ACCEPTED" && order.driverId) {
+    await db.execute(sql`
+      UPDATE order_driver_attempts
+      SET status = 'ACCEPTED', responded_at = NOW()
+      WHERE order_id = ${id} AND driver_id = ${order.driverId} AND status = 'PENDING'
+    `);
+  }
+
   const detail = await getOrderDetail(id);
   res.json(detail);
 });
@@ -212,13 +220,11 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
     return;
   }
 
-  await db.update(ordersTable).set({ driverId: parsed.data.driverId }).where(eq(ordersTable.id, id));
-
-  // Update driver total deliveries
-  await db
-    .update(driversTable)
-    .set({ totalDeliveries: driver.totalDeliveries + 1 })
-    .where(eq(driversTable.id, parsed.data.driverId));
+  const assigned = await assignSpecificDriverForOrder(id, parsed.data.driverId);
+  if (!assigned) {
+    res.status(409).json({ error: "تعذر إسناد الطلب، ربما تم تحديثه من Telegram أو انتهت صلاحيته" });
+    return;
+  }
 
   // Create notification
   await db.insert(notificationsTable).values({
@@ -229,29 +235,6 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
   });
 
   const detail = await getOrderDetail(id);
-
-  // Send WhatsApp to driver
-  if (detail) {
-    const [restaurant] = await db
-      .select()
-      .from(restaurantsTable)
-      .where(eq(restaurantsTable.id, order.restaurantId));
-
-    const itemsSummary = detail.items
-      .map((i) => `${i.productName} x${i.quantity}`)
-      .join(", ");
-
-    void safeNotifyDriverOnAllChannels(driver, {
-      restaurantName: restaurant?.name ?? "",
-      restaurantId: order.restaurantId,
-      orderId: id,
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      items: itemsSummary,
-      total: `${parseFloat(order.totalAmount).toFixed(2)} د.ل`,
-      mapsUrl: order.mapsUrl,
-    });
-  }
 
   res.json(detail);
 });

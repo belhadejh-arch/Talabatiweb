@@ -409,6 +409,39 @@ export interface DriverPatch {
   isActive?: boolean;
 }
 
+export type DriverPlatform = Driver & {
+  restaurantName: string;
+  acceptedCount: number;
+  rejectedCount: number;
+  timeoutCount: number;
+};
+
+export type DriverOrderAttemptStatus = typeof DriverOrderAttemptStatus[keyof typeof DriverOrderAttemptStatus];
+
+
+export const DriverOrderAttemptStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  TIMEOUT: 'TIMEOUT',
+} as const;
+
+export interface DriverOrderAttempt {
+  id: number;
+  orderId: number;
+  driverId: number;
+  status: DriverOrderAttemptStatus;
+  sentAt: string;
+  /** @nullable */
+  respondedAt?: string | null;
+  timeoutAt: string;
+  customerName?: string;
+  customerPhone?: string;
+  totalAmount?: number;
+  orderStatus?: string;
+  orderCreatedAt?: string;
+}
+
 export interface DriverAssignment {
   driverId: number;
 }
@@ -700,6 +733,11 @@ export interface Settings {
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
+  /**
+     * @minimum 30
+     * @maximum 86400
+     */
+  driverResponseTimeoutSeconds?: number;
   updatedAt?: string;
 }
 
@@ -713,6 +751,11 @@ export interface SettingsPatch {
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
+  /**
+     * @minimum 30
+     * @maximum 86400
+     */
+  driverResponseTimeoutSeconds?: number;
 }
 
 export type ListRestaurantsParams = {

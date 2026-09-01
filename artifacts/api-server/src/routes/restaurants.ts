@@ -14,6 +14,7 @@ import {
 import { requireAuth } from "../middlewares/auth";
 import { computeSubscriptionDates } from "../lib/subscriptions";
 import { notificationsTable } from "@workspace/db";
+import { deleteDatabaseStoredImage, deleteStoredImage } from "../lib/imageUpload";
 
 const router: IRouter = Router();
 
@@ -146,6 +147,9 @@ router.patch("/restaurants/:id", requireAuth, async (req, res): Promise<void> =>
   const parsed = UpdateRestaurantBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [previous] = await db.select({ logoUrl: restaurantsTable.logoUrl, coverUrl: restaurantsTable.coverUrl }).from(restaurantsTable).where(eq(restaurantsTable.id, id));
+  if (!previous) { res.status(404).json({ error: "Not found" }); return; }
+
   const updateValues: any = { ...parsed.data };
   if (parsed.data.deliveryFee !== undefined) updateValues.deliveryFee = String(parsed.data.deliveryFee);
 
@@ -156,6 +160,12 @@ router.patch("/restaurants/:id", requireAuth, async (req, res): Promise<void> =>
     .returning();
 
   if (!restaurant) { res.status(404).json({ error: "Not found" }); return; }
+
+  const replacedImages = [previous.logoUrl, previous.coverUrl]
+    .filter((url): url is string => !!url && url !== restaurant.logoUrl && url !== restaurant.coverUrl);
+  for (const url of replacedImages) {
+    void Promise.all([deleteStoredImage(url), deleteDatabaseStoredImage(url)]).catch(() => undefined);
+  }
 
   const [subscription] = await db
     .select()

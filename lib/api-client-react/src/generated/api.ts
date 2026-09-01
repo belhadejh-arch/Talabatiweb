@@ -33,7 +33,9 @@ import type {
   Driver,
   DriverAssignment,
   DriverInput,
+  DriverOrderAttempt,
   DriverPatch,
+  DriverPlatform,
   DriverStat,
   EmailChangeInput,
   GetAnalyticsSummaryParams,
@@ -2481,6 +2483,83 @@ export const useDeleteAddon = <TError = ErrorType<unknown>,
       return useMutation(getDeleteAddonMutationOptions(options));
     }
 
+export const getListAllDriversUrl = () => {
+
+
+
+
+  return `/api/drivers`
+}
+
+/**
+ * @summary List all platform drivers with delivery outcome counters
+ */
+export const listAllDrivers = async ( options?: Parameters<typeof customFetch>[1]): Promise<DriverPlatform[]> => {
+
+  return customFetch<DriverPlatform[]>(getListAllDriversUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAllDriversQueryKey = () => {
+    return [
+    `/api/drivers`
+    ] as const;
+    }
+
+
+export const getListAllDriversQueryOptions = <TData = Awaited<ReturnType<typeof listAllDrivers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAllDrivers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAllDriversQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllDrivers>>> = ({ signal }) => listAllDrivers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllDrivers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAllDriversQueryResult = NonNullable<Awaited<ReturnType<typeof listAllDrivers>>>
+export type ListAllDriversQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all platform drivers with delivery outcome counters
+ */
+
+export function useListAllDrivers<TData = Awaited<ReturnType<typeof listAllDrivers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAllDrivers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAllDriversQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getListDriversUrl = (id: number,) => {
 
 
@@ -2772,6 +2851,83 @@ export const useDeleteDriver = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteDriverMutationOptions(options));
     }
+
+export const getGetDriverHistoryUrl = (id: number,) => {
+
+
+
+
+  return `/api/drivers/${id}/history`
+}
+
+/**
+ * @summary Get a driver's accepted, rejected, and timed out order attempts
+ */
+export const getDriverHistory = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<DriverOrderAttempt[]> => {
+
+  return customFetch<DriverOrderAttempt[]>(getGetDriverHistoryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDriverHistoryQueryKey = (id: number,) => {
+    return [
+    `/api/drivers/${id}/history`
+    ] as const;
+    }
+
+
+export const getGetDriverHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getDriverHistory>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDriverHistoryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDriverHistory>>> = ({ signal }) => getDriverHistory(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDriverHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDriverHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getDriverHistory>>>
+export type GetDriverHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a driver's accepted, rejected, and timed out order attempts
+ */
+
+export function useGetDriverHistory<TData = Awaited<ReturnType<typeof getDriverHistory>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDriverHistoryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListOrdersUrl = (params?: ListOrdersParams,) => {
   const normalizedParams = new URLSearchParams();

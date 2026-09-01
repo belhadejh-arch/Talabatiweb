@@ -38,8 +38,14 @@ export async function ensureTelegramSchema(): Promise<void> {
         ALTER TABLE drivers
           ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
 
-        UPDATE drivers
-          SET status = CASE WHEN is_active THEN 'ACTIVE' ELSE 'INACTIVE' END;
+        ALTER TABLE drivers
+          ALTER COLUMN is_active SET DEFAULT false;
+
+        ALTER TABLE drivers
+          ALTER COLUMN status SET DEFAULT 'INACTIVE';
+
+        ALTER TABLE settings
+          ADD COLUMN IF NOT EXISTS driver_response_timeout_seconds INTEGER NOT NULL DEFAULT 180;
 
         CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
           id SERIAL PRIMARY KEY,
@@ -50,6 +56,19 @@ export async function ensureTelegramSchema(): Promise<void> {
           error_message TEXT,
           sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+
+        CREATE TABLE IF NOT EXISTS order_driver_attempts (
+          id SERIAL PRIMARY KEY,
+          order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+          driver_id INTEGER NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+          status TEXT NOT NULL DEFAULT 'PENDING',
+          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          responded_at TIMESTAMPTZ,
+          timeout_at TIMESTAMPTZ NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS order_driver_attempt_order_driver_idx
+          ON order_driver_attempts(order_id, driver_id);
 
         CREATE TABLE IF NOT EXISTS telegram_contacts (
           chat_id TEXT PRIMARY KEY,

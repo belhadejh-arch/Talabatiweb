@@ -821,6 +821,31 @@ export const DeleteAddonResponse = zod.void()
 
 
 /**
+ * @summary List all platform drivers with delivery outcome counters
+ */
+export const ListAllDriversResponseItem = zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "telegramChatId": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "vehiclePlate": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
+  "totalDeliveries": zod.number(),
+  "createdAt": zod.coerce.date().optional()
+}).and(zod.object({
+  "restaurantName": zod.string(),
+  "acceptedCount": zod.number(),
+  "rejectedCount": zod.number(),
+  "timeoutCount": zod.number()
+}))
+export const ListAllDriversResponse = zod.array(ListAllDriversResponseItem)
+
+
+/**
  * @summary List drivers for a restaurant
  */
 export const ListDriversParams = zod.object({
@@ -921,6 +946,30 @@ export const DeleteDriverParams = zod.object({
 })
 
 export const DeleteDriverResponse = zod.void()
+
+
+/**
+ * @summary Get a driver's accepted, rejected, and timed out order attempts
+ */
+export const GetDriverHistoryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDriverHistoryResponseItem = zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "driverId": zod.number(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'TIMEOUT']),
+  "sentAt": zod.coerce.date(),
+  "respondedAt": zod.coerce.date().nullish(),
+  "timeoutAt": zod.coerce.date(),
+  "customerName": zod.string().optional(),
+  "customerPhone": zod.string().optional(),
+  "totalAmount": zod.number().optional(),
+  "orderStatus": zod.string().optional(),
+  "orderCreatedAt": zod.coerce.date().optional()
+})
+export const GetDriverHistoryResponse = zod.array(GetDriverHistoryResponseItem)
 
 
 /**
@@ -1461,6 +1510,11 @@ export const MarkAllNotificationsReadResponse = zod.unknown()
 /**
  * @summary Get platform settings
  */
+export const getSettingsResponseDriverResponseTimeoutSecondsMin = 30;
+export const getSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
+
+
+
 export const GetSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
@@ -1469,6 +1523,7 @@ export const GetSettingsResponse = zod.object({
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
+  "driverResponseTimeoutSeconds": zod.number().min(getSettingsResponseDriverResponseTimeoutSecondsMin).max(getSettingsResponseDriverResponseTimeoutSecondsMax).optional(),
   "updatedAt": zod.coerce.date().optional()
 })
 
@@ -1476,14 +1531,25 @@ export const GetSettingsResponse = zod.object({
 /**
  * @summary Update platform settings
  */
+export const updateSettingsBodyDriverResponseTimeoutSecondsMin = 30;
+export const updateSettingsBodyDriverResponseTimeoutSecondsMax = 86400;
+
+
+
 export const UpdateSettingsBody = zod.object({
   "platformName": zod.string().optional(),
   "whatsappApiKey": zod.string().nullish(),
   "whatsappPhoneId": zod.string().nullish(),
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
-  "mapsApiKey": zod.string().nullish()
+  "mapsApiKey": zod.string().nullish(),
+  "driverResponseTimeoutSeconds": zod.number().min(updateSettingsBodyDriverResponseTimeoutSecondsMin).max(updateSettingsBodyDriverResponseTimeoutSecondsMax).optional()
 })
+
+export const updateSettingsResponseDriverResponseTimeoutSecondsMin = 30;
+export const updateSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
+
+
 
 export const UpdateSettingsResponse = zod.object({
   "id": zod.number(),
@@ -1493,6 +1559,7 @@ export const UpdateSettingsResponse = zod.object({
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
+  "driverResponseTimeoutSeconds": zod.number().min(updateSettingsResponseDriverResponseTimeoutSecondsMin).max(updateSettingsResponseDriverResponseTimeoutSecondsMax).optional(),
   "updatedAt": zod.coerce.date().optional()
 })
 

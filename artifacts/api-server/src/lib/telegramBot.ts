@@ -11,6 +11,7 @@ import {
 import { and, desc, eq, ne } from "drizzle-orm";
 import { logger } from "./logger";
 import { ensureTelegramSchema } from "./telegramDelivery";
+import { dispatchPendingOrdersForRestaurant, respondToOrderAttempt } from "./driverDispatch";
 import {
   answerTelegramCallbackQuery,
   editTelegramMessageText,
@@ -128,6 +129,10 @@ async function setDriverActivity(id: string, active: boolean): Promise<void> {
     .update(driversTable)
     .set({ isActive: active, status: active ? ACTIVE : INACTIVE })
     .where(eq(driversTable.id, driver.id));
+
+  if (active) {
+    await dispatchPendingOrdersForRestaurant(driver.restaurantId);
+  }
 
   await sendMenu(id, active
     ? "🟢 تم تفعيل نشاطك. ستستقبل الطلبات الجديدة الخاصة بمطعمك."
@@ -258,49 +263,17 @@ async function handleOrderAction(update: TelegramUpdate): Promise<void> {
 
   const isAccept = match[1] === "order_accept";
   if (isAccept) {
-    if (order.status !== "NEW" && order.status !== "ACCEPTED") {
+    if (order.status !== "NEW") {
       await answerTelegramCallbackQuery(callback.id, "هذا الطلب لم يعد قابلًا للقبول.", true);
       return;
     }
-    const [updatedOrder] = await db
-      .update(ordersTable)
-      .set({ status: "ACCEPTED" })
-      .where(and(
-        eq(ordersTable.id, orderId),
-        eq(ordersTable.driverId, driver.id),
-        eq(ordersTable.restaurantId, driver.restaurantId),
-        eq(ordersTable.status, order.status),
-      ))
-      .returning({ id: ordersTable.id });
-    if (!updatedOrder) {
-      await answerTelegramCallbackQuery(callback.id, "هذا الطلب تم تحديثه من جهة أخرى.", true);
-      return;
-    }
-    await db.insert(orderStatusHistoryTable).values({
-      orderId,
-      status: "ACCEPTED",
-      note: `تم قبول الطلب من السائق ${driver.name} عبر Telegram`,
-    });
   } else {
-    const [updatedOrder] = await db
-      .update(ordersTable)
-      .set({ driverId: null, status: "NEW" })
-      .where(and(
-        eq(ordersTable.id, orderId),
-        eq(ordersTable.driverId, driver.id),
-        eq(ordersTable.restaurantId, driver.restaurantId),
-        eq(ordersTable.status, order.status),
-      ))
-      .returning({ id: ordersTable.id });
-    if (!updatedOrder) {
-      await answerTelegramCallbackQuery(callback.id, "هذا الطلب تم تحديثه من جهة أخرى.", true);
-      return;
-    }
-    await db.insert(orderStatusHistoryTable).values({
-      orderId,
-      status: "NEW",
-      note: `تم رفض الطلب من السائق ${driver.name} عبر Telegram`,
-    });
+  }
+
+  const handled = await respondToOrderAttempt(orderId, driver.id, isAccept ? "ACCEPTED" : "REJECTED");
+  if (!handled) {
+    await answerTelegramCallbackQuery(callback.id, "هذا الطلب تم تحديثه من جهة أخرى.", true);
+    return;
   }
 
   await answerTelegramCallbackQuery(callback.id, isAccept ? "تم قبول الطلب" : "تم رفض الطلب");

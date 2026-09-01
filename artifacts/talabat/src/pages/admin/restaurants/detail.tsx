@@ -26,6 +26,7 @@ import { formatCurrency } from "@/lib/currency";
 import { orderStatusLabel, restaurantStatusLabel, subscriptionPlanLabel, subscriptionStatusLabel } from "@/lib/labels";
 import { toast } from "@/hooks/use-toast";
 import { MembershipDialog } from "./membership-dialog";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
@@ -222,8 +223,6 @@ export default function AdminRestaurantDetail() {
                   ["name", "الاسم"],
                   ["phone", "رقم الهاتف"],
                   ["address", "العنوان"],
-                  ["logoUrl", "رابط الشعار"],
-                  ["coverUrl", "رابط الغلاف"],
                   ["primaryColor", "اللون الأساسي"],
                   ["whatsappNumber", "رقم واتساب"],
                 ] as const).map(([key, label]) => (
@@ -236,6 +235,22 @@ export default function AdminRestaurantDetail() {
                     />
                   </label>
                 ))}
+                <div>
+                  <ImageUpload
+                    value={form.logoUrl}
+                    onChange={(value) => setForm({ ...form, logoUrl: value })}
+                    folder="restaurants"
+                    label="شعار المطعم"
+                  />
+                </div>
+                <div>
+                  <ImageUpload
+                    value={form.coverUrl}
+                    onChange={(value) => setForm({ ...form, coverUrl: value })}
+                    folder="restaurants"
+                    label="غلاف المطعم"
+                  />
+                </div>
                 <label>
                   رسوم التوصيل (د.ل)
                   <Input
