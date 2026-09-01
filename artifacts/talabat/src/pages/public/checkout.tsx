@@ -367,42 +367,40 @@ export default function PublicCheckout() {
                 </div>
               </div>
             )}
-          </form>
-        </Form>
-      </div>
+          {/* Sticky Order Summary Bottom Bar */}
+          <div className="fixed bottom-0 inset-x-0 z-40 max-w-[480px] mx-auto">
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 to-transparent -top-12 bottom-0 pointer-events-none" />
 
-      {/* Sticky Order Summary Bottom Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 max-w-[480px] mx-auto">
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 to-transparent -top-12 bottom-0 pointer-events-none" />
-        
-        <div className="relative p-4 sm:p-5 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background/95 backdrop-blur border-t border-border/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
-          <div className="w-12 h-1.5 bg-border/40 rounded-full mx-auto mb-5" />
-          
-          <div className="space-y-3 mb-5 px-2">
-            <div className="flex justify-between text-muted-foreground text-sm font-medium">
-               <span>المجموع الفرعي ({items.length} منتجات)</span>
-               <span>{formatCurrency(total)}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground text-sm font-medium">
-               <span>رسوم التوصيل</span>
-               <span>{orderType === "DELIVERY" ? formatCurrency(deliveryFee) : "—"}</span>
-            </div>
-             <div className="flex justify-between gap-3 font-black text-lg sm:text-xl pt-3 border-t border-border/20 text-foreground">
-               <span>الإجمالي</span>
-                <span className="text-primary">{formatCurrency(total + (orderType === "DELIVERY" ? deliveryFee : 0))}</span>
+            <div className="relative p-4 sm:p-5 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background/95 backdrop-blur border-t border-border/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+              <div className="w-12 h-1.5 bg-border/40 rounded-full mx-auto mb-5" />
+
+              <div className="space-y-3 mb-5 px-2">
+                <div className="flex justify-between text-muted-foreground text-sm font-medium">
+                   <span>المجموع الفرعي ({items.length} منتجات)</span>
+                   <span>{formatCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground text-sm font-medium">
+                   <span>رسوم التوصيل</span>
+                   <span>{orderType === "DELIVERY" ? formatCurrency(deliveryFee) : "—"}</span>
+                </div>
+                 <div className="flex justify-between gap-3 font-black text-lg sm:text-xl pt-3 border-t border-border/20 text-foreground">
+                   <span>الإجمالي</span>
+                    <span className="text-primary">{formatCurrency(total + (orderType === "DELIVERY" ? deliveryFee : 0))}</span>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-16 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-transform active:scale-[0.98]"
+                 disabled={placeOrder.isPending || (orderType === "DELIVERY" && locationStatus !== "granted")}
+              >
+                 {placeOrder.isPending ? "جاري الإرسال..." : orderType === "DELIVERY" ? "🚚 تأكيد التوصيل" : "🏪 تأكيد الحجز"}
+              </Button>
             </div>
           </div>
-
-          <Button 
-            type="submit" 
-            form="checkout-form" 
-            className="w-full h-16 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-transform active:scale-[0.98]"
-             disabled={placeOrder.isPending || (orderType === "DELIVERY" && locationStatus !== "granted")}
-          >
-             {placeOrder.isPending ? "جاري الإرسال..." : orderType === "DELIVERY" ? "🚚 تأكيد التوصيل" : "🏪 تأكيد الحجز"}
-          </Button>
-        </div>
-      </div>
+        </form>
+      </Form>
+    </div>
     </div>
   );
 }

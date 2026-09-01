@@ -17,6 +17,7 @@ import { eq, and, asc, desc } from "drizzle-orm";
 import { PlaceOrderBody } from "@workspace/api-zod";
 import { isSubscriptionActive } from "../lib/subscriptions";
 import { dispatchNextDriverForOrder } from "../lib/driverDispatch";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -354,15 +355,22 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     relatedType: "order",
   });
 
-  const assignment = await dispatchNextDriverForOrder(order.id);
-  if (!assignment.assigned) {
-    await db.insert(notificationsTable).values({
-      type: "NO_DRIVER",
-      message: `لا يوجد سائق ACTIVE متاح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
-      relatedId: order.id,
-      relatedType: "order",
+  // The order is already durable at this point. Dispatching and channel
+  // notifications must not hold the customer's checkout request open.
+  void dispatchNextDriverForOrder(order.id)
+    .then(async (assignment) => {
+      if (!assignment.assigned) {
+        await db.insert(notificationsTable).values({
+          type: "NO_DRIVER",
+          message: `لا يوجد سائق ACTIVE متاح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
+          relatedId: order.id,
+          relatedType: "order",
+        });
+      }
+    })
+    .catch((error) => {
+      logger.error({ err: error, orderId: order.id }, "Failed to dispatch newly-created order");
     });
-  }
 
   res.status(201).json({
     orderId: order.id,
