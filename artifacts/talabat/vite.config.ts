@@ -16,6 +16,8 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+const apiOrigin = process.env.API_ORIGIN || 'http://127.0.0.1:8080';
+
 // The standalone Vercel deployment is served from the domain root.
 const basePath = process.env.BASE_PATH || '/';
 
@@ -61,6 +63,14 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
+    // The web and API services run on separate local ports in Replit.
+    // Keep /api same-origin in the browser and forward it to Express.
+    proxy: {
+      '/api': {
+        target: apiOrigin,
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
     },
@@ -69,5 +79,11 @@ export default defineConfig({
     port,
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: apiOrigin,
+        changeOrigin: true,
+      },
+    },
   },
 });
