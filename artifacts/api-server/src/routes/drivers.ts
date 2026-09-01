@@ -135,7 +135,7 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
        o.id AS "orderId",
        $1::int AS "driverId",
        CASE
-         WHEN a.status = 'PENDING' AND o.status IN ('ACCEPTED', 'DELIVERED') THEN 'ACCEPTED'
+         WHEN COALESCE(a.status, 'PENDING') = 'PENDING' AND o.status IN ('ACCEPTED', 'DELIVERED') THEN 'ACCEPTED'
          ELSE COALESCE(a.status, 'PENDING')
        END AS status,
        COALESCE(a.sent_at, o.created_at) AS "sentAt",
