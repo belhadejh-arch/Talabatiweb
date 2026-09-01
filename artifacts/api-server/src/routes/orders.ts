@@ -8,6 +8,7 @@ import {
   driversTable,
   restaurantsTable,
   notificationsTable,
+  deliveryMessageLogsTable,
 } from "@workspace/db";
 import { eq, desc, and, gte, lte, ilike, count, sql, or } from "drizzle-orm";
 import {
@@ -16,7 +17,7 @@ import {
   AssignDriverBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { sendWhatsAppToDriver } from "../lib/whatsapp";
+import { safeNotifyDriverOnAllChannels } from "../lib/telegramDelivery";
 
 const router: IRouter = Router();
 
@@ -141,6 +142,21 @@ router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(detail);
 });
 
+// Delivery channel audit trail for an order
+router.get("/orders/:id/delivery-status", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const logs = await db
+    .select()
+    .from(deliveryMessageLogsTable)
+    .where(eq(deliveryMessageLogsTable.orderId, id))
+    .orderBy(desc(deliveryMessageLogsTable.sentAt), desc(deliveryMessageLogsTable.id));
+
+  res.json(logs);
+});
+
 // Update order status
 router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -217,7 +233,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
       .map((i) => `${i.productName} x${i.quantity}`)
       .join(", ");
 
-    sendWhatsAppToDriver({
+    void safeNotifyDriverOnAllChannels(driver, {
       restaurantName: restaurant?.name ?? "",
       orderId: id,
       customerName: order.customerName,
@@ -225,8 +241,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
       items: itemsSummary,
       total: `${parseFloat(order.totalAmount).toFixed(2)} د.ل`,
       mapsUrl: order.mapsUrl,
-      driverPhone: driver.phone,
-    }).catch(() => {}); // fire and forget
+    });
   }
 
   res.json(detail);

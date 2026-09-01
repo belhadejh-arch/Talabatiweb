@@ -13,6 +13,7 @@ import notificationsRouter from "./notifications";
 import settingsRouter from "./settings";
 import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
+import telegramRouter from "./telegram";
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use(notificationsRouter);
 router.use(settingsRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
+router.use(telegramRouter);
 
 export default router;

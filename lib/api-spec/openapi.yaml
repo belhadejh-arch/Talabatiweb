@@ -845,6 +845,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/OrderDetail"
 
+  /orders/{id}/delivery-status:
+    get:
+      operationId: getOrderDeliveryStatus
+      tags: [orders]
+      summary: Get Telegram and WhatsApp delivery status for an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Delivery channel attempts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliveryMessageLog"
+
+  /telegram/status:
+    get:
+      operationId: getTelegramStatus
+      tags: [telegram]
+      summary: Verify the configured Telegram bot
+      responses:
+        "200":
+          description: Telegram bot connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [configured, connected]
+                properties:
+                  configured: { type: boolean }
+                  connected: { type: boolean }
+                  bot:
+                    type: object
+                    properties:
+                      id: { type: number }
+                      username: { type: ["string", "null"] }
+                      firstName: { type: string }
+                  error: { type: string }
+
+  /telegram/recent-chats:
+    get:
+      operationId: getTelegramRecentChats
+      tags: [telegram]
+      summary: List recent chats that contacted the bot
+      responses:
+        "200":
+          description: Recent Telegram chats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [chatId, title]
+                      properties:
+                        chatId: { type: string }
+                        title: { type: string }
+                        username: { type: ["string", "null"] }
+
   # ── Public storefront ────────────────────────────────────────────────────────
   /public/restaurants/{slug}:
     get:
@@ -1504,6 +1572,7 @@ components:
         restaurantId: { type: number }
         name: { type: string }
         phone: { type: string }
+        telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
@@ -1517,6 +1586,7 @@ components:
       properties:
         name: { type: string, minLength: 1 }
         phone: { type: string }
+        telegramChatId: { type: string }
         address: { type: string }
         vehicleType: { type: string }
         vehiclePlate: { type: string }
@@ -1527,6 +1597,7 @@ components:
       properties:
         name: { type: string }
         phone: { type: string }
+        telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
@@ -1537,6 +1608,18 @@ components:
       required: [driverId]
       properties:
         driverId: { type: number }
+
+    DeliveryMessageLog:
+      type: object
+      required: [id, orderId, driverId, channel, status, sentAt]
+      properties:
+        id: { type: number }
+        orderId: { type: number }
+        driverId: { type: number }
+        channel: { type: string, enum: [TELEGRAM, WHATSAPP] }
+        status: { type: string, enum: [SENT, FAILED] }
+        errorMessage: { type: ["string", "null"] }
+        sentAt: { type: string, format: date-time }
 
     # ── Order ───────────────────────────────────────────────────────────────────
     Order:

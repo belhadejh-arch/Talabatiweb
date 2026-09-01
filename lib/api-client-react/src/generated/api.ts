@@ -29,6 +29,7 @@ import type {
   Category,
   CategoryInput,
   CategoryPatch,
+  DeliveryMessageLog,
   Driver,
   DriverAssignment,
   DriverInput,
@@ -40,6 +41,8 @@ import type {
   GetOrdersOverTimeParams,
   GetPeakHoursParams,
   GetRevenueOverTimeParams,
+  GetTelegramRecentChats200,
+  GetTelegramStatus200,
   GetTopProductsParams,
   GetTopRestaurantsParams,
   HealthStatus,
@@ -3074,6 +3077,237 @@ export const useAssignDriver = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getAssignDriverMutationOptions(options));
     }
+
+export const getGetOrderDeliveryStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/delivery-status`
+}
+
+/**
+ * @summary Get Telegram and WhatsApp delivery status for an order
+ */
+export const getOrderDeliveryStatus = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<DeliveryMessageLog[]> => {
+
+  return customFetch<DeliveryMessageLog[]>(getGetOrderDeliveryStatusUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderDeliveryStatusQueryKey = (id: number,) => {
+    return [
+    `/api/orders/${id}/delivery-status`
+    ] as const;
+    }
+
+
+export const getGetOrderDeliveryStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderDeliveryStatusQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderDeliveryStatus>>> = ({ signal }) => getOrderDeliveryStatus(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrderDeliveryStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderDeliveryStatus>>>
+export type GetOrderDeliveryStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get Telegram and WhatsApp delivery status for an order
+ */
+
+export function useGetOrderDeliveryStatus<TData = Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrderDeliveryStatusQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTelegramStatusUrl = () => {
+
+
+
+
+  return `/api/telegram/status`
+}
+
+/**
+ * @summary Verify the configured Telegram bot
+ */
+export const getTelegramStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetTelegramStatus200> => {
+
+  return customFetch<GetTelegramStatus200>(getGetTelegramStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTelegramStatusQueryKey = () => {
+    return [
+    `/api/telegram/status`
+    ] as const;
+    }
+
+
+export const getGetTelegramStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTelegramStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTelegramStatus>>> = ({ signal }) => getTelegramStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTelegramStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTelegramStatus>>>
+export type GetTelegramStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Verify the configured Telegram bot
+ */
+
+export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTelegramStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTelegramRecentChatsUrl = () => {
+
+
+
+
+  return `/api/telegram/recent-chats`
+}
+
+/**
+ * @summary List recent chats that contacted the bot
+ */
+export const getTelegramRecentChats = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetTelegramRecentChats200> => {
+
+  return customFetch<GetTelegramRecentChats200>(getGetTelegramRecentChatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTelegramRecentChatsQueryKey = () => {
+    return [
+    `/api/telegram/recent-chats`
+    ] as const;
+    }
+
+
+export const getGetTelegramRecentChatsQueryOptions = <TData = Awaited<ReturnType<typeof getTelegramRecentChats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTelegramRecentChatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTelegramRecentChats>>> = ({ signal }) => getTelegramRecentChats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTelegramRecentChatsQueryResult = NonNullable<Awaited<ReturnType<typeof getTelegramRecentChats>>>
+export type GetTelegramRecentChatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent chats that contacted the bot
+ */
+
+export function useGetTelegramRecentChats<TData = Awaited<ReturnType<typeof getTelegramRecentChats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTelegramRecentChatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetPublicRestaurantUrl = (slug: string,) => {
 

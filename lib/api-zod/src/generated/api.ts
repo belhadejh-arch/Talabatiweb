@@ -832,6 +832,7 @@ export const ListDriversResponseItem = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -855,6 +856,7 @@ export const CreateDriverParams = zod.object({
 export const CreateDriverBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string(),
+  "telegramChatId": zod.string().optional(),
   "address": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "vehiclePlate": zod.string().optional(),
@@ -866,6 +868,7 @@ export const CreateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -885,6 +888,7 @@ export const UpdateDriverParams = zod.object({
 export const UpdateDriverBody = zod.object({
   "name": zod.string().optional(),
   "phone": zod.string().optional(),
+  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -896,6 +900,7 @@ export const UpdateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -1107,6 +1112,52 @@ export const AssignDriverResponse = zod.object({
   "note": zod.string().nullish()
 })),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get Telegram and WhatsApp delivery status for an order
+ */
+export const GetOrderDeliveryStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetOrderDeliveryStatusResponseItem = zod.object({
+  "id": zod.number(),
+  "orderId": zod.number(),
+  "driverId": zod.number(),
+  "channel": zod.enum(['TELEGRAM', 'WHATSAPP']),
+  "status": zod.enum(['SENT', 'FAILED']),
+  "errorMessage": zod.string().nullish(),
+  "sentAt": zod.coerce.date()
+})
+export const GetOrderDeliveryStatusResponse = zod.array(GetOrderDeliveryStatusResponseItem)
+
+
+/**
+ * @summary Verify the configured Telegram bot
+ */
+export const GetTelegramStatusResponse = zod.object({
+  "configured": zod.boolean(),
+  "connected": zod.boolean(),
+  "bot": zod.object({
+  "id": zod.number().optional(),
+  "username": zod.string().nullish(),
+  "firstName": zod.string().optional()
+}).optional(),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * @summary List recent chats that contacted the bot
+ */
+export const GetTelegramRecentChatsResponse = zod.object({
+  "data": zod.array(zod.object({
+  "chatId": zod.string(),
+  "title": zod.string(),
+  "username": zod.string().nullish()
+}))
 })
 
 

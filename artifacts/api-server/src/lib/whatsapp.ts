@@ -16,6 +16,11 @@ interface WhatsAppMessagePayload {
   driverPhone: string;
 }
 
+export type WhatsAppSendResult = {
+  success: boolean;
+  errorMessage?: string;
+};
+
 /** True when running inside a Replit environment (dev workspace or a Replit deployment). */
 function isReplitRuntime(): boolean {
   return !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL);
@@ -62,18 +67,18 @@ async function callWhatsAppApi(phoneNumberId: string, body: unknown): Promise<Re
   );
 }
 
-export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<boolean> {
+export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<WhatsAppSendResult> {
   const [settings] = await db.select().from(settingsTable);
 
   if (!settings?.whatsappEnabled) {
     logger.warn("WhatsApp is disabled in settings — skipping message send");
-    return false;
+    return { success: false, errorMessage: "WhatsApp is disabled in settings" };
   }
 
   const phoneNumberId = settings.whatsappPhoneId || process.env.WHATSAPP_PHONE_ID;
   if (!phoneNumberId) {
     logger.warn("WhatsApp phone number ID is not configured — skipping message send");
-    return false;
+    return { success: false, errorMessage: "WhatsApp phone number ID is not configured" };
   }
 
   const message = `🚨 طلب توصيل جديد
@@ -102,13 +107,13 @@ ${payload.mapsUrl}`;
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "");
       logger.error({ status: response.status, errorBody }, "WhatsApp API error");
-      return false;
+      return { success: false, errorMessage: errorBody || `WhatsApp API returned HTTP ${response.status}` };
     }
 
     logger.info({ orderId: payload.orderId }, "WhatsApp message sent to driver");
-    return true;
+    return { success: true };
   } catch (err) {
     logger.error({ err }, "Failed to send WhatsApp message");
-    return false;
+    return { success: false, errorMessage: err instanceof Error ? err.message : "Unknown WhatsApp error" };
   }
 }

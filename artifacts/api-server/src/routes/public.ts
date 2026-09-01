@@ -17,7 +17,7 @@ import {
 import { eq, and, asc, desc } from "drizzle-orm";
 import { PlaceOrderBody } from "@workspace/api-zod";
 import { isSubscriptionActive } from "../lib/subscriptions";
-import { sendWhatsAppToDriver } from "../lib/whatsapp";
+import { safeNotifyDriverOnAllChannels } from "../lib/telegramDelivery";
 
 const router: IRouter = Router();
 
@@ -334,8 +334,8 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     relatedType: "order",
   });
 
-  // Auto-assign the restaurant's driver (one driver per restaurant) and
-  // notify them on WhatsApp automatically — no manual admin step required.
+  // Auto-assign an active driver belonging to this restaurant and notify
+  // them on both configured delivery channels.
   const [driver] = await db
     .select()
     .from(driversTable)
@@ -361,7 +361,7 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       .map((li) => `${li.productName}${li.sizeName ? ` (${li.sizeName})` : ""} x${li.quantity}`)
       .join(", ");
 
-    sendWhatsAppToDriver({
+    void safeNotifyDriverOnAllChannels(driver, {
       restaurantName: restaurant.name,
       orderId: order.id,
       customerName: customerInfo.customerName,
@@ -369,8 +369,7 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
       items: itemsSummary,
       total: `${grandTotal.toFixed(2)} د.ل`,
       mapsUrl,
-      driverPhone: driver.phone,
-    }).catch(() => {}); // fire and forget — order creation must not fail on WhatsApp errors
+    });
   } else {
     await db.insert(notificationsTable).values({
       type: "NO_DRIVER",

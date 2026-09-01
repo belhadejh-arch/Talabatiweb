@@ -21,6 +21,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel, with the backend staying on Replit — see `DEPLOYMENT.md`). Leave unset for same-origin deploys — requests default to relative `/api/...` |
 | `WhatsApp_API_Secret` or `WHATSAPP_API_KEY` | api-server | Long-lived Meta WhatsApp Cloud API token. When unset, sending falls back to the Replit WhatsApp Business connector (Replit runtime only) |
 | `WHATSAPP_PHONE_ID` | api-server | Fallback WhatsApp Cloud API phone number ID, used only when Settings → WhatsApp phone ID (DB) is empty |
+| `TELEGRAM_BOT_TOKEN` | api-server | Telegram Bot API token, stored only in Replit Secrets and never exposed to the frontend |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
 | `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
 
@@ -36,6 +37,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - Object storage: Replit Object Storage (GCS-backed) when the API runs on Replit, with a PostgreSQL-backed portable fallback for external API hosts such as Render
 - Image processing: `sharp` (resize + WebP re-encode server-side before storage)
 - WhatsApp: Meta Cloud API, sent server-side only (`artifacts/api-server/src/lib/whatsapp.ts`)
+- Telegram: Telegram Bot API, sent server-side only (`artifacts/api-server/src/lib/telegram.ts`)
 - Build: esbuild (api-server), Vite (talabat)
 
 ## Where things live
@@ -46,11 +48,13 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - `lib/api-zod` / `lib/api-client-react` — generated from the OpenAPI spec (`artifacts/api-server` contract); do not hand-edit `generated/`
 - Image uploads: `POST /api/uploads/image` (multipart, `requireAuth`) → `src/lib/imageUpload.ts` (sharp resize/WebP + Replit Object Storage or portable PostgreSQL fallback) → served back via `GET /api/storage/public-objects/*` or `/api/storage/db-images/:id`. The fallback stores processed WebP bytes in PostgreSQL so the Render deployment remains functional without Replit sidecar auth.
 - Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns the first active driver scoped to the order's `restaurantId`, fires the WhatsApp send (fire-and-forget)
+- Delivery channel audit: `delivery_message_logs` records `SENT`/`FAILED`, the attempt time, and a safe error message separately for Telegram and WhatsApp
 
 ## Architecture decisions
 
 - Uploaded images are processed **server-side** (sharp resize → WebP) rather than via a client-direct-to-GCS presigned URL, because compression must happen before the file lands in permanent storage. The endpoint accepts raw multipart (`multer`, memory storage), uses Replit Object Storage when its sidecar is available, and falls back to a lazily-created PostgreSQL image table on external hosts.
 - WhatsApp send prefers a directly configured token (`WhatsApp_API_Secret`/`WHATSAPP_API_KEY`) so the app also works outside Replit (e.g. deployed to Render); it falls back to the Replit WhatsApp Business connector only when running inside a Replit runtime.
+- Telegram sends use only `TELEGRAM_BOT_TOKEN` on the backend. Drivers link by opening the configured bot, sending `/start`, then saving the Chat ID from the recent-chats helper or manually in the driver form.
 - Driver assignment and reassignment are always scoped by `restaurantId` — a driver from another restaurant can never be selected, by construction of the query filters (not just app-level convention).
 - The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; asset URLs (`src/lib/asset-url.ts`) apply the same base URL to relative object-storage paths so `<img>` tags resolve correctly either way.
 

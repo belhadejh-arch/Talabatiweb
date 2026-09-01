@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { ensureTelegramSchema } from "./lib/telegramDelivery";
 
 const app: Express = express();
 
@@ -69,6 +70,16 @@ app.use(
 // exact path regardless of where the API is otherwise mounted.
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.use(async (req, res, next) => {
+  try {
+    await ensureTelegramSchema();
+    next();
+  } catch (error) {
+    req.log.error({ err: error }, "Failed to initialize Telegram delivery schema");
+    res.status(503).json({ error: "Service initialization failed" });
+  }
 });
 
 app.use("/api", router);

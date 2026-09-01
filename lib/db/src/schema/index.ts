@@ -8,4 +8,5 @@ export * from "./addons";
 export * from "./drivers";
 export * from "./orders";
 export * from "./notifications";
+export * from "./delivery-message-logs";
 export * from "./settings";

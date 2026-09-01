@@ -363,6 +363,8 @@ export interface Driver {
   name: string;
   phone: string;
   /** @nullable */
+  telegramChatId?: string | null;
+  /** @nullable */
   address?: string | null;
   /** @nullable */
   vehicleType?: string | null;
@@ -377,6 +379,7 @@ export interface DriverInput {
   /** @minLength 1 */
   name: string;
   phone: string;
+  telegramChatId?: string;
   address?: string;
   vehicleType?: string;
   vehiclePlate?: string;
@@ -386,6 +389,8 @@ export interface DriverInput {
 export interface DriverPatch {
   name?: string;
   phone?: string;
+  /** @nullable */
+  telegramChatId?: string | null;
   /** @nullable */
   address?: string | null;
   /** @nullable */
@@ -397,6 +402,33 @@ export interface DriverPatch {
 
 export interface DriverAssignment {
   driverId: number;
+}
+
+export type DeliveryMessageLogChannel = typeof DeliveryMessageLogChannel[keyof typeof DeliveryMessageLogChannel];
+
+
+export const DeliveryMessageLogChannel = {
+  TELEGRAM: 'TELEGRAM',
+  WHATSAPP: 'WHATSAPP',
+} as const;
+
+export type DeliveryMessageLogStatus = typeof DeliveryMessageLogStatus[keyof typeof DeliveryMessageLogStatus];
+
+
+export const DeliveryMessageLogStatus = {
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+} as const;
+
+export interface DeliveryMessageLog {
+  id: number;
+  orderId: number;
+  driverId: number;
+  channel: DeliveryMessageLogChannel;
+  status: DeliveryMessageLogStatus;
+  /** @nullable */
+  errorMessage?: string | null;
+  sentAt: string;
 }
 
 export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
@@ -700,6 +732,31 @@ dateTo?: string;
 search?: string;
 page?: number;
 limit?: number;
+};
+
+export type GetTelegramStatus200Bot = {
+  id?: number;
+  /** @nullable */
+  username?: string | null;
+  firstName?: string;
+};
+
+export type GetTelegramStatus200 = {
+  configured: boolean;
+  connected: boolean;
+  bot?: GetTelegramStatus200Bot;
+  error?: string;
+};
+
+export type GetTelegramRecentChats200DataItem = {
+  chatId: string;
+  title: string;
+  /** @nullable */
+  username?: string | null;
+};
+
+export type GetTelegramRecentChats200 = {
+  data: GetTelegramRecentChats200DataItem[];
 };
 
 export type GetAnalyticsSummaryParams = {
