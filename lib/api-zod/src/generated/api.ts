@@ -837,6 +837,7 @@ export const ListDriversResponseItem = zod.object({
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
   "totalDeliveries": zod.number(),
   "createdAt": zod.coerce.date().optional()
 })
@@ -873,6 +874,7 @@ export const CreateDriverResponse = zod.object({
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
   "totalDeliveries": zod.number(),
   "createdAt": zod.coerce.date().optional()
 })
@@ -905,6 +907,7 @@ export const UpdateDriverResponse = zod.object({
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
   "totalDeliveries": zod.number(),
   "createdAt": zod.coerce.date().optional()
 })

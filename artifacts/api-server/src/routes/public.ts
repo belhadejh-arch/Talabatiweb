@@ -339,7 +339,11 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   const [driver] = await db
     .select()
     .from(driversTable)
-    .where(and(eq(driversTable.restaurantId, restaurant.id), eq(driversTable.isActive, true)))
+    .where(and(
+      eq(driversTable.restaurantId, restaurant.id),
+      eq(driversTable.isActive, true),
+      eq(driversTable.status, "ACTIVE"),
+    ))
     // Prefer a driver who can actually receive Telegram notifications. This
     // prevents an older active driver without a Chat ID from silently
     // capturing every new order before a linked driver.
@@ -369,6 +373,7 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
 
     void safeNotifyDriverOnAllChannels(driver, {
       restaurantName: restaurant.name,
+      restaurantId: restaurant.id,
       orderId: order.id,
       customerName: customerInfo.customerName,
       customerPhone: customerInfo.customerPhone,

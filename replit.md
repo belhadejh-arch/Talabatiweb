@@ -1,6 +1,6 @@
 # TALABAT — منصة إدارة المطاعم
 
-Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants/menus/drivers, plus slug-based public storefronts (`/{slug}`) where customers browse a menu, build a cart, and place delivery orders with GPS location. Order confirmation auto-notifies the assigned driver over WhatsApp with a Google Maps link.
+Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants/menus/drivers, plus slug-based public storefronts (`/{slug}`) where customers browse a menu, build a cart, and place delivery orders with GPS location. Order confirmation auto-notifies the assigned active driver over Telegram/WhatsApp with a Google Maps link.
 
 ## Run & Operate
 
@@ -47,14 +47,15 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - `lib/db` — Drizzle schema (source of truth for tables) + `push` script
 - `lib/api-zod` / `lib/api-client-react` — generated from the OpenAPI spec (`artifacts/api-server` contract); do not hand-edit `generated/`
 - Image uploads: `POST /api/uploads/image` (multipart, `requireAuth`) → `src/lib/imageUpload.ts` (sharp resize/WebP + Replit Object Storage or portable PostgreSQL fallback) → served back via `GET /api/storage/public-objects/*` or `/api/storage/db-images/:id`. The fallback stores processed WebP bytes in PostgreSQL so the Render deployment remains functional without Replit sidecar auth.
-- Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns the first active driver scoped to the order's `restaurantId`, fires the WhatsApp send (fire-and-forget)
+- Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns an active driver scoped to the order's `restaurantId` (preferring a Telegram-linked driver), and fires both channel sends independently
 - Delivery channel audit: `delivery_message_logs` records `SENT`/`FAILED`, the attempt time, and a safe error message separately for Telegram and WhatsApp
+- Telegram driver bot: `artifacts/api-server/src/lib/telegramBot.ts` — long-polls Telegram updates, links `/start driver_<id>` deep links, toggles PostgreSQL activity, lists assigned orders, and handles accept/reject callbacks
 
 ## Architecture decisions
 
 - Uploaded images are processed **server-side** (sharp resize → WebP) rather than via a client-direct-to-GCS presigned URL, because compression must happen before the file lands in permanent storage. The endpoint accepts raw multipart (`multer`, memory storage), uses Replit Object Storage when its sidecar is available, and falls back to a lazily-created PostgreSQL image table on external hosts.
 - WhatsApp send prefers a directly configured token (`WhatsApp_API_Secret`/`WHATSAPP_API_KEY`) so the app also works outside Replit (e.g. deployed to Render); it falls back to the Replit WhatsApp Business connector only when running inside a Replit runtime.
-- Telegram sends use only `TELEGRAM_BOT_TOKEN` on the backend. Drivers link by opening the configured bot, sending `/start`, then saving the Chat ID from the recent-chats helper or manually in the driver form.
+- Telegram sends and inbound bot actions use only `TELEGRAM_BOT_TOKEN` on the backend. Drivers link by opening their per-driver deep link (`?start=driver_<id>`), then sending `/start`; the bot stores the Chat ID automatically and presents its activity/orders/account keyboard.
 - Driver assignment and reassignment are always scoped by `restaurantId` — a driver from another restaurant can never be selected, by construction of the query filters (not just app-level convention).
 - The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; asset URLs (`src/lib/asset-url.ts`) apply the same base URL to relative object-storage paths so `<img>` tags resolve correctly either way.
 
@@ -62,7 +63,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 
 - **Admin dashboard**: manage restaurants, menu (categories/products/sizes/addons with image upload), drivers, orders, analytics, and platform settings (incl. WhatsApp configuration).
 - **Public storefront** (`/{slug}`): mobile-first dark-themed menu browsing, cart, and checkout with mandatory GPS location capture — order confirmation is blocked until the browser reports a location.
-- **Delivery dispatch**: on order confirmation, the assigned driver (restaurant-scoped) receives a WhatsApp message with order details and a clickable Google Maps link to the customer.
+- **Delivery dispatch**: on order confirmation, the assigned active driver (restaurant-scoped) receives Telegram and WhatsApp messages with order details and a clickable Google Maps link to the customer. Telegram includes accept/reject/location buttons.
 
 ## User preferences
 

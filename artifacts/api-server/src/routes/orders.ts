@@ -200,9 +200,17 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
   const [driver] = await db
     .select()
     .from(driversTable)
-    .where(and(eq(driversTable.id, parsed.data.driverId), eq(driversTable.restaurantId, order.restaurantId)));
+    .where(and(
+      eq(driversTable.id, parsed.data.driverId),
+      eq(driversTable.restaurantId, order.restaurantId),
+      eq(driversTable.isActive, true),
+      eq(driversTable.status, "ACTIVE"),
+    ));
 
-  if (!driver) { res.status(400).json({ error: "Driver not found in this restaurant" }); return; }
+  if (!driver) {
+    res.status(400).json({ error: "Driver not found, inactive, or not in this restaurant" });
+    return;
+  }
 
   await db.update(ordersTable).set({ driverId: parsed.data.driverId }).where(eq(ordersTable.id, id));
 
@@ -235,6 +243,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
 
     void safeNotifyDriverOnAllChannels(driver, {
       restaurantName: restaurant?.name ?? "",
+      restaurantId: order.restaurantId,
       orderId: id,
       customerName: order.customerName,
       customerPhone: order.customerPhone,

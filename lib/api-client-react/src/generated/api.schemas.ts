@@ -357,6 +357,14 @@ export interface AddonPatch {
   isAvailable?: boolean;
 }
 
+export type DriverStatus = typeof DriverStatus[keyof typeof DriverStatus];
+
+
+export const DriverStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+
 export interface Driver {
   id: number;
   restaurantId: number;
@@ -371,6 +379,7 @@ export interface Driver {
   /** @nullable */
   vehiclePlate?: string | null;
   isActive: boolean;
+  status: DriverStatus;
   totalDeliveries: number;
   createdAt?: string;
 }

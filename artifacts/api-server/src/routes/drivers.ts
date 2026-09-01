@@ -35,7 +35,11 @@ router.post("/restaurants/:id/drivers", requireAuth, async (req, res): Promise<v
 
   const [driver] = await db
     .insert(driversTable)
-    .values({ ...parsed.data, restaurantId })
+    .values({
+      ...parsed.data,
+      restaurantId,
+      status: parsed.data.isActive === false ? "INACTIVE" : "ACTIVE",
+    })
     .returning();
 
   res.status(201).json(driver);
@@ -50,9 +54,16 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   const parsed = UpdateDriverBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const updateValues = {
+    ...parsed.data,
+    ...(parsed.data.isActive !== undefined
+      ? { status: parsed.data.isActive ? "ACTIVE" : "INACTIVE" }
+      : {}),
+  };
+
   const [driver] = await db
     .update(driversTable)
-    .set(parsed.data)
+    .set(updateValues)
     .where(eq(driversTable.id, id))
     .returning();
 

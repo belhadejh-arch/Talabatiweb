@@ -1,4 +1,6 @@
 import { pool } from "@workspace/db";
+import { db, driversTable, ordersTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendTelegramToDriver, type TelegramSendResult } from "./telegram";
 import { sendWhatsAppToDriver, type WhatsAppSendResult } from "./whatsapp";
@@ -9,6 +11,7 @@ export type DeliveryChannel = "TELEGRAM" | "WHATSAPP";
 
 export type DriverDeliveryPayload = {
   restaurantName: string;
+  restaurantId: number;
   orderId: number;
   customerName: string;
   customerPhone: string;
@@ -32,6 +35,12 @@ export async function ensureTelegramSchema(): Promise<void> {
         ALTER TABLE drivers
           ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 
+        ALTER TABLE drivers
+          ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
+
+        UPDATE drivers
+          SET status = CASE WHEN is_active THEN 'ACTIVE' ELSE 'INACTIVE' END;
+
         CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
           id SERIAL PRIMARY KEY,
           order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -40,6 +49,13 @@ export async function ensureTelegramSchema(): Promise<void> {
           status TEXT NOT NULL,
           error_message TEXT,
           sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS telegram_contacts (
+          chat_id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          username TEXT,
+          last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
       `)
       .then(() => undefined)
@@ -69,9 +85,32 @@ async function logDeliveryResult(
 }
 
 export async function notifyDriverOnAllChannels(
-  driver: { id: number; phone: string; telegramChatId: string | null },
+  driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
 ): Promise<void> {
+  const [currentDriver] = await db.select().from(driversTable).where(eq(driversTable.id, driver.id));
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, payload.orderId));
+  const eligible =
+    currentDriver &&
+    order &&
+    currentDriver.restaurantId === order.restaurantId &&
+    order.restaurantId === payload.restaurantId &&
+    order.driverId === currentDriver.id &&
+    currentDriver.isActive &&
+    currentDriver.status === "ACTIVE";
+
+  if (!eligible) {
+    const result = {
+      success: false,
+      errorMessage: "Driver is not ACTIVE or is not assigned within the order restaurant",
+    };
+    await Promise.all([
+      logDeliveryResult(payload.orderId, driver.id, "TELEGRAM", result),
+      logDeliveryResult(payload.orderId, driver.id, "WHATSAPP", result),
+    ]);
+    return;
+  }
+
   const [telegramResult, whatsappResult] = await Promise.all([
     sendTelegramToDriver({
       ...payload,
@@ -90,7 +129,7 @@ export async function notifyDriverOnAllChannels(
 }
 
 export async function safeNotifyDriverOnAllChannels(
-  driver: { id: number; phone: string; telegramChatId: string | null },
+  driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
 ): Promise<void> {
   try {

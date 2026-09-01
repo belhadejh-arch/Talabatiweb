@@ -1566,7 +1566,7 @@ components:
     # ── Driver ──────────────────────────────────────────────────────────────────
     Driver:
       type: object
-      required: [id, restaurantId, name, phone, isActive, totalDeliveries]
+      required: [id, restaurantId, name, phone, isActive, status, totalDeliveries]
       properties:
         id: { type: number }
         restaurantId: { type: number }
@@ -1577,6 +1577,7 @@ components:
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
         isActive: { type: boolean }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
         totalDeliveries: { type: number }
         createdAt: { type: string, format: date-time }
 

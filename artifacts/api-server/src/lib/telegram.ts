@@ -1,3 +1,4 @@
+import { pool } from "@workspace/db";
 import { logger } from "./logger";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -18,6 +19,36 @@ export type TelegramOrderPayload = {
   telegramChatId: string | null;
 };
 
+export type TelegramChat = {
+  id: number;
+  type: string;
+  title?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
+export type TelegramUpdate = {
+  update_id: number;
+  message?: {
+    text?: string;
+    chat: TelegramChat;
+    from?: { id: number; first_name?: string; last_name?: string; username?: string };
+  };
+  callback_query?: {
+    id: string;
+    data?: string;
+    from: { id: number; first_name?: string; last_name?: string; username?: string };
+    message?: { message_id: number; chat: TelegramChat; text?: string };
+  };
+};
+
+export type TelegramInlineKeyboard = Array<Array<{
+  text: string;
+  callback_data?: string;
+  url?: string;
+}>>;
+
 function getBotToken(): string | undefined {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   return token || undefined;
@@ -27,9 +58,63 @@ function apiUrl(token: string, method: string): string {
   return `${TELEGRAM_API_BASE}/bot${token}/${method}`;
 }
 
-async function readTelegramError(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as { description?: string } | null;
-  return body?.description || `Telegram API returned HTTP ${response.status}`;
+async function telegramRequest<T>(method: string, body?: Record<string, unknown>): Promise<T> {
+  const token = getBotToken();
+  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+
+  const response = await fetch(apiUrl(token, method), {
+    method: body ? "POST" : "GET",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const result = await response.json().catch(() => null) as { ok?: boolean; result?: T; description?: string } | null;
+  if (!response.ok || !result?.ok) {
+    throw new Error(result?.description || `Telegram API returned HTTP ${response.status}`);
+  }
+  return result.result as T;
+}
+
+export async function sendTelegramMessage(
+  chatId: string | number,
+  text: string,
+  replyMarkup?: { keyboard?: Array<Array<{ text: string }>>; inline_keyboard?: TelegramInlineKeyboard; resize_keyboard?: boolean; is_persistent?: boolean },
+): Promise<void> {
+  await telegramRequest("sendMessage", {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: false,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  });
+}
+
+export async function answerTelegramCallbackQuery(callbackQueryId: string, text: string, showAlert = false): Promise<void> {
+  await telegramRequest("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    text,
+    show_alert: showAlert,
+  });
+}
+
+export async function editTelegramMessageText(chatId: string | number, messageId: number, text: string): Promise<void> {
+  await telegramRequest("editMessageText", { chat_id: chatId, message_id: messageId, text });
+}
+
+export async function getTelegramUpdates(offset: number, timeout = 25): Promise<TelegramUpdate[]> {
+  return telegramRequest<TelegramUpdate[]>("getUpdates", {
+    offset,
+    timeout,
+    allowed_updates: ["message", "callback_query"],
+  });
+}
+
+export async function setTelegramCommands(): Promise<void> {
+  await telegramRequest("setMyCommands", {
+    commands: [
+      { command: "start", description: "ربط الحساب أو فتح القائمة" },
+      { command: "orders", description: "عرض طلباتي" },
+      { command: "account", description: "عرض حسابي" },
+    ],
+  });
 }
 
 /**
@@ -64,29 +149,20 @@ ${payload.total}
 ${payload.mapsUrl}`;
 
   try {
-    const response = await fetch(apiUrl(token, "sendMessage"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        disable_web_page_preview: false,
-      }),
+    await telegramRequest("sendMessage", {
+      chat_id: chatId,
+      text: message,
+      disable_web_page_preview: false,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ قبول الطلب", callback_data: `order_accept:${payload.orderId}` },
+            { text: "❌ رفض الطلب", callback_data: `order_reject:${payload.orderId}` },
+          ],
+          [{ text: "📍 فتح الموقع", url: payload.mapsUrl }],
+        ],
+      },
     });
-
-    if (!response.ok) {
-      const errorMessage = await readTelegramError(response);
-      logger.error({ orderId: payload.orderId, status: response.status, errorMessage }, "Telegram API error");
-      return { success: false, errorMessage };
-    }
-
-    const body = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null;
-    if (!body?.ok) {
-      const errorMessage = body?.description || "Telegram API rejected the message";
-      logger.error({ orderId: payload.orderId, errorMessage }, "Telegram message was rejected");
-      return { success: false, errorMessage };
-    }
-
     logger.info({ orderId: payload.orderId }, "Telegram message sent to driver");
     return { success: true };
   } catch (error) {
@@ -144,35 +220,15 @@ export async function getTelegramRecentChats(): Promise<Array<{
   title: string;
   username: string | null;
 }>> {
-  const token = getBotToken();
-  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
-
-  const response = await fetch(apiUrl(token, "getUpdates"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ limit: 50, allowed_updates: ["message"] }),
-  });
-  const body = await response.json().catch(() => null) as {
-    ok?: boolean;
-    result?: Array<{ message?: { chat?: { id: number; title?: string; username?: string; first_name?: string; last_name?: string } } }>;
-    description?: string;
-  } | null;
-
-  if (!response.ok || !body?.ok) {
-    throw new Error(body?.description || `Telegram API returned HTTP ${response.status}`);
-  }
-
-  const chats = new Map<string, { chatId: string; title: string; username: string | null }>();
-  for (const update of body.result || []) {
-    const chat = update.message?.chat;
-    if (!chat) continue;
-    const title = chat.title || [chat.first_name, chat.last_name].filter(Boolean).join(" ") || chat.username || chat.id.toString();
-    chats.set(String(chat.id), {
-      chatId: String(chat.id),
-      title,
-      username: chat.username ? `@${chat.username}` : null,
-    });
-  }
-
-  return Array.from(chats.values()).reverse();
+  const result = await pool.query<{
+    chatId: string;
+    title: string;
+    username: string | null;
+  }>(`
+    SELECT chat_id AS "chatId", title, username
+    FROM telegram_contacts
+    ORDER BY last_seen_at DESC
+    LIMIT 50
+  `);
+  return result.rows;
 }
