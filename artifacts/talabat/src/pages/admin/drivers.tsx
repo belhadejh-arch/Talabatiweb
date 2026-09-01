@@ -28,7 +28,7 @@ type DriverAttempt = {
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "TIMEOUT";
   sentAt: string;
   respondedAt?: string | null;
-  timeoutAt: string;
+  timeoutAt?: string | null;
   customerName: string;
   customerPhone: string;
   totalAmount: number;
@@ -47,8 +47,16 @@ export default function AdminDrivers() {
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<{ connected: boolean; bot?: { username: string | null }; error?: string } | null>(null);
-  const [recentChats, setRecentChats] = useState<Array<{ chatId: string; title: string; username: string | null }>>([]);
+  const [recentChats, setRecentChats] = useState<Array<{
+    chatId: string;
+    title: string;
+    username: string | null;
+    linkedDriverId: number | null;
+    linkedDriverName: string | null;
+    linkedDriverCount: number;
+  }>>([]);
   const [loadingChats, setLoadingChats] = useState(false);
+  const [activityId, setActivityId] = useState<number | null>(null);
   const { data: restaurants } = useListRestaurants({ limit: 100 });
   const create = useCreateDriver();
   const update = useUpdateDriver();
@@ -70,6 +78,7 @@ export default function AdminDrivers() {
 
   useEffect(() => {
     void loadDrivers();
+    void loadRecentChats();
     fetch(`${base}/api/telegram/status`, { credentials: "include" })
       .then(async (response) => response.ok ? response.json() : null)
       .then((data) => data && setTelegramStatus(data))
@@ -88,6 +97,55 @@ export default function AdminDrivers() {
       setHistory([]);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const setActivity = async (driver: PlatformDriver, active: boolean) => {
+    setActivityId(driver.id);
+    try {
+      const response = await fetch(`${base}/api/drivers/${driver.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: active }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "تعذر تحديث نشاط السائق");
+      await loadDrivers();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "تعذر تحديث نشاط السائق");
+    } finally {
+      setActivityId(null);
+    }
+  };
+
+  const linkTelegramChat = async (chatId: string, driverId: number) => {
+    try {
+      const response = await fetch(`${base}/api/drivers/${driverId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramChatId: chatId }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "تعذر ربط حساب Telegram");
+      await Promise.all([loadDrivers(), loadRecentChats()]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "تعذر ربط حساب Telegram");
+    }
+  };
+
+  const loadRecentChats = async () => {
+    setLoadingChats(true);
+    try {
+      const response = await fetch(`${base}/api/telegram/recent-chats`, { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "تعذر جلب محادثات Telegram");
+      setRecentChats(data?.data ?? []);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "تعذر جلب المحادثات");
+    } finally {
+      setLoadingChats(false);
     }
   };
 
@@ -114,7 +172,7 @@ export default function AdminDrivers() {
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold">إدارة السائقين</h2>
-        <p className="mt-1 text-sm text-muted-foreground">لا يصبح السائق مؤهلًا للطلبات إلا بعد ربط Telegram والضغط على «تفعيل نشاطي» من البوت.</p>
+        <p className="mt-1 text-sm text-muted-foreground">افتح البوت ليظهر Chat ID هنا، ثم اربطه بالسائق وفعّل الحساب من هذه الشاشة.</p>
       </div>
 
       <Card>
@@ -129,34 +187,30 @@ export default function AdminDrivers() {
               {restaurants?.data.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
             <div className="md:col-span-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">النشاط يُفعّل من Telegram فقط</p>
-              <p>بعد الحفظ، افتح رابط الربط الظاهر أمام السائق، ثم أرسل /start واضغط «تفعيل نشاطي» لاستقبال الطلبات.</p>
+              <p className="font-medium text-foreground">طريقة تفعيل السائق</p>
+              <p>يفتح السائق البوت ويرسل /start، ثم يجلب المدير المحادثات، يختار السائق المناسب ويربط Chat ID، وبعدها يضغط «تفعيل» من الجدول.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" disabled={create.isPending || update.isPending}>{editingId ? "حفظ التعديلات" : "إضافة السائق"}</Button>
               {editingId && <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(empty); }}>إلغاء</Button>}
             </div>
-            <Button type="button" variant="outline" onClick={async () => {
-              setLoadingChats(true);
-              try {
-                const response = await fetch(`${base}/api/telegram/recent-chats`, { credentials: "include" });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data?.error || "تعذر جلب محادثات Telegram");
-                setRecentChats(data?.data ?? []);
-              } catch (error) {
-                alert(error instanceof Error ? error.message : "تعذر جلب المحادثات");
-              } finally {
-                setLoadingChats(false);
-              }
-            }} disabled={loadingChats}>
+            <Button type="button" variant="outline" onClick={() => void loadRecentChats()} disabled={loadingChats}>
               {loadingChats ? "جاري الجلب..." : "جلب محادثات Telegram"}
             </Button>
             {recentChats.length > 0 && <div className="md:col-span-2 rounded-md border p-3 space-y-2">
-              <p className="text-sm font-medium">محادثات Telegram التي تواصلت مع البوت</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {recentChats.map(chat => <div key={chat.chatId} className="flex items-center justify-between gap-2 rounded border p-2 text-sm">
-                  <span>{chat.title}{chat.username ? ` (${chat.username})` : ""}</span>
-                  <Button type="button" size="sm" variant="outline" onClick={() => navigator.clipboard?.writeText(chat.chatId)}>نسخ Chat ID</Button>
+              <p className="text-sm font-medium">حسابات Telegram التي فتحت البوت — اختر السائق لربط الحساب</p>
+              <div className="space-y-2">
+                {recentChats.map(chat => <div key={chat.chatId} className="grid gap-2 rounded border p-2 text-sm sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                  <span>{chat.title}{chat.username ? ` (${chat.username})` : ""}<br /><span dir="ltr" className="text-xs text-muted-foreground">Chat ID: {chat.chatId}</span></span>
+                  <select
+                    className="h-9 rounded-md border bg-background px-2"
+                    defaultValue={chat.linkedDriverId ? String(chat.linkedDriverId) : ""}
+                    onChange={e => { if (e.target.value) void linkTelegramChat(chat.chatId, Number(e.target.value)); }}
+                  >
+                    <option value="">اختر السائق</option>
+                    {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name} — {driver.restaurantName}</option>)}
+                  </select>
+                  <span className={chat.linkedDriverId ? "text-emerald-600" : "text-amber-600"}>{chat.linkedDriverName ? chat.linkedDriverCount > 1 ? `مربوط بأكثر من سائق — الافتراضي: ${chat.linkedDriverName}` : `مربوط: ${chat.linkedDriverName}` : "غير مربوط"}</span>
                 </div>)}
               </div>
             </div>}
@@ -184,7 +238,7 @@ export default function AdminDrivers() {
                     <TableCell dir="ltr" className="text-right">{driver.phone}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <span className={driver.telegramChatId ? "text-emerald-600" : "text-muted-foreground"}>{driver.telegramChatId ? "متصل" : "غير مربوط"}</span>
+                        <span className={driver.telegramChatId ? "text-emerald-600" : "text-muted-foreground"}>{driver.telegramChatId ? `متصل (${driver.telegramChatId})` : "غير مربوط"}</span>
                         {link && <a className="block text-xs text-primary underline" href={link} target="_blank" rel="noreferrer">رابط الربط</a>}
                       </div>
                     </TableCell>
@@ -197,7 +251,17 @@ export default function AdminDrivers() {
                     <TableCell className="whitespace-nowrap">
                       <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, address: driver.address || "", restaurantId: String(driver.restaurantId) }); }}>تعديل</Button>
                       <Button size="sm" variant="outline" className="mr-1" onClick={() => void openHistory(driver)}>السجل</Button>
-                      <Button size="sm" variant="destructive" className="mr-1" onClick={() => { if (confirm("حذف السائق نهائياً؟")) remove.mutate({ id: driver.id }, { onSuccess: () => { void loadDrivers(); } }); }}>حذف</Button>
+                      <Button size="sm" className="mr-1" variant={driver.status === "ACTIVE" ? "secondary" : "default"} disabled={activityId === driver.id || (!driver.telegramChatId && driver.status === "INACTIVE")} onClick={() => void setActivity(driver, driver.status !== "ACTIVE")}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
+                      <Button size="sm" variant="destructive" className="mr-1" disabled={remove.isPending} onClick={() => {
+                        if (!confirm("حذف السائق نهائياً؟")) return;
+                        remove.mutate({ id: driver.id }, {
+                          onSuccess: () => {
+                            setDrivers(current => current.filter(item => item.id !== driver.id));
+                            if (selectedDriver?.id === driver.id) setSelectedDriver(null);
+                          },
+                          onError: (error) => alert(error instanceof Error ? error.message : "تعذر حذف السائق"),
+                        });
+                      }}>حذف</Button>
                     </TableCell>
                   </TableRow>;
                 })}
@@ -208,20 +272,20 @@ export default function AdminDrivers() {
       </Card>
 
       {selectedDriver && <Card>
-        <CardHeader><CardTitle>سجل محاولات {selectedDriver.name}</CardTitle></CardHeader>
+        <CardHeader><CardTitle>كل طلبات السائق {selectedDriver.name}</CardTitle></CardHeader>
         <CardContent>
           <Button variant="ghost" onClick={() => setSelectedDriver(null)}>إغلاق</Button>
-          {loadingHistory ? <p className="py-8 text-center text-muted-foreground">جاري تحميل السجل...</p> : history.length === 0 ? <p className="py-8 text-center text-muted-foreground">لا توجد محاولات لهذا السائق</p> : (
+          {loadingHistory ? <p className="py-8 text-center text-muted-foreground">جاري تحميل الطلبات...</p> : history.length === 0 ? <p className="py-8 text-center text-muted-foreground">لا توجد طلبات لهذا السائق</p> : (
             <Table>
               <TableHeader><TableRow><TableHead>الطلب</TableHead><TableHead>العميل</TableHead><TableHead>الإجمالي</TableHead><TableHead>الحالة</TableHead><TableHead>وقت الإرسال</TableHead><TableHead>وقت الرد</TableHead><TableHead>المهلة</TableHead></TableRow></TableHeader>
               <TableBody>{history.map(attempt => <TableRow key={attempt.id}>
                 <TableCell>#{attempt.orderId}</TableCell>
                 <TableCell>{attempt.customerName}<br /><span dir="ltr" className="text-xs text-muted-foreground">{attempt.customerPhone}</span></TableCell>
                 <TableCell>{formatCurrency(attempt.totalAmount)}</TableCell>
-                <TableCell>{attempt.status === "ACCEPTED" ? "مقبول" : attempt.status === "REJECTED" ? "مرفوض" : attempt.status === "TIMEOUT" ? "انتهت المهلة" : orderStatusLabel(attempt.orderStatus as never)}</TableCell>
+                <TableCell>{attempt.status === "ACCEPTED" ? "مقبول" : attempt.status === "REJECTED" ? "مرفوض" : attempt.status === "TIMEOUT" ? "انتهت المهلة" : attempt.status === "PENDING" ? "بانتظار الرد" : orderStatusLabel(attempt.orderStatus as never)}</TableCell>
                 <TableCell>{new Date(attempt.sentAt).toLocaleString("ar-LY")}</TableCell>
                 <TableCell>{attempt.respondedAt ? new Date(attempt.respondedAt).toLocaleString("ar-LY") : "—"}</TableCell>
-                <TableCell>{new Date(attempt.timeoutAt).toLocaleString("ar-LY")}</TableCell>
+                <TableCell>{attempt.timeoutAt ? new Date(attempt.timeoutAt).toLocaleString("ar-LY") : "—"}</TableCell>
               </TableRow>)}</TableBody>
             </Table>
           )}

@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db, pool, driversTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, ne } from "drizzle-orm";
 import {
   CreateDriverBody,
   UpdateDriverBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { dispatchPendingOrdersForRestaurant } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
 
@@ -90,9 +91,17 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
 
   const parsed = UpdateDriverBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  if (parsed.data.isActive === true) {
-    res.status(400).json({ error: "يجب على السائق تفعيل نشاطه من Telegram" });
+  const [existing] = await db.select().from(driversTable).where(eq(driversTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (parsed.data.isActive === true && !existing.telegramChatId) {
+    res.status(400).json({ error: "يجب أن يفتح السائق البوت أولاً حتى يظهر معرف Telegram في المنصة" });
     return;
+  }
+  if (parsed.data.telegramChatId) {
+    await db
+      .update(driversTable)
+      .set({ telegramChatId: null, isActive: false, status: "INACTIVE" })
+      .where(and(eq(driversTable.telegramChatId, parsed.data.telegramChatId), ne(driversTable.id, id)));
   }
 
   const updateValues = {
@@ -108,7 +117,9 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(driversTable.id, id))
     .returning();
 
-  if (!driver) { res.status(404).json({ error: "Not found" }); return; }
+  if (parsed.data.isActive === true) {
+    await dispatchPendingOrdersForRestaurant(existing.restaurantId);
+  }
   res.json(driver);
 });
 
@@ -120,11 +131,14 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
 
   const result = await pool.query(
     `SELECT
-       a.id,
-       a.order_id AS "orderId",
-       a.driver_id AS "driverId",
-       a.status,
-       a.sent_at AS "sentAt",
+       COALESCE(a.id, -o.id) AS id,
+       o.id AS "orderId",
+       $1::int AS "driverId",
+       CASE
+         WHEN a.status = 'PENDING' AND o.status IN ('ACCEPTED', 'DELIVERED') THEN 'ACCEPTED'
+         ELSE COALESCE(a.status, 'PENDING')
+       END AS status,
+       COALESCE(a.sent_at, o.created_at) AS "sentAt",
        a.responded_at AS "respondedAt",
        a.timeout_at AS "timeoutAt",
        o.customer_name AS "customerName",
@@ -132,10 +146,12 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
        o.total_amount AS "totalAmount",
        o.status AS "orderStatus",
        o.created_at AS "orderCreatedAt"
-     FROM order_driver_attempts a
-     JOIN orders o ON o.id = a.order_id
-     WHERE a.driver_id = $1
-     ORDER BY a.sent_at DESC, a.id DESC`,
+     FROM orders o
+     LEFT JOIN order_driver_attempts a
+       ON a.order_id = o.id AND a.driver_id = $1
+     WHERE o.driver_id = $1
+        OR a.driver_id = $1
+     ORDER BY COALESCE(a.sent_at, o.created_at) DESC, o.id DESC`,
     [id],
   );
   res.json(result.rows.map((row) => ({ ...row, totalAmount: Number(row.totalAmount) })));
@@ -147,7 +163,29 @@ router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  await db.delete(driversTable).where(eq(driversTable.id, id));
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const exists = await client.query("SELECT id FROM drivers WHERE id = $1", [id]);
+    if (!exists.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    await client.query("UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE driver_id = $1", [id]);
+    const result = await client.query("DELETE FROM drivers WHERE id = $1 RETURNING id", [id]);
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
   res.sendStatus(204);
 });
 

@@ -1208,7 +1208,10 @@ export const GetTelegramRecentChatsResponse = zod.object({
   "data": zod.array(zod.object({
   "chatId": zod.string(),
   "title": zod.string(),
-  "username": zod.string().nullish()
+  "username": zod.string().nullish(),
+  "linkedDriverId": zod.number().nullish(),
+  "linkedDriverName": zod.string().nullish(),
+  "linkedDriverCount": zod.number().optional()
 }))
 })
 

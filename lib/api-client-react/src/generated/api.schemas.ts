@@ -805,6 +805,11 @@ export type GetTelegramRecentChats200DataItem = {
   title: string;
   /** @nullable */
   username?: string | null;
+  /** @nullable */
+  linkedDriverId?: number | null;
+  /** @nullable */
+  linkedDriverName?: string | null;
+  linkedDriverCount?: number;
 };
 
 export type GetTelegramRecentChats200 = {

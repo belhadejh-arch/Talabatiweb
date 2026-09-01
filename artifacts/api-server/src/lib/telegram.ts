@@ -219,15 +219,37 @@ export async function getTelegramRecentChats(): Promise<Array<{
   chatId: string;
   title: string;
   username: string | null;
+  linkedDriverId: number | null;
+  linkedDriverName: string | null;
+  linkedDriverCount: number;
 }>> {
   const result = await pool.query<{
     chatId: string;
     title: string;
     username: string | null;
+    linkedDriverId: number | null;
+    linkedDriverName: string | null;
+    linkedDriverCount: number;
   }>(`
-    SELECT chat_id AS "chatId", title, username
-    FROM telegram_contacts
-    ORDER BY last_seen_at DESC
+    SELECT
+      c.chat_id AS "chatId",
+      c.title,
+      c.username,
+      d.id AS "linkedDriverId",
+      d.name AS "linkedDriverName",
+      COALESCE(d.linked_driver_count, 0)::int AS "linkedDriverCount"
+    FROM telegram_contacts c
+    LEFT JOIN LATERAL (
+      SELECT
+        d0.id,
+        d0.name,
+        COUNT(*) OVER () AS linked_driver_count
+      FROM drivers d0
+      WHERE d0.telegram_chat_id = c.chat_id
+      ORDER BY d0.id ASC
+      LIMIT 1
+    ) d ON true
+    ORDER BY c.last_seen_at DESC
     LIMIT 50
   `);
   return result.rows;

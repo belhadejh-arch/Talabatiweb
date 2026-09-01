@@ -947,6 +947,9 @@ paths:
                         chatId: { type: string }
                         title: { type: string }
                         username: { type: ["string", "null"] }
+                        linkedDriverId: { type: ["number", "null"] }
+                        linkedDriverName: { type: ["string", "null"] }
+                        linkedDriverCount: { type: number }
 
   # ── Public storefront ────────────────────────────────────────────────────────
   /public/restaurants/{slug}:
