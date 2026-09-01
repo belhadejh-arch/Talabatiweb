@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -59,15 +60,36 @@ function apiUrl(token: string, method: string): string {
   return `${TELEGRAM_API_BASE}/bot${token}/${method}`;
 }
 
-async function telegramRequest<T>(method: string, body?: Record<string, unknown>): Promise<T> {
-  const token = getBotToken();
-  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
-
-  const response = await fetch(apiUrl(token, method), {
+async function requestThroughConfiguredTelegramConnection(
+  method: string,
+  body?: Record<string, unknown>,
+): Promise<Response> {
+  const connectors = new ReplitConnectors();
+  return connectors.proxy("telegram", `/${method}`, {
     method: body ? "POST" : "GET",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
+}
+
+async function telegramRequest<T>(method: string, body?: Record<string, unknown>): Promise<T> {
+  let response: Response;
+  try {
+    response = await requestThroughConfiguredTelegramConnection(method, body);
+  } catch (connectionError) {
+    const token = getBotToken();
+    if (!token) {
+      throw connectionError instanceof Error
+        ? connectionError
+        : new Error("Telegram connection is not configured");
+    }
+    response = await fetch(apiUrl(token, method), {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
   const result = await response.json().catch(() => null) as { ok?: boolean; result?: T; description?: string } | null;
   if (!response.ok || !result?.ok) {
     throw new Error(result?.description || `Telegram API returned HTTP ${response.status}`);
@@ -119,18 +141,14 @@ export async function setTelegramCommands(): Promise<void> {
 }
 
 /**
- * Sends the delivery message from the API server only. The bot token is read
- * from Replit Secrets and is never returned to the client or logged.
+ * Sends the delivery message from the API server only. The configured Replit
+ * Telegram connection is preferred; TELEGRAM_BOT_TOKEN remains a fallback for
+ * deployments that do not have the connector available.
  */
 export async function sendTelegramToDriver(payload: TelegramOrderPayload): Promise<TelegramSendResult> {
   const chatId = payload.telegramChatId?.trim();
   if (!chatId) {
     return { success: false, errorMessage: "Telegram Chat ID is not configured for this driver" };
-  }
-
-  const token = getBotToken();
-  if (!token) {
-    return { success: false, errorMessage: "TELEGRAM_BOT_TOKEN is not configured" };
   }
 
   const message = payload.orderType === "RESERVATION"
@@ -196,33 +214,13 @@ export async function getTelegramBotStatus(): Promise<{
   bot?: { id: number; username: string | null; firstName: string };
   error?: string;
 }> {
-  const token = getBotToken();
-  if (!token) return { configured: false, connected: false, error: "TELEGRAM_BOT_TOKEN is not configured" };
-
   try {
-    const response = await fetch(apiUrl(token, "getMe"));
-    const body = await response.json().catch(() => null) as {
-      ok?: boolean;
-      result?: { id: number; username?: string; first_name: string };
-      description?: string;
-    } | null;
-
-    if (!response.ok || !body?.ok || !body.result) {
-      return {
-        configured: true,
-        connected: false,
-        error: body?.description || `Telegram API returned HTTP ${response.status}`,
-      };
-    }
+    const bot = await telegramRequest<{ id: number; username?: string; first_name: string }>("getMe");
 
     return {
       configured: true,
       connected: true,
-      bot: {
-        id: body.result.id,
-        username: body.result.username || null,
-        firstName: body.result.first_name,
-      },
+      bot: { id: bot.id, username: bot.username || null, firstName: bot.first_name },
     };
   } catch (error) {
     return {

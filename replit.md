@@ -21,7 +21,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel, with the backend staying on Replit — see `DEPLOYMENT.md`). Leave unset for same-origin deploys — requests default to relative `/api/...` |
 | `WhatsApp_API_Secret` or `WHATSAPP_API_KEY` | api-server | Long-lived Meta WhatsApp Cloud API token. When unset, sending falls back to the Replit WhatsApp Business connector (Replit runtime only) |
 | `WHATSAPP_PHONE_ID` | api-server | Fallback WhatsApp Cloud API phone number ID, used only when Settings → WhatsApp phone ID (DB) is empty |
-| `TELEGRAM_BOT_TOKEN` | api-server | Telegram Bot API token, stored only in Replit Secrets and never exposed to the frontend |
+| Telegram connection or `TELEGRAM_BOT_TOKEN` | api-server | The connected Replit Telegram integration is preferred; the Secret remains a fallback for external deployments |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
 | `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
 
@@ -55,7 +55,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 
 - Uploaded images are processed **server-side** (sharp resize → WebP) rather than via a client-direct-to-GCS presigned URL, because compression must happen before the file lands in permanent storage. The endpoint accepts raw multipart (`multer`, memory storage), uses Replit Object Storage when its sidecar is available, and falls back to a lazily-created PostgreSQL image table on external hosts.
 - WhatsApp send prefers a directly configured token (`WhatsApp_API_Secret`/`WHATSAPP_API_KEY`) so the app also works outside Replit (e.g. deployed to Render); it falls back to the Replit WhatsApp Business connector only when running inside a Replit runtime.
-- Telegram sends and inbound bot actions use only `TELEGRAM_BOT_TOKEN` on the backend. Drivers link by opening their per-driver deep link (`?start=driver_<id>`), then sending `/start`; the bot stores the Chat ID automatically and presents its activity/orders/account keyboard.
+- Telegram sends and inbound bot actions use the connected Replit Telegram integration on the backend, with `TELEGRAM_BOT_TOKEN` as an external-deployment fallback. Drivers link by opening their per-driver deep link (`?start=driver_<id>`), then sending `/start`; the bot stores the Chat ID automatically and presents its activity/orders/account keyboard.
 - Driver assignment and reassignment are always scoped by `restaurantId` — a driver from another restaurant can never be selected, by construction of the query filters (not just app-level convention).
 - The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; asset URLs (`src/lib/asset-url.ts`) apply the same base URL to relative object-storage paths so `<img>` tags resolve correctly either way.
 

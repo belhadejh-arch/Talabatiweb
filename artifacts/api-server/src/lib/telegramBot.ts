@@ -15,6 +15,7 @@ import { dispatchPendingOrdersForRestaurant, respondToOrderAttempt } from "./dri
 import {
   answerTelegramCallbackQuery,
   editTelegramMessageText,
+  getTelegramBotStatus,
   getTelegramUpdates,
   sendTelegramMessage,
   setTelegramCommands,
@@ -363,6 +364,16 @@ async function pollTelegram(): Promise<void> {
 }
 
 export function startTelegramBot(): void {
-  if (!process.env.TELEGRAM_BOT_TOKEN?.trim() || pollingPromise) return;
-  pollingPromise = pollTelegram();
+  if (pollingPromise) return;
+  void getTelegramBotStatus()
+    .then((status) => {
+      if (!status.connected) {
+        logger.warn({ error: status.error }, "Telegram bot is not configured; driver polling is disabled");
+        return;
+      }
+      pollingPromise = pollTelegram();
+    })
+    .catch((error) => {
+      logger.error({ err: error }, "Failed to initialize Telegram driver bot");
+    });
 }
