@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+type DriverTimeoutSeconds = 60 | 120 | 180 | 300 | 600;
+
 export default function AdminSettings() {
   const { data: settings } = useGetSettings();
   const updateSettings = useUpdateSettings();
@@ -13,8 +15,8 @@ export default function AdminSettings() {
   const [emailPassword, setEmailPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [driverTimeout, setDriverTimeout] = useState<number | null>(null);
-  const timeoutSeconds = driverTimeout ?? settings?.driverResponseTimeoutSeconds ?? 180;
+  const [driverTimeout, setDriverTimeout] = useState<DriverTimeoutSeconds | null>(null);
+  const timeoutSeconds = (driverTimeout ?? settings?.driverResponseTimeoutSeconds ?? 180) as DriverTimeoutSeconds;
 
   return (
     <div className="w-full max-w-3xl space-y-4 sm:space-y-6">
@@ -57,14 +59,16 @@ export default function AdminSettings() {
           </div>
           <label className="block space-y-2 font-medium">
             مدة انتظار رد السائق (بالدقائق)
-            <Input
-              type="number"
-              min="1"
-              max="1440"
-              step="1"
+            <select
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               value={Math.max(1, Math.round(timeoutSeconds / 60))}
-              onChange={(event) => setDriverTimeout(Math.max(60, Number(event.target.value || 1) * 60))}
-            />
+              onChange={(event) => {
+                const value = Number(event.target.value) * 60;
+                if ([60, 120, 180, 300, 600].includes(value)) setDriverTimeout(value as DriverTimeoutSeconds);
+              }}
+            >
+              {[1, 2, 3, 5, 10].map((minutes) => <option key={minutes} value={minutes}>{minutes} {minutes === 1 ? "دقيقة" : "دقائق"}</option>)}
+            </select>
           </label>
           <p className="text-xs text-muted-foreground">بعد انتهاء المدة ينتقل الطلب تلقائيًا إلى سائق نشط آخر من نفس المطعم.</p>
           <Button

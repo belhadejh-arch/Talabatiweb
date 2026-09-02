@@ -789,30 +789,44 @@ export interface NotificationListResponse {
   unreadCount: number;
 }
 
+export type SettingsDriverResponseTimeoutSeconds = typeof SettingsDriverResponseTimeoutSeconds[keyof typeof SettingsDriverResponseTimeoutSeconds];
+
+
+export const SettingsDriverResponseTimeoutSeconds = {
+  NUMBER_60: 60,
+  NUMBER_120: 120,
+  NUMBER_180: 180,
+  NUMBER_300: 300,
+  NUMBER_600: 600,
+} as const;
+
 export interface Settings {
   id: number;
   platformName?: string;
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
-  /**
-     * @minimum 30
-     * @maximum 86400
-     */
-  driverResponseTimeoutSeconds?: number;
+  driverResponseTimeoutSeconds?: SettingsDriverResponseTimeoutSeconds;
   updatedAt?: string;
 }
+
+export type SettingsPatchDriverResponseTimeoutSeconds = typeof SettingsPatchDriverResponseTimeoutSeconds[keyof typeof SettingsPatchDriverResponseTimeoutSeconds];
+
+
+export const SettingsPatchDriverResponseTimeoutSeconds = {
+  NUMBER_60: 60,
+  NUMBER_120: 120,
+  NUMBER_180: 180,
+  NUMBER_300: 300,
+  NUMBER_600: 600,
+} as const;
 
 export interface SettingsPatch {
   platformName?: string;
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
-  /**
-     * @minimum 30
-     * @maximum 86400
-     */
-  driverResponseTimeoutSeconds?: number;
+  driverResponseTimeoutSeconds?: SettingsPatchDriverResponseTimeoutSeconds;
 }
 
 export type ListRestaurantsParams = {

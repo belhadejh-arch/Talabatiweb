@@ -1751,17 +1751,12 @@ export const MarkAllNotificationsReadResponse = zod.unknown()
 /**
  * @summary Get platform settings
  */
-export const getSettingsResponseDriverResponseTimeoutSecondsMin = 30;
-export const getSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
-
-
-
 export const GetSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
-  "driverResponseTimeoutSeconds": zod.number().min(getSettingsResponseDriverResponseTimeoutSecondsMin).max(getSettingsResponseDriverResponseTimeoutSecondsMax).optional(),
+  "driverResponseTimeoutSeconds": zod.union([zod.literal(60),zod.literal(120),zod.literal(180),zod.literal(300),zod.literal(600)]).optional(),
   "updatedAt": zod.coerce.date().optional()
 })
 
@@ -1769,29 +1764,19 @@ export const GetSettingsResponse = zod.object({
 /**
  * @summary Update platform settings
  */
-export const updateSettingsBodyDriverResponseTimeoutSecondsMin = 30;
-export const updateSettingsBodyDriverResponseTimeoutSecondsMax = 86400;
-
-
-
 export const UpdateSettingsBody = zod.object({
   "platformName": zod.string().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
-  "driverResponseTimeoutSeconds": zod.number().min(updateSettingsBodyDriverResponseTimeoutSecondsMin).max(updateSettingsBodyDriverResponseTimeoutSecondsMax).optional()
+  "driverResponseTimeoutSeconds": zod.union([zod.literal(60),zod.literal(120),zod.literal(180),zod.literal(300),zod.literal(600)]).optional()
 })
-
-export const updateSettingsResponseDriverResponseTimeoutSecondsMin = 30;
-export const updateSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
-
-
 
 export const UpdateSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
-  "driverResponseTimeoutSeconds": zod.number().min(updateSettingsResponseDriverResponseTimeoutSecondsMin).max(updateSettingsResponseDriverResponseTimeoutSecondsMax).optional(),
+  "driverResponseTimeoutSeconds": zod.union([zod.literal(60),zod.literal(120),zod.literal(180),zod.literal(300),zod.literal(600)]).optional(),
   "updatedAt": zod.coerce.date().optional()
 })
 

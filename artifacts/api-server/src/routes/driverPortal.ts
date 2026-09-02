@@ -19,14 +19,10 @@ router.get("/driver/orders", requireDriverAuth, async (req, res): Promise<void> 
     ))
     .orderBy(desc(ordersTable.createdAt));
 
+  const details = await Promise.all(orders.map((order) => getOrderDetail(order.id)));
   res.json({
-    data: orders.map((order) => ({
+    data: details.filter((order): order is NonNullable<typeof order> => order !== null).map((order) => ({
       ...order,
-      subtotal: Number(order.subtotal),
-      deliveryFee: Number(order.deliveryFee),
-      totalAmount: Number(order.totalAmount),
-      restaurantName: "",
-      driverName: driver.name,
       canRespond: order.status === "NEW",
     })),
   });

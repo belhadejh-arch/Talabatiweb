@@ -43,7 +43,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || order.status !== "NEW" || order.driver_id !== null) {
+    if (!order || !["NEW", "WAITING_FOR_DRIVER"].includes(order.status) || order.driver_id !== null) {
       await client.query("COMMIT");
       return { assigned: false, reason: "not_pending" };
     }
@@ -65,6 +65,10 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     const driver = driverResult.rows[0];
     if (!driver) {
+      await client.query(
+        "UPDATE orders SET status = 'WAITING_FOR_DRIVER', updated_at = NOW() WHERE id = $1 AND driver_id IS NULL AND status IN ('NEW', 'WAITING_FOR_DRIVER')",
+        [order.id],
+      );
       await client.query("COMMIT");
       return { assigned: false, reason: "no_driver" };
     }
@@ -77,6 +81,10 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     await client.query(
       "UPDATE orders SET driver_id = $2, updated_at = NOW() WHERE id = $1",
+      [order.id, driver.id],
+    );
+    await client.query(
+      "UPDATE orders SET status = 'NEW', updated_at = NOW() WHERE id = $1 AND driver_id = $2",
       [order.id, driver.id],
     );
     await client.query(
@@ -188,7 +196,7 @@ export async function retryOrderDispatch(orderId: number): Promise<DispatchResul
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || order.status !== "NEW") {
+    if (!order || !["NEW", "WAITING_FOR_DRIVER"].includes(order.status)) {
       await client.query("ROLLBACK");
       return { assigned: false, reason: "not_pending" };
     }
@@ -267,7 +275,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       [orderId, driverId, timeoutSeconds],
     );
     await client.query(
-      "UPDATE orders SET driver_id = $2, updated_at = NOW() WHERE id = $1",
+        "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1",
       [orderId, driverId],
     );
     await client.query(
@@ -288,7 +296,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
 
 async function dispatchPendingOrders(): Promise<void> {
   const result = await pool.query<{ id: number }>(
-    "SELECT id FROM orders WHERE status = 'NEW' AND driver_id IS NULL ORDER BY created_at ASC, id ASC LIMIT 100",
+    "SELECT id FROM orders WHERE status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC LIMIT 100",
   );
   for (const order of result.rows) {
     await dispatchNextDriverForOrder(order.id);
