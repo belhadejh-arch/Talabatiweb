@@ -46,7 +46,7 @@ type OrderDetail = DriverOrder & {
   items: NonNullable<DriverOrder["items"]>;
 };
 
-const STATUS_LABEL: Record<string, string> = { NEW: "طلب جديد", ACCEPTED: "تم القبول", OUT_FOR_DELIVERY: "في الطريق", DELIVERED: "تم التسليم", PREPARING: "قيد التحضير", READY: "جاهز", CANCELLED: "ملغى" };
+const STATUS_LABEL: Record<string, string> = { NEW: "طلب جديد", WAITING_FOR_DRIVER: "بانتظار سائق", ACCEPTED: "تم القبول", OUT_FOR_DELIVERY: "في الطريق", DELIVERED: "تم التسليم", PREPARING: "قيد التحضير", READY: "جاهز", CANCELLED: "ملغى" };
 const STATUS_CLASS: Record<string, string> = { NEW: "border-amber-400/30 bg-amber-400/10 text-amber-600", ACCEPTED: "border-blue-400/30 bg-blue-400/10 text-blue-600", OUT_FOR_DELIVERY: "border-violet-400/30 bg-violet-400/10 text-violet-600", DELIVERED: "border-emerald-400/30 bg-emerald-400/10 text-emerald-600" };
 
 export default function DriverDashboard() {
@@ -57,9 +57,7 @@ export default function DriverDashboard() {
   const [busy, setBusy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [newAlert, setNewAlert] = useState<DriverOrder | null>(null);
-  const knownOrderIds = useRef<Set<number>>(new Set());
-  const hasLoadedOrders = useRef(false);
+  const openedPushOrder = useRef(false);
   const base = getBaseUrl() ?? "";
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
@@ -75,19 +73,6 @@ export default function DriverDashboard() {
     try {
       const [me, orderResponse] = await Promise.all([request("/api/driver-auth/me"), request("/api/driver/orders")]);
       const nextOrders: DriverOrder[] = orderResponse.data || [];
-      if (hasLoadedOrders.current) {
-        const incoming = nextOrders.find((order) => order.status === "NEW" && order.canRespond && !knownOrderIds.current.has(order.id));
-        if (incoming) {
-          setNewAlert(incoming);
-          playNewOrderTone();
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("🚨 طلب جديد", { body: `طلب #${incoming.id} من ${incoming.restaurantName || me.restaurantName}` });
-          }
-          window.setTimeout(() => setNewAlert(null), 8000);
-        }
-      }
-      knownOrderIds.current = new Set(nextOrders.map((order) => order.id));
-      hasLoadedOrders.current = true;
       setDriver(me);
       setOrders(nextOrders);
       setError("");
@@ -100,6 +85,12 @@ export default function DriverDashboard() {
 
   useEffect(() => { void load(true); }, [load]);
   useEffect(() => { const timer = window.setInterval(() => void load(), 10000); return () => window.clearInterval(timer); }, [load]);
+  useEffect(() => {
+    const orderId = Number(new URLSearchParams(window.location.search).get("order"));
+    if (!driver || loading || openedPushOrder.current || !Number.isInteger(orderId) || orderId <= 0) return;
+    openedPushOrder.current = true;
+    void request(`/api/driver/orders/${orderId}`).then(setSelected).catch(() => undefined);
+  }, [driver, loading, request]);
 
   const pending = useMemo(() => orders.filter((order) => order.status === "NEW" && order.canRespond), [orders]);
   const active = useMemo(() => orders.filter((order) => ["ACCEPTED", "OUT_FOR_DELIVERY"].includes(order.status)), [orders]);
@@ -133,7 +124,6 @@ export default function DriverDashboard() {
       </header>
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6">
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-        {newAlert && <div role="alert" className="flex animate-pulse items-center justify-between gap-3 rounded-2xl border-2 border-red-400 bg-red-50 p-4 text-red-900 shadow-lg shadow-red-500/10"><div><p className="font-black">🚨 طلب جديد</p><p className="mt-1 text-sm">طلب #{newAlert.id} من {newAlert.restaurantName || driver?.restaurantName}</p></div><Button className="shrink-0 bg-red-600 hover:bg-red-700" onClick={() => { void openOrder(newAlert); setNewAlert(null); }}>عرض الطلب</Button></div>}
         <section className="grid gap-3 sm:grid-cols-3"><Summary label="طلبات جديدة" value={pending.length} icon={Clock3} tone="amber" /><Summary label="طلبات نشطة" value={active.length} icon={Truck} tone="blue" /><Summary label="تم التسليم" value={driver?.totalDeliveries || 0} icon={Check} tone="emerald" /></section>
         <section className="grid gap-5 lg:grid-cols-[1fr_300px]">
           <div className="space-y-5">
@@ -159,26 +149,3 @@ function Summary({ label, value, icon: Icon, tone }: { label: string; value: num
 function OrderSection({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) { return <Card><CardHeader className="flex flex-row items-center justify-between border-b pb-3"><CardTitle className="text-base">{title}</CardTitle><Badge variant="secondary">{count}</Badge></CardHeader><CardContent className="space-y-3 p-3">{count ? children : <p className="py-6 text-center text-sm text-muted-foreground">{empty}</p>}</CardContent></Card>; }
 function OrderCard({ order, busy, onOpen, onAccept, onReject, onDeliver }: { order: DriverOrder; busy?: boolean; onOpen: () => void; onAccept?: () => void; onReject?: () => void; onDeliver?: () => void }) { return <div className="rounded-xl border bg-background p-4 transition-shadow hover:shadow-sm"><div className="flex items-start justify-between gap-3"><button className="min-w-0 text-right" onClick={onOpen}><p className="font-bold">طلب #{order.id} · {order.customerName}</p><p className="mt-1 text-xs text-muted-foreground">{order.restaurantName || "المطعم التابع"} · {new Date(order.createdAt).toLocaleString("ar-LY")} · {order.orderType === "DELIVERY" ? "DELIVERY / توصيل" : "RESERVATION / حجز"}</p></button><Badge variant="outline" className={STATUS_CLASS[order.status] || ""}>{STATUS_LABEL[order.status] || order.status}</Badge></div>{order.items && order.items.length > 0 && <div className="mt-3 space-y-1 rounded-lg bg-muted/50 p-3 text-sm">{order.items.map((item, index) => <div key={`${item.productName}-${index}`} className="flex justify-between gap-3"><span>{item.productName}{item.sizeName ? ` (${item.sizeName})` : ""} × {item.quantity}</span><b>{item.subtotal.toFixed(2)} د.ل</b></div>)}</div>}<div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm"><span className="font-bold">{order.totalAmount.toFixed(2)} د.ل</span><span className="flex items-center gap-1 text-muted-foreground"><Phone className="h-3.5 w-3.5" /><span dir="ltr">{order.customerPhone}</span></span>{order.orderType === "DELIVERY" && order.mapsUrl && <a className="flex items-center gap-1 text-primary hover:underline" href={order.mapsUrl} target="_blank" rel="noreferrer"><MapPin className="h-3.5 w-3.5" />الموقع</a>}</div>{onAccept && onReject && <div className="mt-4 grid grid-cols-2 gap-2"><Button onClick={onAccept} disabled={busy}><Check className="ms-2 h-4 w-4" />قبول الطلب</Button><Button variant="outline" onClick={onReject} disabled={busy}><X className="ms-2 h-4 w-4" />رفض</Button></div>}{onDeliver && <Button className="mt-4 w-full" variant={order.status === "ACCEPTED" ? "default" : "secondary"} onClick={onDeliver} disabled={busy}>{order.status === "ACCEPTED" ? "بدأت التوصيل" : "تأكيد التسليم"}</Button>}</div>; }
 function OrderDialog({ order, onClose }: { order: OrderDetail; onClose: () => void }) { const hasLocation = order.orderType === "DELIVERY" && (order.latitude != null || order.longitude != null || !!order.mapsUrl); return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4" onClick={onClose}><div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-background p-5 sm:rounded-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><div><p className="text-lg font-black">تفاصيل الطلب #{order.id}</p><p className="text-sm text-muted-foreground">{order.restaurantName} · {order.orderType === "DELIVERY" ? "DELIVERY / توصيل" : "RESERVATION / حجز"}</p><p className="mt-1 text-xs text-muted-foreground">{order.customerName} · {order.customerPhone} · {new Date(order.createdAt).toLocaleString("ar-LY")}</p></div><Button size="icon" variant="ghost" onClick={onClose}><X /></Button></div><div className="mt-5 space-y-3">{order.items.map((item, index) => <div key={`${item.productName}-${index}`} className="flex justify-between gap-3 border-b pb-2 text-sm"><span>{item.productName}{item.sizeName ? ` (${item.sizeName})` : ""} × {item.quantity}</span><b>{item.subtotal.toFixed(2)} د.ل</b></div>)}</div><div className="mt-4 flex justify-between rounded-lg bg-primary/5 p-3 font-black"><span>الإجمالي</span><span>{order.totalAmount.toFixed(2)} د.ل</span></div>{order.notes && <p className="mt-4 rounded-lg bg-muted p-3 text-sm">ملاحظات العميل: {order.notes}</p>}{hasLocation && <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm"><p className="font-bold text-primary">موقع العميل</p>{order.latitude != null && <p className="mt-2" dir="ltr">Latitude: {order.latitude}</p>}{order.longitude != null && <p dir="ltr">Longitude: {order.longitude}</p>}{order.mapsUrl && <a href={order.mapsUrl} target="_blank" rel="noreferrer" className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-primary p-3 font-semibold text-primary-foreground"><ExternalLink className="h-4 w-4" />فتح الموقع في Google Maps</a>}</div>}<Button className="mt-4 w-full" variant="outline" onClick={onClose}><ChevronDown className="ms-2 h-4 w-4" />إغلاق</Button></div></div>; }
-
-function playNewOrderTone() {
-  try {
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const context = new AudioContextClass();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, context.currentTime);
-    oscillator.frequency.setValueAtTime(660, context.currentTime + 0.16);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.2, context.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.45);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.45);
-    oscillator.addEventListener("ended", () => void context.close());
-  } catch {
-    // Browsers can block audio until the driver interacts with the page.
-  }
-}

@@ -10,3 +10,4 @@ export * from "./orders";
 export * from "./notifications";
 export * from "./settings";
 export * from "./order-driver-attempts";
+export * from "./driver-push-subscriptions";

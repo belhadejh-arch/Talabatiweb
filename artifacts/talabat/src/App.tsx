@@ -26,6 +26,7 @@ import AdminNotifications from '@/pages/admin/notifications';
 import AdminSettings from '@/pages/admin/settings';
 import DriverLogin from '@/pages/driver/login';
 import DriverDashboard from '@/pages/driver/dashboard';
+import DriverNotifications from '@/components/driver-notifications';
 
 // Import public pages
 import PublicRestaurant from '@/pages/public/restaurant';
@@ -50,11 +51,14 @@ function Router() {
   return (
     <RoutedErrorBoundary>
       {isDriver ? (
-        <Switch>
-          <Route path="/driver/login" component={DriverLogin} />
-          <Route path="/driver/dashboard" component={DriverDashboard} />
-          <Route component={() => <Redirect to="/driver/login" />} />
-        </Switch>
+        <>
+          <DriverNotifications enabled={location !== '/driver/login'} />
+          <Switch>
+            <Route path="/driver/login" component={DriverLogin} />
+            <Route path="/driver/dashboard" component={DriverDashboard} />
+            <Route component={() => <Redirect to="/driver/login" />} />
+          </Switch>
+        </>
       ) : isAdmin ? (
         <Switch>
           <Route path="/admin/login" component={AdminLogin} />

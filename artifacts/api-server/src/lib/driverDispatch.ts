@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { notifyAssignedDriver } from "./driverPush";
 
 const DEFAULT_TIMEOUT_SECONDS = 180;
 const DISPATCH_INTERVAL_MS = 10_000;
@@ -94,6 +95,11 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     await client.query("COMMIT");
 
+    try {
+      await notifyAssignedDriver(driver.id, order.id);
+    } catch (error) {
+      logger.error({ err: error, driverId: driver.id, orderId: order.id }, "Failed to notify assigned driver");
+    }
     return { assigned: true, orderId: order.id, driverId: driver.id };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -105,7 +111,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
 
 export async function dispatchPendingOrdersForRestaurant(restaurantId: number): Promise<void> {
   const result = await pool.query<{ id: number }>(
-    "SELECT id FROM orders WHERE restaurant_id = $1 AND status = 'NEW' AND driver_id IS NULL ORDER BY created_at ASC, id ASC",
+    "SELECT id FROM orders WHERE restaurant_id = $1 AND status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC",
     [restaurantId],
   );
   for (const order of result.rows) {

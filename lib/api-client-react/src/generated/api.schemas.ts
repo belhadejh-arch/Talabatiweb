@@ -510,6 +510,7 @@ export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
 export const OrderStatus = {
   NEW: 'NEW',
+  WAITING_FOR_DRIVER: 'WAITING_FOR_DRIVER',
   ACCEPTED: 'ACCEPTED',
   PREPARING: 'PREPARING',
   READY: 'READY',
@@ -552,6 +553,51 @@ export interface DriverOrderListResponse {
   data: DriverOrder[];
 }
 
+export interface Notification {
+  id: number;
+  type: string;
+  message: string;
+  /** @nullable */
+  driverId?: number | null;
+  /** @nullable */
+  restaurantId?: number | null;
+  /** @nullable */
+  orderId?: number | null;
+  /** @nullable */
+  relatedId?: number | null;
+  /** @nullable */
+  relatedType?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export type DriverNotification = Notification & ({
+  driverId?: number;
+  /** @nullable */
+  restaurantId?: number | null;
+  /** @nullable */
+  orderId?: number | null;
+});
+
+export interface DriverNotificationListResponse {
+  data: DriverNotification[];
+}
+
+export type DriverPushSubscriptionInputSubscriptionKeys = {
+  p256dh: string;
+  auth: string;
+};
+
+export type DriverPushSubscriptionInputSubscription = {
+  endpoint: string;
+  keys: DriverPushSubscriptionInputSubscriptionKeys;
+};
+
+export interface DriverPushSubscriptionInput {
+  subscription: DriverPushSubscriptionInputSubscription;
+  device?: string;
+}
+
 export type OrderDetailOrderType = typeof OrderDetailOrderType[keyof typeof OrderDetailOrderType];
 
 
@@ -565,6 +611,7 @@ export type OrderDetailStatus = typeof OrderDetailStatus[keyof typeof OrderDetai
 
 export const OrderDetailStatus = {
   NEW: 'NEW',
+  WAITING_FOR_DRIVER: 'WAITING_FOR_DRIVER',
   ACCEPTED: 'ACCEPTED',
   PREPARING: 'PREPARING',
   READY: 'READY',
@@ -642,6 +689,7 @@ export type OrderStatusInputStatus = typeof OrderStatusInputStatus[keyof typeof 
 
 export const OrderStatusInputStatus = {
   NEW: 'NEW',
+  WAITING_FOR_DRIVER: 'WAITING_FOR_DRIVER',
   ACCEPTED: 'ACCEPTED',
   PREPARING: 'PREPARING',
   READY: 'READY',
@@ -771,18 +819,6 @@ export interface HourStat {
   orderCount: number;
 }
 
-export interface Notification {
-  id: number;
-  type: string;
-  message: string;
-  /** @nullable */
-  relatedId?: number | null;
-  /** @nullable */
-  relatedType?: string | null;
-  isRead: boolean;
-  createdAt: string;
-}
-
 export interface NotificationListResponse {
   data: Notification[];
   total: number;
@@ -828,6 +864,20 @@ export interface SettingsPatch {
   mapsApiKey?: string | null;
   driverResponseTimeoutSeconds?: SettingsPatchDriverResponseTimeoutSeconds;
 }
+
+export type ListDriverNotificationsParams = {
+unreadOnly?: boolean;
+};
+
+export type GetDriverPushPublicKey200 = {
+  /** @nullable */
+  publicKey?: string | null;
+  configured: boolean;
+};
+
+export type DeactivateDriverPushSubscriptionBody = {
+  endpoint: string;
+};
 
 export type ListRestaurantsParams = {
 search?: string;

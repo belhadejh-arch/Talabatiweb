@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, notificationsTable } from "@workspace/db";
-import { eq, desc, count, and } from "drizzle-orm";
+import { eq, desc, count, and, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 import { ListNotificationsQueryParams } from "@workspace/api-zod";
 
@@ -13,7 +13,10 @@ router.get("/notifications", requireAuth, async (req, res): Promise<void> => {
   const unreadOnly = qp.success ? qp.data.unreadOnly : false;
   const offset = (page - 1) * limit;
 
-  const where = unreadOnly ? eq(notificationsTable.isRead, false) : undefined;
+  const adminNotificationScope = isNull(notificationsTable.driverId);
+  const where = unreadOnly
+    ? and(adminNotificationScope, eq(notificationsTable.isRead, false))
+    : adminNotificationScope;
 
   const [notifications, totalResult, unreadResult] = await Promise.all([
     db
@@ -39,12 +42,12 @@ router.patch("/notifications/:id/read", requireAuth, async (req, res): Promise<v
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  await db.update(notificationsTable).set({ isRead: true }).where(eq(notificationsTable.id, id));
+  await db.update(notificationsTable).set({ isRead: true }).where(and(eq(notificationsTable.id, id), isNull(notificationsTable.driverId)));
   res.json({ ok: true });
 });
 
 router.post("/notifications/read-all", requireAuth, async (req, res): Promise<void> => {
-  await db.update(notificationsTable).set({ isRead: true }).where(eq(notificationsTable.isRead, false));
+  await db.update(notificationsTable).set({ isRead: true }).where(and(eq(notificationsTable.isRead, false), isNull(notificationsTable.driverId)));
   res.json({ ok: true });
 });
 

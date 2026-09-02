@@ -1,0 +1,20 @@
+{
+  "name": "TALABAT — بوابة السائق",
+  "short_name": "TALABAT Driver",
+  "description": "إشعارات وطلبات السائق داخل منصة TALABAT",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./driver/dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#071126",
+  "theme_color": "#111936",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

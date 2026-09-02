@@ -29,22 +29,26 @@ import type {
   Category,
   CategoryInput,
   CategoryPatch,
+  DeactivateDriverPushSubscriptionBody,
   Driver,
   DriverAssignment,
   DriverAuthResponse,
   DriverInput,
   DriverLoginInput,
+  DriverNotificationListResponse,
   DriverOrderAttempt,
   DriverOrderListResponse,
   DriverOrderResponseInput,
   DriverOrderStatusInput,
   DriverPatch,
   DriverPlatform,
+  DriverPushSubscriptionInput,
   DriverSession,
   DriverStat,
   EmailChangeInput,
   GetAnalyticsSummaryParams,
   GetDriverPerformanceParams,
+  GetDriverPushPublicKey200,
   GetOrdersOverTimeParams,
   GetPeakHoursParams,
   GetRevenueOverTimeParams,
@@ -52,6 +56,7 @@ import type {
   GetTopRestaurantsParams,
   HealthStatus,
   HourStat,
+  ListDriverNotificationsParams,
   ListNotificationsParams,
   ListOrdersParams,
   ListProductsParams,
@@ -1069,6 +1074,451 @@ export const useUpdateDriverOrderStatus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateDriverOrderStatusMutationOptions(options));
+    }
+
+export const getListDriverNotificationsUrl = (params?: ListDriverNotificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/driver/notifications?${stringifiedParams}` : `/api/driver/notifications`
+}
+
+/**
+ * @summary List notifications for the authenticated driver
+ */
+export const listDriverNotifications = async (params?: ListDriverNotificationsParams, options?: Parameters<typeof customFetch>[1]): Promise<DriverNotificationListResponse> => {
+
+  return customFetch<DriverNotificationListResponse>(getListDriverNotificationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDriverNotificationsQueryKey = (params?: ListDriverNotificationsParams,) => {
+    return [
+    `/api/driver/notifications`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDriverNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listDriverNotifications>>, TError = ErrorType<unknown>>(params?: ListDriverNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDriverNotificationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDriverNotifications>>> = ({ signal }) => listDriverNotifications(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDriverNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDriverNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof listDriverNotifications>>>
+export type ListDriverNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List notifications for the authenticated driver
+ */
+
+export function useListDriverNotifications<TData = Awaited<ReturnType<typeof listDriverNotifications>>, TError = ErrorType<unknown>>(
+ params?: ListDriverNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDriverNotificationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkDriverNotificationReadUrl = (id: number,) => {
+
+
+
+
+  return `/api/driver/notifications/${id}/read`
+}
+
+/**
+ * @summary Mark a driver notification as read
+ */
+export const markDriverNotificationRead = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkDriverNotificationReadUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkDriverNotificationReadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markDriverNotificationRead>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markDriverNotificationRead>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['markDriverNotificationRead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markDriverNotificationRead>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  markDriverNotificationRead(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkDriverNotificationReadMutationResult = NonNullable<Awaited<ReturnType<typeof markDriverNotificationRead>>>
+
+    export type MarkDriverNotificationReadMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark a driver notification as read
+ */
+export const useMarkDriverNotificationRead = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markDriverNotificationRead>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markDriverNotificationRead>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getMarkDriverNotificationReadMutationOptions(options));
+    }
+
+export const getMarkAllDriverNotificationsReadUrl = () => {
+
+
+
+
+  return `/api/driver/notifications/read-all`
+}
+
+/**
+ * @summary Mark all driver notifications as read
+ */
+export const markAllDriverNotificationsRead = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkAllDriverNotificationsReadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkAllDriverNotificationsReadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markAllDriverNotificationsRead>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markAllDriverNotificationsRead>>, TError,void, TContext> => {
+
+const mutationKey = ['markAllDriverNotificationsRead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markAllDriverNotificationsRead>>, void> = () => {
+
+
+          return  markAllDriverNotificationsRead(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkAllDriverNotificationsReadMutationResult = NonNullable<Awaited<ReturnType<typeof markAllDriverNotificationsRead>>>
+
+    export type MarkAllDriverNotificationsReadMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark all driver notifications as read
+ */
+export const useMarkAllDriverNotificationsRead = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markAllDriverNotificationsRead>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markAllDriverNotificationsRead>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMarkAllDriverNotificationsReadMutationOptions(options));
+    }
+
+export const getGetDriverPushPublicKeyUrl = () => {
+
+
+
+
+  return `/api/driver/push/vapid-public-key`
+}
+
+/**
+ * @summary Get the public VAPID key for Web Push
+ */
+export const getDriverPushPublicKey = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetDriverPushPublicKey200> => {
+
+  return customFetch<GetDriverPushPublicKey200>(getGetDriverPushPublicKeyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDriverPushPublicKeyQueryKey = () => {
+    return [
+    `/api/driver/push/vapid-public-key`
+    ] as const;
+    }
+
+
+export const getGetDriverPushPublicKeyQueryOptions = <TData = Awaited<ReturnType<typeof getDriverPushPublicKey>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverPushPublicKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDriverPushPublicKeyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDriverPushPublicKey>>> = ({ signal }) => getDriverPushPublicKey({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDriverPushPublicKey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDriverPushPublicKeyQueryResult = NonNullable<Awaited<ReturnType<typeof getDriverPushPublicKey>>>
+export type GetDriverPushPublicKeyQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the public VAPID key for Web Push
+ */
+
+export function useGetDriverPushPublicKey<TData = Awaited<ReturnType<typeof getDriverPushPublicKey>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverPushPublicKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDriverPushPublicKeyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveDriverPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/driver/push/subscription`
+}
+
+/**
+ * @summary Save or reactivate a driver browser Push subscription
+ */
+export const saveDriverPushSubscription = async (driverPushSubscriptionInput: DriverPushSubscriptionInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getSaveDriverPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(driverPushSubscriptionInput)
+  }
+);}
+
+
+
+
+
+export const getSaveDriverPushSubscriptionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDriverPushSubscription>>, TError,{data: BodyType<DriverPushSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveDriverPushSubscription>>, TError,{data: BodyType<DriverPushSubscriptionInput>}, TContext> => {
+
+const mutationKey = ['saveDriverPushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDriverPushSubscription>>, {data: BodyType<DriverPushSubscriptionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveDriverPushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveDriverPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof saveDriverPushSubscription>>>
+    export type SaveDriverPushSubscriptionMutationBody = BodyType<DriverPushSubscriptionInput>
+    export type SaveDriverPushSubscriptionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save or reactivate a driver browser Push subscription
+ */
+export const useSaveDriverPushSubscription = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDriverPushSubscription>>, TError,{data: BodyType<DriverPushSubscriptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveDriverPushSubscription>>,
+        TError,
+        {data: BodyType<DriverPushSubscriptionInput>},
+        TContext
+      > => {
+      return useMutation(getSaveDriverPushSubscriptionMutationOptions(options));
+    }
+
+export const getDeactivateDriverPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/driver/push/subscription`
+}
+
+/**
+ * @summary Deactivate a driver browser Push subscription
+ */
+export const deactivateDriverPushSubscription = async (deactivateDriverPushSubscriptionBody: DeactivateDriverPushSubscriptionBody, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeactivateDriverPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(deactivateDriverPushSubscriptionBody)
+  }
+);}
+
+
+
+
+
+export const getDeactivateDriverPushSubscriptionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateDriverPushSubscription>>, TError,{data: BodyType<DeactivateDriverPushSubscriptionBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deactivateDriverPushSubscription>>, TError,{data: BodyType<DeactivateDriverPushSubscriptionBody>}, TContext> => {
+
+const mutationKey = ['deactivateDriverPushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deactivateDriverPushSubscription>>, {data: BodyType<DeactivateDriverPushSubscriptionBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  deactivateDriverPushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeactivateDriverPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof deactivateDriverPushSubscription>>>
+    export type DeactivateDriverPushSubscriptionMutationBody = BodyType<DeactivateDriverPushSubscriptionBody>
+    export type DeactivateDriverPushSubscriptionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Deactivate a driver browser Push subscription
+ */
+export const useDeactivateDriverPushSubscription = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateDriverPushSubscription>>, TError,{data: BodyType<DeactivateDriverPushSubscriptionBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deactivateDriverPushSubscription>>,
+        TError,
+        {data: BodyType<DeactivateDriverPushSubscriptionBody>},
+        TContext
+      > => {
+      return useMutation(getDeactivateDriverPushSubscriptionMutationOptions(options));
     }
 
 export const getListRestaurantsUrl = (params?: ListRestaurantsParams,) => {

@@ -175,7 +175,7 @@ export const ListDriverOrdersResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -206,7 +206,7 @@ export const GetDriverOrderResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -259,7 +259,7 @@ export const RespondToDriverOrderResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -312,7 +312,7 @@ export const UpdateDriverOrderStatusResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -338,6 +338,85 @@ export const UpdateDriverOrderStatusResponse = zod.object({
 })),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary List notifications for the authenticated driver
+ */
+export const ListDriverNotificationsQueryParams = zod.object({
+  "unreadOnly": zod.coerce.boolean().optional()
+})
+
+export const ListDriverNotificationsResponse = zod.object({
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "message": zod.string(),
+  "driverId": zod.number().nullish(),
+  "restaurantId": zod.number().nullish(),
+  "orderId": zod.number().nullish(),
+  "relatedId": zod.number().nullish(),
+  "relatedType": zod.string().nullish(),
+  "isRead": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "driverId": zod.number().optional(),
+  "restaurantId": zod.number().nullish(),
+  "orderId": zod.number().nullish()
+})))
+})
+
+
+/**
+ * @summary Mark a driver notification as read
+ */
+export const MarkDriverNotificationReadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarkDriverNotificationReadResponse = zod.unknown()
+
+
+/**
+ * @summary Mark all driver notifications as read
+ */
+export const MarkAllDriverNotificationsReadResponse = zod.unknown()
+
+
+/**
+ * @summary Get the public VAPID key for Web Push
+ */
+export const GetDriverPushPublicKeyResponse = zod.object({
+  "publicKey": zod.string().nullish(),
+  "configured": zod.boolean()
+})
+
+
+/**
+ * @summary Save or reactivate a driver browser Push subscription
+ */
+export const SaveDriverPushSubscriptionBody = zod.object({
+  "subscription": zod.object({
+  "endpoint": zod.string(),
+  "keys": zod.object({
+  "p256dh": zod.string(),
+  "auth": zod.string()
+})
+}),
+  "device": zod.string().optional()
+})
+
+export const SaveDriverPushSubscriptionResponse = zod.void()
+
+
+/**
+ * @summary Deactivate a driver browser Push subscription
+ */
+export const DeactivateDriverPushSubscriptionBody = zod.object({
+  "endpoint": zod.string()
+})
+
+export const DeactivateDriverPushSubscriptionResponse = zod.unknown()
 
 
 /**
@@ -1286,7 +1365,7 @@ export const ListOrdersResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -1318,7 +1397,7 @@ export const GetOrderResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -1354,7 +1433,7 @@ export const UpdateOrderStatusParams = zod.object({
 })
 
 export const UpdateOrderStatusBody = zod.object({
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "note": zod.string().optional()
 })
 
@@ -1372,7 +1451,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -1425,7 +1504,7 @@ export const AssignDriverResponse = zod.object({
   "subtotal": zod.number().optional(),
   "deliveryFee": zod.number().optional(),
   "totalAmount": zod.number(),
-  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
   "driverId": zod.number().nullish(),
   "driverName": zod.string().nullish(),
   "driverPhone": zod.string().nullish(),
@@ -1722,6 +1801,9 @@ export const ListNotificationsResponse = zod.object({
   "id": zod.number(),
   "type": zod.string(),
   "message": zod.string(),
+  "driverId": zod.number().nullish(),
+  "restaurantId": zod.number().nullish(),
+  "orderId": zod.number().nullish(),
   "relatedId": zod.number().nullish(),
   "relatedType": zod.string().nullish(),
   "isRead": zod.boolean(),

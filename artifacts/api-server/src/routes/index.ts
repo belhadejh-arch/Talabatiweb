@@ -15,6 +15,7 @@ import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
 import driverAuthRouter from "./driverAuth";
 import driverPortalRouter from "./driverPortal";
+import driverNotificationsRouter from "./driverNotifications";
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use(storageRouter);
 router.use(uploadsRouter);
 router.use(driverAuthRouter);
 router.use(driverPortalRouter);
+router.use(driverNotificationsRouter);
 
 export default router;
