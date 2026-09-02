@@ -818,7 +818,6 @@ limit?: number;
 export type GetWpSenderSessionConfig200 = {
   apiKeyConfigured?: boolean;
   apiUrlConfigured?: boolean;
-  sessionIdConfigured?: boolean;
   apiUrl?: string;
   /** @nullable */
   sessionId?: string | null;

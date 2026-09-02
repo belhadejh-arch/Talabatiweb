@@ -7,15 +7,58 @@ import { Input } from "@/components/ui/input";
 type SessionConfig = {
   apiKeyConfigured: boolean;
   apiUrlConfigured: boolean;
-  sessionIdConfigured: boolean;
   apiUrl: string;
+  sessionId: string | null;
 };
 
+type SessionRow = {
+  sessionId: string;
+  phoneNumber: string;
+  status: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
 function providerStatus(value: unknown): string {
-  if (!value || typeof value !== "object") return "غير معروف";
-  const root = value as Record<string, unknown>;
-  const data = root.data && typeof root.data === "object" ? root.data as Record<string, unknown> : {};
+  const root = asRecord(value);
+  const data = asRecord(root.data);
   return String(data.status ?? root.status ?? "غير معروف");
+}
+
+function findString(value: unknown, keys: string[], depth = 0): string {
+  if (depth > 4) return "";
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findString(item, keys, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+  const record = asRecord(value);
+  for (const key of keys) {
+    if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
+  }
+  for (const nested of Object.values(record)) {
+    const found = findString(nested, keys, depth + 1);
+    if (found) return found;
+  }
+  return "";
+}
+
+function parseSessionRows(value: unknown): SessionRow[] {
+  const data = asRecord(value).data;
+  if (!Array.isArray(data)) return [];
+  return data.map(item => {
+    const row = asRecord(item);
+    return {
+      sessionId: String(row.session_id ?? row.sessionId ?? ""),
+      phoneNumber: String(row.phone_number ?? row.phoneNumber ?? "—"),
+      status: String(row.status ?? "غير معروف"),
+    };
+  }).filter(row => row.sessionId);
 }
 
 export default function AdminSettings() {
@@ -31,6 +74,9 @@ export default function AdminSettings() {
   const [driverTimeout, setDriverTimeout] = useState<number | null>(null);
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
   const [sessionStatus, setSessionStatus] = useState("غير معروف");
+  const [connectedPhone, setConnectedPhone] = useState("—");
+  const [sessionRows, setSessionRows] = useState<SessionRow[]>([]);
+  const [qrDataUrl, setQrDataUrl] = useState("");
   const [sessionResult, setSessionResult] = useState<unknown>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const base = getBaseUrl() ?? "";
@@ -38,14 +84,41 @@ export default function AdminSettings() {
   const timeoutSeconds = driverTimeout ?? settings?.driverResponseTimeoutSeconds ?? 180;
   const sessionResultText = sessionResult ? JSON.stringify(sessionResult, null, 2) : "";
 
+  const readResponse = async (path: string): Promise<unknown> => {
+    const response = await fetch(`${base}${path}`, { credentials: "include" });
+    const text = await response.text();
+    let body: unknown = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    if (!response.ok) throw new Error(asRecord(body).error ? String(asRecord(body).error) : "تعذر قراءة بيانات WP Sender");
+    return body;
+  };
+
   const loadSession = async () => {
     try {
-      const configResponse = await fetch(`${base}/api/wp-sender/session`, { credentials: "include" });
-      if (!configResponse.ok) throw new Error("تعذر قراءة إعدادات WP Sender");
-      setSessionConfig(await configResponse.json());
-      const statusResponse = await fetch(`${base}/api/wp-sender/session/status`, { credentials: "include" });
-      const statusBody = await statusResponse.json().catch(() => null);
-      setSessionStatus(statusResponse.ok ? providerStatus(statusBody) : statusBody?.error || "غير متصل");
+      const config = await readResponse("/api/wp-sender/session") as SessionConfig;
+      setSessionConfig(config);
+      setSessionRows([]);
+      if (!config.sessionId) {
+        setSessionStatus("لم تُنشأ جلسة بعد");
+        setConnectedPhone("—");
+        setQrDataUrl("");
+        return;
+      }
+      const [statusResult, detailsResult, qrResult, listResult] = await Promise.allSettled([
+        readResponse("/api/wp-sender/session/status"),
+        readResponse("/api/wp-sender/session/details"),
+        readResponse("/api/wp-sender/session/qr?output=base64"),
+        readResponse("/api/wp-sender/sessions"),
+      ]);
+      if (statusResult.status === "fulfilled") setSessionStatus(providerStatus(statusResult.value));
+      if (detailsResult.status === "fulfilled") {
+        setConnectedPhone(findString(detailsResult.value, ["phone_number", "phoneNumber", "number"]) || "—");
+      }
+      if (listResult.status === "fulfilled") setSessionRows(parseSessionRows(listResult.value));
+      if (qrResult.status === "fulfilled") {
+        const dataUrl = findString(qrResult.value, ["dataUrl", "dataURL", "qrCode", "qr"]);
+        setQrDataUrl(dataUrl.startsWith("data:image/") ? dataUrl : "");
+      }
     } catch (error) {
       setSessionStatus(error instanceof Error ? error.message : "تعذر فحص الجلسة");
     }
@@ -79,19 +152,22 @@ export default function AdminSettings() {
     <Card><CardHeader><CardTitle>WP Sender وWhatsApp</CardTitle></CardHeader><CardContent className="space-y-4">
       <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">إعدادات الخادم</p>
-        <p>يقرأ الخادم هذه القيم من Replit Secrets فقط: WP_SENDER_API_KEY وWP_SENDER_API_URL وWP_SENDER_SESSION_ID. لا تظهر قيمة المفتاح في الواجهة أو في GitHub.</p>
+        <p>يقرأ الخادم مفتاح WP_SENDER_API_KEY من Replit Secrets. عنوان الإنتاج مأخوذ من `servers` في توثيق WP Sender، وSession ID يُحفظ تلقائيًا في PostgreSQL بعد إنشاء الجلسة.</p>
       </div>
       <div className="grid gap-2 rounded-md border p-3 text-sm">
         <div className="flex justify-between gap-4"><span>API Key</span><strong>{sessionConfig?.apiKeyConfigured ? "مُكوّن" : "غير مُكوّن"}</strong></div>
         <div className="flex justify-between gap-4"><span>API URL</span><span dir="ltr" className="text-left">{sessionConfig?.apiUrl || "—"}</span></div>
-        <div className="flex justify-between gap-4"><span>Session ID</span><strong>{sessionConfig?.sessionIdConfigured ? "مُكوّن" : "غير مُكوّن"}</strong></div>
+        <div className="flex justify-between gap-4"><span>Session ID</span><strong dir="ltr">{sessionConfig?.sessionId || "لم تُنشأ جلسة"}</strong></div>
         <div className="flex justify-between gap-4"><span>حالة WhatsApp Session</span><strong>{sessionStatus}</strong></div>
+        <div className="flex justify-between gap-4"><span>رقم WhatsApp المتصل</span><strong dir="ltr">{connectedPhone}</strong></div>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={() => void loadSession()} disabled={sessionBusy}>فحص الاتصال</Button>
-        <Button type="button" variant="outline" onClick={() => void sessionAction("/api/wp-sender/session/create")} disabled={sessionBusy}>إنشاء Session</Button>
+        <Button type="button" variant="outline" onClick={() => void sessionAction("/api/wp-sender/session/create")} disabled={sessionBusy || Boolean(sessionConfig?.sessionId)}>إنشاء جلسة</Button>
         <Button type="button" variant="outline" onClick={() => void sessionAction("/api/wp-sender/session/reconnect")} disabled={sessionBusy}>إعادة الاتصال</Button>
       </div>
+      {qrDataUrl && <div className="rounded-md border p-4 text-center"><p className="mb-3 font-medium">QR Code لربط WhatsApp</p><img src={qrDataUrl} alt="WP Sender WhatsApp QR Code" className="mx-auto h-64 w-64" /></div>}
+      {sessionRows.length > 0 && <div className="space-y-2"><h3 className="font-semibold">الجلسات الموجودة</h3><div className="overflow-x-auto rounded-md border"><table className="w-full text-sm"><thead><tr className="border-b text-right"><th className="p-2">Session ID</th><th className="p-2">الرقم</th><th className="p-2">الحالة</th></tr></thead><tbody>{sessionRows.map(row => <tr key={row.sessionId} className="border-b last:border-0"><td dir="ltr" className="p-2">{row.sessionId}</td><td dir="ltr" className="p-2">{row.phoneNumber}</td><td className="p-2">{row.status}</td></tr>)}</tbody></table></div></div>}
       {sessionResultText && <pre dir="ltr" className="max-h-48 overflow-auto rounded bg-muted p-3 text-xs">{sessionResultText}</pre>}
       <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={e => setWhatsappEnabled(e.target.checked)} /> تفعيل إرسال الطلبات تلقائيًا إلى السائقين</label>
       <p className="text-xs text-muted-foreground">عند التفعيل، يرسل النظام الطلب إلى سائق ACTIVE واحد فقط من نفس المطعم باستخدام رقم WhatsApp المسجل.</p>

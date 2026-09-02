@@ -1,6 +1,9 @@
+import { db, settingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
-const DEFAULT_API_URL = "https://backendapi.wpsenderx.com/api";
+// Production server extracted from https://www.wpsenderx.com/api-docs.json servers[0].
+export const WP_SENDER_PRODUCTION_API_URL = "https://backendapi.wpsenderx.com/api";
 
 export type WhatsAppMessagePayload = {
   restaurantName: string;
@@ -22,35 +25,48 @@ export type WhatsAppSendResult = {
 type WpSenderConfig = {
   apiKey: string;
   apiUrl: string;
-  sessionId: string | null;
 };
 
 function getConfig(): WpSenderConfig | null {
   const apiKey = process.env.WP_SENDER_API_KEY?.trim();
-  const apiUrl = process.env.WP_SENDER_API_URL?.trim()?.replace(/\/+$/, "");
-  const sessionId = process.env.WP_SENDER_SESSION_ID?.trim() || null;
-  return apiKey && apiUrl ? { apiKey, apiUrl, sessionId } : null;
+  return apiKey ? { apiKey, apiUrl: WP_SENDER_PRODUCTION_API_URL } : null;
 }
 
-export function isWpSenderConfigured(requireSession = false): boolean {
+export function isWpSenderConfigured(): boolean {
   const config = getConfig();
-  return Boolean(config && (!requireSession || config.sessionId));
+  return Boolean(config);
 }
 
-export function getWpSenderConfigStatus(): {
+export async function getStoredWpSenderSessionId(): Promise<string | null> {
+  const [settings] = await db.select({ sessionId: settingsTable.wpSenderSessionId }).from(settingsTable).limit(1);
+  return settings?.sessionId?.trim() || null;
+}
+
+export async function storeWpSenderSessionId(sessionId: string): Promise<void> {
+  const [settings] = await db.select({ id: settingsTable.id }).from(settingsTable).limit(1);
+  if (settings) {
+    await db.update(settingsTable).set({ wpSenderSessionId: sessionId }).where(eq(settingsTable.id, settings.id));
+  } else {
+    await db.insert(settingsTable).values({ wpSenderSessionId: sessionId });
+  }
+}
+
+export function extractWpSenderSessionId(body: unknown): string | null {
+  return findStringProperty(body, ["sessionId", "session_id"]);
+}
+
+export async function getWpSenderConfigStatus(): Promise<{
   apiKeyConfigured: boolean;
   apiUrlConfigured: boolean;
-  sessionIdConfigured: boolean;
   apiUrl: string;
   sessionId: string | null;
-} {
+}> {
   const config = getConfig();
   return {
     apiKeyConfigured: Boolean(config?.apiKey),
-    apiUrlConfigured: Boolean(process.env.WP_SENDER_API_URL?.trim()),
-    sessionIdConfigured: Boolean(config?.sessionId),
-    apiUrl: config?.apiUrl || DEFAULT_API_URL,
-    sessionId: config?.sessionId || null,
+    apiUrlConfigured: true,
+    apiUrl: config?.apiUrl || WP_SENDER_PRODUCTION_API_URL,
+    sessionId: await getStoredWpSenderSessionId(),
   };
 }
 
@@ -110,12 +126,13 @@ async function wpSenderRequest<T = unknown>(path: string, init: RequestInit = {}
 export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<WhatsAppSendResult> {
   const config = getConfig();
   const phone = normalizePhone(payload.driverPhone);
+  const sessionId = await getStoredWpSenderSessionId();
 
   if (!config) {
     return { success: false, errorMessage: "WP Sender is not configured: set WP_SENDER_API_KEY" };
   }
-  if (!config.sessionId) {
-    return { success: false, errorMessage: "WP Sender session is not configured: set WP_SENDER_SESSION_ID" };
+  if (!sessionId) {
+    return { success: false, errorMessage: "WP Sender WhatsApp session has not been created" };
   }
   if (!phone) {
     return { success: false, errorMessage: "Driver WhatsApp number is not configured" };
@@ -129,7 +146,7 @@ export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Pro
         recipients: phone,
         message: buildOrderMessage(payload),
         contentType: "string",
-        sender_number: config.sessionId,
+        sender_number: sessionId,
       }),
     });
     logger.info({ orderId: payload.orderId, driverPhone: phone }, "WP Sender message sent to driver");
@@ -210,6 +227,26 @@ export type WpSenderWebhookMessage = {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function findStringProperty(value: unknown, keys: string[], depth = 0): string | null {
+  if (depth > 6) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findStringProperty(item, keys, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  const record = asRecord(value);
+  for (const key of keys) {
+    if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
+  }
+  for (const nested of Object.values(record)) {
+    const found = findStringProperty(nested, keys, depth + 1);
+    if (found) return found;
+  }
+  return null;
 }
 
 function firstString(...values: unknown[]): string | null {

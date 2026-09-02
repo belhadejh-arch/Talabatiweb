@@ -915,7 +915,6 @@ paths:
                 properties:
                   apiKeyConfigured: { type: boolean }
                   apiUrlConfigured: { type: boolean }
-                  sessionIdConfigured: { type: boolean }
                   apiUrl: { type: string }
                   sessionId: { type: ["string", "null"] }
 

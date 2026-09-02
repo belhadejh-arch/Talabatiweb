@@ -1198,7 +1198,6 @@ export const GetOrderDeliveryStatusResponse = zod.array(GetOrderDeliveryStatusRe
 export const GetWpSenderSessionConfigResponse = zod.object({
   "apiKeyConfigured": zod.boolean().optional(),
   "apiUrlConfigured": zod.boolean().optional(),
-  "sessionIdConfigured": zod.boolean().optional(),
   "apiUrl": zod.string().optional(),
   "sessionId": zod.string().nullish()
 })

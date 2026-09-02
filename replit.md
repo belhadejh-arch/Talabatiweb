@@ -20,8 +20,6 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `FRONTEND_URL` | api-server | Restricts CORS + enables cross-site cookies (`SameSite=None`) when frontend/backend are on different domains. Required when the frontend is deployed to Vercel (see `DEPLOYMENT.md`); omit for same-origin (Replit-only) deploys |
 | `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel, with the backend staying on Replit — see `DEPLOYMENT.md`). Leave unset for same-origin deploys — requests default to relative `/api/...` |
 | `WP_SENDER_API_KEY` | api-server | WP Sender API key; server-side secret only |
-| `WP_SENDER_API_URL` | api-server | WP Sender API base URL, normally `https://backendapi.wpsenderx.com/api` |
-| `WP_SENDER_SESSION_ID` | api-server | WP Sender WhatsApp Session ID; server-side secret only |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
 | `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
 
@@ -48,13 +46,13 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - Image uploads: `POST /api/uploads/image` (multipart, `requireAuth`) → `src/lib/imageUpload.ts` (sharp resize/WebP + Replit Object Storage or portable PostgreSQL fallback) → served back via `GET /api/storage/public-objects/*` or `/api/storage/db-images/:id`. The fallback stores processed WebP bytes in PostgreSQL so the Render deployment remains functional without Replit sidecar auth.
 - Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns one active driver scoped to the order's `restaurantId`, and sends only through WP Sender
 - Delivery channel audit: `delivery_message_logs` records `SENT`/`FAILED`, `sent_at`, `response_at`, and a safe error message for WhatsApp
-- WP Sender session management: `artifacts/api-server/src/routes/wpSender.ts` exposes authenticated status, list, create, details, reconnect, QR, pairing-code, and webhook configuration actions
+- WP Sender session management: `artifacts/api-server/src/routes/wpSender.ts` exposes authenticated status, list, create, details, reconnect, QR, pairing-code, and webhook configuration actions; the active session ID is stored in PostgreSQL
 - Driver response webhook: `POST /api/webhooks/wp-sender` accepts driver replies such as `قبول #123` or `رفض #123`; rejected and timed-out drivers are excluded from later attempts
 
 ## Architecture decisions
 
 - Uploaded images are processed **server-side** (sharp resize → WebP) rather than via a client-direct-to-GCS presigned URL, because compression must happen before the file lands in permanent storage. The endpoint accepts raw multipart (`multer`, memory storage), uses Replit Object Storage when its sidecar is available, and falls back to a lazily-created PostgreSQL image table on external hosts.
-- WP Sender uses the official `POST /messages/send` contract with `X-API-Key` and `{ recipients, message, contentType: "string", sender_number }`. Configure the session webhook to `/api/webhooks/wp-sender` if inbound driver replies are enabled. The three WP Sender secrets never reach the frontend.
+- WP Sender uses the production server declared by `https://www.wpsenderx.com/api-docs.json` (`servers[0]`) and the official `POST /messages/send` contract with `X-API-Key` and `{ recipients, message, contentType: "string", sender_number }`. Configure the session webhook to `/api/webhooks/wp-sender` if inbound driver replies are enabled. The API key never reaches the frontend.
 - Driver assignment and reassignment are always scoped by `restaurantId` — a driver from another restaurant can never be selected, by construction of the query filters (not just app-level convention).
 - The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; asset URLs (`src/lib/asset-url.ts`) apply the same base URL to relative object-storage paths so `<img>` tags resolve correctly either way.
 

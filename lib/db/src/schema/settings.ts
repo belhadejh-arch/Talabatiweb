@@ -6,6 +6,7 @@ export const settingsTable = pgTable("settings", {
   id: serial("id").primaryKey(),
   platformName: text("platform_name").notNull().default("TALABAT"),
   whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
+  wpSenderSessionId: text("wp_sender_session_id"),
   defaultCurrency: text("default_currency").notNull().default("LYD"),
   mapsApiKey: text("maps_api_key"),
   driverResponseTimeoutSeconds: integer("driver_response_timeout_seconds").notNull().default(180),

@@ -3,10 +3,12 @@ import { pool } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import {
   createWpSenderSession,
+  extractWpSenderSessionId,
   getWpSenderConfigStatus,
   getWpSenderQr,
   getWpSenderSessionDetails,
   getWpSenderSessionStatus,
+  getStoredWpSenderSessionId,
   listWpSenderSessions,
   normalizeWhatsAppNumber,
   parseDriverOrderResponse,
@@ -14,22 +16,19 @@ import {
   reconnectWpSenderSession,
   requestWpSenderPairingCode,
   setWpSenderWebhook,
+  storeWpSenderSessionId,
 } from "../lib/wpSender";
 import { respondToOrderAttempt } from "../lib/driverDispatch";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-function configuredSessionId(): string | null {
-  return process.env.WP_SENDER_SESSION_ID?.trim() || null;
-}
-
 function providerError(res: Response, error: unknown): void {
   res.status(502).json({ error: error instanceof Error ? error.message : "WP Sender request failed" });
 }
 
 router.get("/wp-sender/session", requireAuth, async (_req, res): Promise<void> => {
-  res.json(getWpSenderConfigStatus());
+  res.json(await getWpSenderConfigStatus());
 });
 
 router.get("/wp-sender/sessions", requireAuth, async (_req, res): Promise<void> => {
@@ -42,15 +41,22 @@ router.get("/wp-sender/sessions", requireAuth, async (_req, res): Promise<void> 
 
 router.post("/wp-sender/session/create", requireAuth, async (_req, res): Promise<void> => {
   try {
-    res.status(201).json(await createWpSenderSession());
+    const providerResponse = await createWpSenderSession();
+    const sessionId = extractWpSenderSessionId(providerResponse);
+    if (!sessionId) {
+      res.status(502).json({ error: "WP Sender did not return a sessionId for the new session" });
+      return;
+    }
+    await storeWpSenderSessionId(sessionId);
+    res.status(201).json({ providerResponse, sessionId });
   } catch (error) {
     providerError(res, error);
   }
 });
 
 router.get("/wp-sender/session/status", requireAuth, async (_req, res): Promise<void> => {
-  const sessionId = configuredSessionId();
-  if (!sessionId) { res.status(400).json({ error: "WP_SENDER_SESSION_ID is not configured" }); return; }
+  const sessionId = await getStoredWpSenderSessionId();
+  if (!sessionId) { res.status(400).json({ error: "No WP Sender WhatsApp session has been created" }); return; }
   try {
     res.json(await getWpSenderSessionStatus(sessionId));
   } catch (error) {
@@ -59,8 +65,8 @@ router.get("/wp-sender/session/status", requireAuth, async (_req, res): Promise<
 });
 
 router.get("/wp-sender/session/details", requireAuth, async (_req, res): Promise<void> => {
-  const sessionId = configuredSessionId();
-  if (!sessionId) { res.status(400).json({ error: "WP_SENDER_SESSION_ID is not configured" }); return; }
+  const sessionId = await getStoredWpSenderSessionId();
+  if (!sessionId) { res.status(400).json({ error: "No WP Sender WhatsApp session has been created" }); return; }
   try {
     res.json(await getWpSenderSessionDetails(sessionId));
   } catch (error) {
@@ -69,8 +75,8 @@ router.get("/wp-sender/session/details", requireAuth, async (_req, res): Promise
 });
 
 router.post("/wp-sender/session/reconnect", requireAuth, async (_req, res): Promise<void> => {
-  const sessionId = configuredSessionId();
-  if (!sessionId) { res.status(400).json({ error: "WP_SENDER_SESSION_ID is not configured" }); return; }
+  const sessionId = await getStoredWpSenderSessionId();
+  if (!sessionId) { res.status(400).json({ error: "No WP Sender WhatsApp session has been created" }); return; }
   try {
     res.json(await reconnectWpSenderSession(sessionId));
   } catch (error) {
@@ -79,8 +85,8 @@ router.post("/wp-sender/session/reconnect", requireAuth, async (_req, res): Prom
 });
 
 router.get("/wp-sender/session/qr", requireAuth, async (req, res): Promise<void> => {
-  const sessionId = configuredSessionId();
-  if (!sessionId) { res.status(400).json({ error: "WP_SENDER_SESSION_ID is not configured" }); return; }
+  const sessionId = await getStoredWpSenderSessionId();
+  if (!sessionId) { res.status(400).json({ error: "No WP Sender WhatsApp session has been created" }); return; }
   const output = req.query.output === "image" || req.query.output === "raw" ? req.query.output : "base64";
   try {
     const qr = await getWpSenderQr(sessionId, output);
@@ -91,9 +97,9 @@ router.get("/wp-sender/session/qr", requireAuth, async (req, res): Promise<void>
 });
 
 router.post("/wp-sender/session/pairing-code", requireAuth, async (req, res): Promise<void> => {
-  const sessionId = configuredSessionId();
+  const sessionId = await getStoredWpSenderSessionId();
   const phoneNumber = typeof req.body?.phoneNumber === "string" ? req.body.phoneNumber : "";
-  if (!sessionId) { res.status(400).json({ error: "WP_SENDER_SESSION_ID is not configured" }); return; }
+  if (!sessionId) { res.status(400).json({ error: "No WP Sender WhatsApp session has been created" }); return; }
   if (!phoneNumber.trim()) { res.status(400).json({ error: "phoneNumber is required" }); return; }
   try {
     res.json(await requestWpSenderPairingCode(sessionId, phoneNumber));
