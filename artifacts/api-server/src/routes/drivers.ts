@@ -24,6 +24,15 @@ async function createUniqueSerialNumber(): Promise<string> {
   throw new Error("Unable to generate a unique driver serial number");
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "23505",
+  );
+}
+
 // Platform-wide driver list with assignment outcome counters.
 router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
   const result = await pool.query(`
@@ -92,16 +101,31 @@ router.post("/restaurants/:id/drivers", requireAuth, async (req, res): Promise<v
   const parsed = CreateDriverBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
-  const [driver] = await db
-    .insert(driversTable)
-    .values({
-      ...parsed.data,
-      serialNumber: await createUniqueSerialNumber(),
-      restaurantId,
-      isActive: false,
-      status: "INACTIVE",
-    })
-    .returning();
+  let driver;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      [driver] = await db
+        .insert(driversTable)
+        .values({
+          ...parsed.data,
+          serialNumber: await createUniqueSerialNumber(),
+          restaurantId,
+          isActive: false,
+          status: "INACTIVE",
+        })
+        .returning();
+      break;
+    } catch (error) {
+      // The availability check above and the unique index must both be kept:
+      // concurrent admins can still choose the same number between them.
+      if (!isUniqueViolation(error) || attempt === 2) throw error;
+    }
+  }
+
+  if (!driver) {
+    res.status(503).json({ error: "تعذر توليد رقم تسلسلي فريد، حاول مرة أخرى" });
+    return;
+  }
 
   res.status(201).json(driver);
 });

@@ -77,4 +77,13 @@ app.get("/health", (_req, res) => {
 
 app.use("/api", router);
 
+// Keep API failures machine-readable for split deployments such as Vercel +
+// Render. Express otherwise returns an HTML error page that obscures the
+// actual failure in the admin dashboard.
+app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err: error, method: req.method, path: req.path }, "Unhandled API error");
+  if (res.headersSent) return;
+  res.status(500).json({ error: "حدث خطأ داخلي في الخادم. حاول مرة أخرى" });
+});
+
 export default app;

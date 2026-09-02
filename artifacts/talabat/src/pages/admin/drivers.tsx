@@ -9,7 +9,7 @@ import { ImageUpload } from "@/components/admin/image-upload";
 import { formatCurrency } from "@/lib/currency";
 import { orderStatusLabel } from "@/lib/labels";
 import { getAssetUrl } from "@/lib/asset-url";
-import { CheckCircle2, Clipboard, IdCard, Pencil, Plus, ShieldCheck, UserRound, X } from "lucide-react";
+import { CheckCircle2, Clipboard, Copy, ExternalLink, IdCard, Pencil, Plus, ShieldCheck, UserRound, X } from "lucide-react";
 
 type DriverForm = {
   name: string;
@@ -50,6 +50,12 @@ type DriverAttempt = {
   orderCreatedAt: string;
 };
 
+type CreatedDriverCredentials = {
+  name: string;
+  serialNumber: string;
+  loginUrl: string;
+};
+
 const empty: DriverForm = {
   name: "",
   phone: "",
@@ -67,6 +73,7 @@ export default function AdminDrivers() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [drivers, setDrivers] = useState<PlatformDriver[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<PlatformDriver | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedDriverCredentials | null>(null);
   const [history, setHistory] = useState<DriverAttempt[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -150,8 +157,23 @@ export default function AdminDrivers() {
       });
     } else {
       create.mutate({ id: Number(form.restaurantId), data }, {
-        onSuccess: () => { setForm(empty); void loadDrivers(); },
-        onError: (error) => alert(error instanceof Error ? error.message : "تعذر إنشاء حساب السائق"),
+        onSuccess: (driver) => {
+          setCreatedCredentials({
+            name: driver.name,
+            serialNumber: driver.serialNumber,
+            loginUrl: `${window.location.origin}/driver/login`,
+          });
+          setForm(empty);
+          void loadDrivers();
+        },
+        onError: (error) => {
+          const status = typeof error === "object" && error !== null && "status" in error
+            ? Number((error as { status?: unknown }).status)
+            : 0;
+          alert(status >= 500
+            ? "تعذر إنشاء حساب السائق بسبب خطأ في الخادم. تم تسجيل الخطأ، حاول مرة أخرى."
+            : error instanceof Error ? error.message : "تعذر إنشاء حساب السائق");
+        },
       });
     }
   };
@@ -217,6 +239,38 @@ export default function AdminDrivers() {
           </form>
         </CardContent>
       </Card>
+
+      {createdCredentials && <Card className="border-emerald-500/30 bg-emerald-500/5 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg text-emerald-700"><CheckCircle2 className="h-5 w-5" />تم إنشاء حساب السائق بنجاح</CardTitle>
+          <p className="text-sm text-muted-foreground">احفظ الرقم التالي وشاركه مع السائق. يجب تفعيل الحساب من جدول السائقين قبل أول دخول.</p>
+        </CardHeader>
+        <CardContent className="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-end sm:p-6">
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">السائق</p>
+              <p className="font-bold">{createdCredentials.name}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">الرقم التسلسلي — 6 أرقام</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span dir="ltr" className="rounded-lg bg-background px-4 py-2 font-mono text-2xl font-black tracking-[0.35em] text-primary shadow-sm">{createdCredentials.serialNumber}</span>
+                <Button type="button" size="sm" variant="outline" onClick={() => void navigator.clipboard.writeText(createdCredentials.serialNumber)}><Copy className="ms-1 h-4 w-4" />نسخ الرقم</Button>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">رابط دخول السائق</p>
+              <a href={createdCredentials.loginUrl} target="_blank" rel="noreferrer" dir="ltr" className="mt-1 inline-flex max-w-full items-center gap-2 break-all text-sm font-semibold text-primary underline underline-offset-4">
+                {createdCredentials.loginUrl}<ExternalLink className="h-4 w-4 shrink-0" />
+              </a>
+            </div>
+          </div>
+          <div className="flex gap-2 sm:flex-col">
+            <Button type="button" onClick={() => void navigator.clipboard.writeText(`${createdCredentials.name}\nالرقم: ${createdCredentials.serialNumber}\nرابط الدخول: ${createdCredentials.loginUrl}`)}><Copy className="ms-2 h-4 w-4" />نسخ بيانات الدخول</Button>
+            <Button type="button" variant="ghost" onClick={() => setCreatedCredentials(null)}>إخفاء</Button>
+          </div>
+        </CardContent>
+      </Card>}
 
       <Card>
         <CardHeader><CardTitle>حسابات السائقين ({drivers.length})</CardTitle></CardHeader>
