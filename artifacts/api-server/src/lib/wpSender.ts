@@ -55,6 +55,25 @@ export function extractWpSenderSessionId(body: unknown): string | null {
   return findStringProperty(body, ["sessionId", "session_id"]);
 }
 
+export function extractWpSenderSessionIds(body: unknown): string[] {
+  const found = new Set<string>();
+  const visit = (value: unknown, depth = 0) => {
+    if (depth > 6) return;
+    if (Array.isArray(value)) {
+      value.forEach(item => visit(item, depth + 1));
+      return;
+    }
+    const record = asRecord(value);
+    const sessionId = typeof record.sessionId === "string"
+      ? record.sessionId
+      : typeof record.session_id === "string" ? record.session_id : "";
+    if (sessionId.trim()) found.add(sessionId.trim());
+    Object.values(record).forEach(item => visit(item, depth + 1));
+  };
+  visit(body);
+  return [...found];
+}
+
 export async function getWpSenderConfigStatus(): Promise<{
   apiKeyConfigured: boolean;
   apiUrlConfigured: boolean;

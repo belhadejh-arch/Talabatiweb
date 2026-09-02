@@ -4,6 +4,7 @@ import { requireAuth } from "../middlewares/auth";
 import {
   createWpSenderSession,
   extractWpSenderSessionId,
+  extractWpSenderSessionIds,
   getWpSenderConfigStatus,
   getWpSenderQr,
   getWpSenderSessionDetails,
@@ -28,6 +29,16 @@ function providerError(res: Response, error: unknown): void {
 }
 
 router.get("/wp-sender/session", requireAuth, async (_req, res): Promise<void> => {
+  const currentSessionId = await getStoredWpSenderSessionId();
+  if (!currentSessionId) {
+    try {
+      const sessions = await listWpSenderSessions();
+      const sessionIds = extractWpSenderSessionIds(sessions);
+      if (sessionIds.length === 1) await storeWpSenderSessionId(sessionIds[0]);
+    } catch (error) {
+      logger.warn({ err: error }, "Unable to auto-discover an existing WP Sender session");
+    }
+  }
   res.json(await getWpSenderConfigStatus());
 });
 
