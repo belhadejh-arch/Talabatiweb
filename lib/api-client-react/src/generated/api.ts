@@ -45,6 +45,7 @@ import type {
   DriverPushSubscriptionInput,
   DriverSession,
   DriverStat,
+  DriverStats,
   EmailChangeInput,
   GetAnalyticsSummaryParams,
   GetDriverPerformanceParams,
@@ -843,6 +844,160 @@ export function useListDriverOrders<TData = Awaited<ReturnType<typeof listDriver
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListDriverOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListDriverOrderHistoryUrl = () => {
+
+
+
+
+  return `/api/driver/orders/history`
+}
+
+/**
+ * @summary List historical orders and the authenticated driver's response
+ */
+export const listDriverOrderHistory = async ( options?: Parameters<typeof customFetch>[1]): Promise<DriverOrderListResponse> => {
+
+  return customFetch<DriverOrderListResponse>(getListDriverOrderHistoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDriverOrderHistoryQueryKey = () => {
+    return [
+    `/api/driver/orders/history`
+    ] as const;
+    }
+
+
+export const getListDriverOrderHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listDriverOrderHistory>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverOrderHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDriverOrderHistoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDriverOrderHistory>>> = ({ signal }) => listDriverOrderHistory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDriverOrderHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDriverOrderHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listDriverOrderHistory>>>
+export type ListDriverOrderHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List historical orders and the authenticated driver's response
+ */
+
+export function useListDriverOrderHistory<TData = Awaited<ReturnType<typeof listDriverOrderHistory>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverOrderHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDriverOrderHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDriverStatsUrl = () => {
+
+
+
+
+  return `/api/driver/stats`
+}
+
+/**
+ * @summary Get driver assignment statistics from PostgreSQL
+ */
+export const getDriverStats = async ( options?: Parameters<typeof customFetch>[1]): Promise<DriverStats> => {
+
+  return customFetch<DriverStats>(getGetDriverStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDriverStatsQueryKey = () => {
+    return [
+    `/api/driver/stats`
+    ] as const;
+    }
+
+
+export const getGetDriverStatsQueryOptions = <TData = Awaited<ReturnType<typeof getDriverStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDriverStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDriverStats>>> = ({ signal }) => getDriverStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDriverStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDriverStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getDriverStats>>>
+export type GetDriverStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get driver assignment statistics from PostgreSQL
+ */
+
+export function useGetDriverStats<TData = Awaited<ReturnType<typeof getDriverStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDriverStatsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

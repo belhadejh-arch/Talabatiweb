@@ -62,7 +62,6 @@ export default function AdminRestaurantDetail() {
     coverUrl: "",
     description: "",
     primaryColor: "",
-    whatsappNumber: "",
     deliveryFee: "0",
   });
 
@@ -76,7 +75,6 @@ export default function AdminRestaurantDetail() {
         coverUrl: restaurant.coverUrl || "",
         description: restaurant.description || "",
         primaryColor: restaurant.primaryColor || "",
-        whatsappNumber: restaurant.whatsappNumber || "",
         deliveryFee: String(restaurant.deliveryFee ?? 0),
       });
     }
@@ -211,7 +209,6 @@ export default function AdminRestaurantDetail() {
                         coverUrl: form.coverUrl || null,
                         description: form.description || null,
                         primaryColor: form.primaryColor || null,
-                        whatsappNumber: form.whatsappNumber || null,
                         deliveryFee: Number(form.deliveryFee) || 0,
                       },
                     },
@@ -224,7 +221,6 @@ export default function AdminRestaurantDetail() {
                   ["phone", "رقم الهاتف"],
                   ["address", "العنوان"],
                   ["primaryColor", "اللون الأساسي"],
-                  ["whatsappNumber", "رقم واتساب"],
                 ] as const).map(([key, label]) => (
                   <label key={key} className={key === "address" ? "md:col-span-2" : ""}>
                     {label}

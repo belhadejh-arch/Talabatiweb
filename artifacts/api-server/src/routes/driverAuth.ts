@@ -73,7 +73,12 @@ router.post("/driver-auth/login", async (req, res): Promise<void> => {
 });
 
 router.post("/driver-auth/logout", requireDriverAuth, (req, res): void => {
-  (req as any).session.destroy(() => {
+  (req as any).session.destroy((error: Error | null) => {
+    res.clearCookie("talabat.sid", { path: "/" });
+    if (error) {
+      res.status(500).json({ error: "تعذر إنهاء الجلسة" });
+      return;
+    }
     res.json({ ok: true });
   });
 });

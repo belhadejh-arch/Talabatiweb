@@ -12,7 +12,6 @@ export const restaurantsTable = pgTable("restaurants", {
   coverUrl: text("cover_url"),
   description: text("description"),
   primaryColor: text("primary_color"),
-  whatsappNumber: text("whatsapp_number"),
   deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("ACTIVE"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

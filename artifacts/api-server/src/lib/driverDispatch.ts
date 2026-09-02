@@ -151,8 +151,8 @@ export async function respondToOrderAttempt(
     }
 
     await client.query(
-      "UPDATE order_driver_attempts SET status = $3, response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
-      [attempt.id, orderId, response],
+      "UPDATE order_driver_attempts SET status = $2, response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
+      [attempt.id, response],
     );
 
     if (response === "ACCEPTED") {

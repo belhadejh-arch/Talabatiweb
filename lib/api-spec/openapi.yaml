@@ -173,6 +173,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/DriverOrderListResponse"
 
+  /driver/orders/history:
+    get:
+      operationId: listDriverOrderHistory
+      tags: [drivers]
+      summary: List historical orders and the authenticated driver's response
+      responses:
+        "200":
+          description: Historical driver orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverOrderListResponse"
+
+  /driver/stats:
+    get:
+      operationId: getDriverStats
+      tags: [drivers]
+      summary: Get driver assignment statistics from PostgreSQL
+      responses:
+        "200":
+          description: Driver assignment statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverStats"
+
   /driver/orders/{id}:
     get:
       operationId: getDriverOrder
@@ -1483,7 +1509,6 @@ components:
         status:
           type: string
           enum: [ACTIVE, INACTIVE, SUSPENDED]
-        whatsappNumber: { type: ["string", "null"] }
         deliveryFee: { type: number }
         createdAt: { type: string, format: date-time }
         subscription:
@@ -1501,7 +1526,6 @@ components:
         coverUrl: { type: string }
         description: { type: string }
         primaryColor: { type: string }
-        whatsappNumber: { type: string }
         deliveryFee: { type: number, minimum: 0 }
         subscriptionPlan:
           type: string
@@ -1517,7 +1541,6 @@ components:
         coverUrl: { type: ["string", "null"] }
         description: { type: ["string", "null"] }
         primaryColor: { type: ["string", "null"] }
-        whatsappNumber: { type: ["string", "null"] }
         deliveryFee: { type: number, minimum: 0 }
 
     StatusUpdate:
@@ -1860,6 +1883,10 @@ components:
           required: [canRespond]
           properties:
             canRespond: { type: boolean }
+            driverResponseStatus: { type: ["string", "null"] }
+            driverAttemptSentAt: { type: ["string", "null"], format: date-time }
+            driverAttemptResponseAt: { type: ["string", "null"], format: date-time }
+            driverAttemptTimeoutAt: { type: ["string", "null"], format: date-time }
 
     DriverOrderListResponse:
       type: object
@@ -1869,6 +1896,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DriverOrder"
+
+    DriverStats:
+      type: object
+      required: [totalOrders, acceptedOrders, rejectedOrders, timeoutOrders]
+      properties:
+        totalOrders: { type: number }
+        acceptedOrders: { type: number }
+        rejectedOrders: { type: number }
+        timeoutOrders: { type: number }
 
     DriverNotification:
       allOf:

@@ -180,8 +180,55 @@ export const ListDriverOrdersResponse = zod.object({
   "driverName": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
-  "canRespond": zod.boolean()
+  "canRespond": zod.boolean(),
+  "driverResponseStatus": zod.string().nullish(),
+  "driverAttemptSentAt": zod.coerce.date().nullish(),
+  "driverAttemptResponseAt": zod.coerce.date().nullish(),
+  "driverAttemptTimeoutAt": zod.coerce.date().nullish()
 })))
+})
+
+
+/**
+ * @summary List historical orders and the authenticated driver's response
+ */
+export const ListDriverOrderHistoryResponse = zod.object({
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "restaurantName": zod.string().optional(),
+  "orderType": zod.enum(['DELIVERY', 'RESERVATION']),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "notes": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "mapsUrl": zod.string().nullish(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
+  "totalAmount": zod.number(),
+  "status": zod.enum(['NEW', 'WAITING_FOR_DRIVER', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "driverId": zod.number().nullish(),
+  "driverName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "canRespond": zod.boolean(),
+  "driverResponseStatus": zod.string().nullish(),
+  "driverAttemptSentAt": zod.coerce.date().nullish(),
+  "driverAttemptResponseAt": zod.coerce.date().nullish(),
+  "driverAttemptTimeoutAt": zod.coerce.date().nullish()
+})))
+})
+
+
+/**
+ * @summary Get driver assignment statistics from PostgreSQL
+ */
+export const GetDriverStatsResponse = zod.object({
+  "totalOrders": zod.number(),
+  "acceptedOrders": zod.number(),
+  "rejectedOrders": zod.number(),
+  "timeoutOrders": zod.number()
 })
 
 
@@ -444,7 +491,6 @@ export const ListRestaurantsResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
@@ -483,7 +529,6 @@ export const CreateRestaurantBody = zod.object({
   "coverUrl": zod.string().optional(),
   "description": zod.string().optional(),
   "primaryColor": zod.string().optional(),
-  "whatsappNumber": zod.string().optional(),
   "deliveryFee": zod.number().min(createRestaurantBodyDeliveryFeeMin).optional(),
   "subscriptionPlan": zod.enum(['TRIAL', 'MONTHLY', 'YEARLY'])
 })
@@ -499,7 +544,6 @@ export const CreateRestaurantResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
@@ -532,7 +576,6 @@ export const GetRestaurantResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
@@ -566,7 +609,6 @@ export const UpdateRestaurantBody = zod.object({
   "coverUrl": zod.string().nullish(),
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().min(updateRestaurantBodyDeliveryFeeMin).optional()
 })
 
@@ -581,7 +623,6 @@ export const UpdateRestaurantResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({
@@ -628,7 +669,6 @@ export const UpdateRestaurantStatusResponse = zod.object({
   "description": zod.string().nullish(),
   "primaryColor": zod.string().nullish(),
   "status": zod.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-  "whatsappNumber": zod.string().nullish(),
   "deliveryFee": zod.number().optional(),
   "createdAt": zod.coerce.date(),
   "subscription": zod.object({

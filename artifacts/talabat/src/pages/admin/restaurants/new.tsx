@@ -24,7 +24,6 @@ const formSchema = z.object({
   coverUrl: z.string().optional(),
   description: z.string().optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/i, "Must be a valid hex color").optional().or(z.literal("")),
-  whatsappNumber: z.string().optional(),
   subscriptionPlan: z.nativeEnum(RestaurantInputSubscriptionPlan)
 });
 
@@ -60,7 +59,6 @@ export default function AdminRestaurantNew() {
       coverUrl: "",
       description: "",
       primaryColor: "#FF6B35",
-      whatsappNumber: "",
       subscriptionPlan: RestaurantInputSubscriptionPlan.TRIAL
     }
   });
@@ -78,7 +76,6 @@ export default function AdminRestaurantNew() {
       logoUrl: values.logoUrl || undefined,
       coverUrl: values.coverUrl || undefined,
       primaryColor: values.primaryColor || undefined,
-      whatsappNumber: values.whatsappNumber || undefined
     } }, {
       onSuccess: (restaurant) => {
         queryClient.invalidateQueries({ queryKey: getListRestaurantsQueryKey() });
@@ -160,20 +157,6 @@ export default function AdminRestaurantNew() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="whatsappNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>رقم واتساب</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="+218 ..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="logoUrl"

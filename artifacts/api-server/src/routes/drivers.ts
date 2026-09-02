@@ -169,36 +169,23 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
   res.json(result.rows.map((row) => ({ ...row, totalAmount: Number(row.totalAmount) })));
 });
 
-// Delete driver
+// Retire a driver without deleting assignment history.
 router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const exists = await client.query("SELECT id FROM drivers WHERE id = $1", [id]);
-    if (!exists.rowCount) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    await client.query("UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE driver_id = $1", [id]);
-    const result = await client.query("DELETE FROM drivers WHERE id = $1 RETURNING id", [id]);
-    if (!result.rowCount) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
+  const [driver] = await db
+    .update(driversTable)
+    .set({ isActive: false, status: "INACTIVE" })
+    .where(eq(driversTable.id, id))
+    .returning({ id: driversTable.id, restaurantId: driversTable.restaurantId });
+  if (!driver) {
+    res.status(404).json({ error: "Not found" });
+    return;
   }
-  res.sendStatus(204);
+  await dispatchPendingOrdersForRestaurant(driver.restaurantId);
+  res.json({ ok: true, retired: true });
 });
 
 export default router;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { getBaseUrl, useCreateDriver, useDeleteDriver, useListRestaurants, useUpdateDriver } from "@workspace/api-client-react";
+import { getBaseUrl, useCreateDriver, useListRestaurants, useUpdateDriver } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { ImageUpload } from "@/components/admin/image-upload";
 import { formatCurrency } from "@/lib/currency";
 import { orderStatusLabel } from "@/lib/labels";
 import { getAssetUrl } from "@/lib/asset-url";
-import { CheckCircle2, Clipboard, IdCard, Pencil, Plus, ShieldCheck, Trash2, UserRound, X } from "lucide-react";
+import { CheckCircle2, Clipboard, IdCard, Pencil, Plus, ShieldCheck, UserRound, X } from "lucide-react";
 
 type DriverForm = {
   name: string;
@@ -74,7 +74,6 @@ export default function AdminDrivers() {
   const { data: restaurants } = useListRestaurants({ limit: 100 });
   const create = useCreateDriver();
   const update = useUpdateDriver();
-  const remove = useDeleteDriver();
   const base = getBaseUrl() ?? "";
 
   const activeCount = useMemo(() => drivers.filter((driver) => driver.status === "ACTIVE").length, [drivers]);
@@ -236,7 +235,7 @@ export default function AdminDrivers() {
                     <TableCell dir="ltr" className="text-right">{driver.phone}</TableCell>
                     <TableCell><Badge variant="outline" className={driver.status === "ACTIVE" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-slate-500/30 bg-slate-500/10 text-slate-600"}>{driver.status === "ACTIVE" ? "نشط" : "غير نشط"}</Badge></TableCell>
                     <TableCell>{driver.totalDeliveries}</TableCell>
-                    <TableCell className="whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => beginEdit(driver)}><Pencil className="ms-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="ghost" onClick={() => void openHistory(driver)}>السجل</Button><Button size="sm" variant="ghost" onClick={() => void setActivity(driver, driver.status !== "ACTIVE")} disabled={activityId === driver.id}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={remove.isPending} onClick={() => { if (!confirm("حذف حساب السائق نهائيًا؟")) return; remove.mutate({ id: driver.id }, { onSuccess: () => setDrivers((current) => current.filter((item) => item.id !== driver.id)), onError: (error) => alert(error instanceof Error ? error.message : "تعذر حذف السائق") }); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                   <TableCell className="whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => beginEdit(driver)}><Pencil className="ms-1 h-4 w-4" />تعديل</Button><Button size="sm" variant="ghost" onClick={() => void openHistory(driver)}>السجل</Button><Button size="sm" variant="ghost" onClick={() => void setActivity(driver, driver.status !== "ACTIVE")} disabled={activityId === driver.id}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button></TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>

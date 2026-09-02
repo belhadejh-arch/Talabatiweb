@@ -43,8 +43,11 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-const sessionSecret = process.env.SESSION_SECRET || process.env.AUTH_SECRET || "talabat-dev-secret-change-in-prod";
 const isProduction = process.env.NODE_ENV === "production";
+const sessionSecret = process.env.SESSION_SECRET || process.env.AUTH_SECRET;
+if (isProduction && !sessionSecret) {
+  throw new Error("SESSION_SECRET or AUTH_SECRET is required in production");
+}
 
 // When the frontend and backend are on different origins (e.g. Vercel +
 // Render), the session cookie must be SameSite=None + Secure to be sent on
@@ -53,7 +56,8 @@ if (isProduction) app.set("trust proxy", 1);
 
 app.use(
   session({
-    secret: sessionSecret,
+    name: "talabat.sid",
+    secret: sessionSecret || "talabat-dev-only-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {

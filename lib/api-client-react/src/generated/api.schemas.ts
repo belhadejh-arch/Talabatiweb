@@ -92,8 +92,6 @@ export interface Restaurant {
   /** @nullable */
   primaryColor?: string | null;
   status: RestaurantStatus;
-  /** @nullable */
-  whatsappNumber?: string | null;
   deliveryFee?: number;
   createdAt: string;
   subscription?: Subscription;
@@ -122,7 +120,6 @@ export interface RestaurantInput {
   coverUrl?: string;
   description?: string;
   primaryColor?: string;
-  whatsappNumber?: string;
   /** @minimum 0 */
   deliveryFee?: number;
   subscriptionPlan: RestaurantInputSubscriptionPlan;
@@ -140,8 +137,6 @@ export interface RestaurantPatch {
   description?: string | null;
   /** @nullable */
   primaryColor?: string | null;
-  /** @nullable */
-  whatsappNumber?: string | null;
   /** @minimum 0 */
   deliveryFee?: number;
 }
@@ -545,12 +540,27 @@ export interface Order {
   createdAt: string;
 }
 
-export type DriverOrder = Order & {
+export type DriverOrder = Order & ({
   canRespond: boolean;
-};
+  /** @nullable */
+  driverResponseStatus?: string | null;
+  /** @nullable */
+  driverAttemptSentAt?: string | null;
+  /** @nullable */
+  driverAttemptResponseAt?: string | null;
+  /** @nullable */
+  driverAttemptTimeoutAt?: string | null;
+});
 
 export interface DriverOrderListResponse {
   data: DriverOrder[];
+}
+
+export interface DriverStats {
+  totalOrders: number;
+  acceptedOrders: number;
+  rejectedOrders: number;
+  timeoutOrders: number;
 }
 
 export interface Notification {
