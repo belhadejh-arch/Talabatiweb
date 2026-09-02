@@ -31,6 +31,7 @@ router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
     restaurantId: driver.restaurant_id,
     name: driver.name,
     phone: driver.phone,
+    whatsappNumber: driver.whatsapp_number,
     telegramChatId: driver.telegram_chat_id,
     address: driver.address,
     vehicleType: driver.vehicle_type,
@@ -93,8 +94,14 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const [existing] = await db.select().from(driversTable).where(eq(driversTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (parsed.data.isActive === true && !existing.telegramChatId) {
-    res.status(400).json({ error: "يجب أن يفتح السائق البوت أولاً حتى يظهر معرف Telegram في المنصة" });
+   const hasWhatsApp = parsed.data.whatsappNumber !== undefined
+     ? Boolean(parsed.data.whatsappNumber?.trim())
+     : Boolean(existing.whatsappNumber?.trim());
+   const hasTelegram = parsed.data.telegramChatId !== undefined
+     ? Boolean(parsed.data.telegramChatId?.trim())
+     : Boolean(existing.telegramChatId?.trim());
+   if (parsed.data.isActive === true && !hasTelegram && !hasWhatsApp) {
+     res.status(400).json({ error: "يجب تسجيل رقم WhatsApp أو ربط Telegram قبل تفعيل السائق" });
     return;
   }
   if (parsed.data.telegramChatId) {
@@ -139,7 +146,7 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
          ELSE COALESCE(a.status, 'PENDING')
        END AS status,
        COALESCE(a.sent_at, o.created_at) AS "sentAt",
-       a.responded_at AS "respondedAt",
+        a.response_at AS "responseAt",
        a.timeout_at AS "timeoutAt",
        o.customer_name AS "customerName",
        o.customer_phone AS "customerPhone",

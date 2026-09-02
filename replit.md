@@ -19,8 +19,8 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `SESSION_SECRET` (or `AUTH_SECRET`) | api-server | Express session signing secret |
 | `FRONTEND_URL` | api-server | Restricts CORS + enables cross-site cookies (`SameSite=None`) when frontend/backend are on different domains. Required when the frontend is deployed to Vercel (see `DEPLOYMENT.md`); omit for same-origin (Replit-only) deploys |
 | `VITE_API_URL` | talabat (build-time) | Absolute API origin, only needed when the frontend is deployed separately from the backend (e.g. Vercel, with the backend staying on Replit — see `DEPLOYMENT.md`). Leave unset for same-origin deploys — requests default to relative `/api/...` |
-| `WhatsApp_API_Secret` or `WHATSAPP_API_KEY` | api-server | Long-lived Meta WhatsApp Cloud API token. When unset, sending falls back to the Replit WhatsApp Business connector (Replit runtime only) |
-| `WHATSAPP_PHONE_ID` | api-server | Fallback WhatsApp Cloud API phone number ID, used only when Settings → WhatsApp phone ID (DB) is empty |
+| `WAPI_SENDER_API_KEY` | api-server | WapiSender API key; server-side secret only |
+| `WAPI_SENDER_INSTANCE` | api-server | WapiSender instance name used by the server-side send endpoint |
 | Telegram connection or `TELEGRAM_BOT_TOKEN` | api-server | The connected Replit Telegram integration is preferred; the Secret remains a fallback for external deployments |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
 | `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
@@ -36,7 +36,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - API codegen: Orval (from OpenAPI spec) — most endpoints go through generated TanStack Query hooks in `@workspace/api-client-react`
 - Object storage: Replit Object Storage (GCS-backed) when the API runs on Replit, with a PostgreSQL-backed portable fallback for external API hosts such as Render
 - Image processing: `sharp` (resize + WebP re-encode server-side before storage)
-- WhatsApp: Meta Cloud API, sent server-side only (`artifacts/api-server/src/lib/whatsapp.ts`)
+- WhatsApp: WapiSender direct API, sent server-side only (`artifacts/api-server/src/lib/whatsapp.ts`)
 - Telegram: Telegram Bot API, sent server-side only (`artifacts/api-server/src/lib/telegram.ts`)
 - Build: esbuild (api-server), Vite (talabat)
 
@@ -47,14 +47,15 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 - `lib/db` — Drizzle schema (source of truth for tables) + `push` script
 - `lib/api-zod` / `lib/api-client-react` — generated from the OpenAPI spec (`artifacts/api-server` contract); do not hand-edit `generated/`
 - Image uploads: `POST /api/uploads/image` (multipart, `requireAuth`) → `src/lib/imageUpload.ts` (sharp resize/WebP + Replit Object Storage or portable PostgreSQL fallback) → served back via `GET /api/storage/public-objects/*` or `/api/storage/db-images/:id`. The fallback stores processed WebP bytes in PostgreSQL so the Render deployment remains functional without Replit sidecar auth.
-- Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns an active driver scoped to the order's `restaurantId` (preferring a Telegram-linked driver), and fires both channel sends independently
-- Delivery channel audit: `delivery_message_logs` records `SENT`/`FAILED`, the attempt time, and a safe error message separately for Telegram and WhatsApp
+- Order placement + driver notification: `artifacts/api-server/src/routes/public.ts` — computes the Google Maps link, auto-assigns one active driver scoped to the order's `restaurantId`, and fires both channel sends independently
+- Delivery channel audit: `delivery_message_logs` records `SENT`/`FAILED`, `sent_at`, `response_at`, and a safe error message separately for Telegram and WhatsApp
+- WapiSender webhook: `POST /api/webhooks/wapisender` parses driver replies such as `قبول #123` or `رفض #123`; rejected and timed-out drivers are excluded from later attempts
 - Telegram driver bot: `artifacts/api-server/src/lib/telegramBot.ts` — long-polls Telegram updates, links `/start driver_<id>` deep links, toggles PostgreSQL activity, lists assigned orders, and handles accept/reject callbacks
 
 ## Architecture decisions
 
 - Uploaded images are processed **server-side** (sharp resize → WebP) rather than via a client-direct-to-GCS presigned URL, because compression must happen before the file lands in permanent storage. The endpoint accepts raw multipart (`multer`, memory storage), uses Replit Object Storage when its sidecar is available, and falls back to a lazily-created PostgreSQL image table on external hosts.
-- WhatsApp send prefers a directly configured token (`WhatsApp_API_Secret`/`WHATSAPP_API_KEY`) so the app also works outside Replit (e.g. deployed to Render); it falls back to the Replit WhatsApp Business connector only when running inside a Replit runtime.
+- WapiSender uses the documented `POST https://api.wapisender.com/message/sendText/{instance}` endpoint with `{ number, text }`. `WAPI_SENDER_API_KEY` and `WAPI_SENDER_INSTANCE` are never exposed to the frontend. Configure WapiSender's inbound webhook to `/api/webhooks/wapisender` for driver replies.
 - Telegram sends and inbound bot actions use the connected Replit Telegram integration on the backend, with `TELEGRAM_BOT_TOKEN` as an external-deployment fallback. Drivers link by opening their per-driver deep link (`?start=driver_<id>`), then sending `/start`; the bot stores the Chat ID automatically and presents its activity/orders/account keyboard.
 - Driver assignment and reassignment are always scoped by `restaurantId` — a driver from another restaurant can never be selected, by construction of the query filters (not just app-level convention).
 - The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; asset URLs (`src/lib/asset-url.ts`) apply the same base URL to relative object-storage paths so `<img>` tags resolve correctly either way.

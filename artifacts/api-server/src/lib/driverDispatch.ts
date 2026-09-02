@@ -35,13 +35,14 @@ async function isWhatsAppDispatchConfigured(): Promise<boolean> {
 
   return Boolean(
     settings?.whatsappEnabled &&
-    (settings.whatsappPhoneId?.trim() || process.env.WHATSAPP_PHONE_ID?.trim()),
+    process.env.WAPI_SENDER_API_KEY?.trim() &&
+    process.env.WAPI_SENDER_INSTANCE?.trim(),
   );
 }
 
 function driverChannelFilter(whatsappConfigured: boolean): string {
   const telegram = "d.telegram_chat_id IS NOT NULL AND d.telegram_chat_id <> ''";
-  const whatsapp = "d.phone IS NOT NULL AND TRIM(d.phone) <> ''";
+  const whatsapp = "d.whatsapp_number IS NOT NULL AND TRIM(d.whatsapp_number) <> ''";
   return whatsappConfigured ? `(${telegram} OR ${whatsapp})` : `(${telegram})`;
 }
 
@@ -194,7 +195,7 @@ export async function respondToOrderAttempt(
     }
 
     await client.query(
-      "UPDATE order_driver_attempts SET status = $3, responded_at = NOW() WHERE id = $1 AND status = 'PENDING'",
+      "UPDATE order_driver_attempts SET status = $3, response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
       [attempt.id, orderId, response],
     );
 
@@ -205,8 +206,8 @@ export async function respondToOrderAttempt(
       );
       await client.query(
         `INSERT INTO order_status_history (order_id, status, note)
-         VALUES ($1, 'ACCEPTED', $2)`,
-        [orderId, `تم قبول الطلب من السائق رقم ${driverId} عبر Telegram`],
+          VALUES ($1, 'ACCEPTED', $2)`,
+          [orderId, `تم قبول الطلب من السائق رقم ${driverId}`],
       );
     } else {
       await client.query(
@@ -230,6 +231,52 @@ export async function respondToOrderAttempt(
 
   if (shouldDispatchNext) await dispatchNextDriverForOrder(orderId);
   return true;
+}
+
+/**
+ * Marks the current delivery attempt as failed and starts the next eligible
+ * driver. Rejected and timed-out drivers remain excluded by their history.
+ */
+export async function retryOrderDispatch(orderId: number): Promise<DispatchResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const orderResult = await client.query<{ driver_id: number | null; status: string }>(
+      "SELECT driver_id, status FROM orders WHERE id = $1 FOR UPDATE",
+      [orderId],
+    );
+    const order = orderResult.rows[0];
+    if (!order || order.status !== "NEW") {
+      await client.query("ROLLBACK");
+      return { assigned: false, reason: "not_pending" };
+    }
+
+    if (order.driver_id) {
+      await client.query(
+        `UPDATE order_driver_attempts
+         SET status = 'FAILED'
+         WHERE order_id = $1 AND driver_id = $2 AND status = 'PENDING'`,
+        [orderId, order.driver_id],
+      );
+      await client.query(
+        "UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE id = $1",
+        [orderId],
+      );
+    }
+    await client.query(
+      `INSERT INTO order_status_history (order_id, status, note)
+       VALUES ($1, 'NEW', 'إعادة محاولة إرسال الطلب إلى سائق آخر')`,
+      [orderId],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return dispatchNextDriverForOrder(orderId);
 }
 
 export async function assignSpecificDriverForOrder(orderId: number, driverId: number): Promise<boolean> {
@@ -264,7 +311,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     if (order.driver_id && order.driver_id !== driverId) {
       await client.query(
         `UPDATE order_driver_attempts
-         SET status = 'REJECTED', responded_at = NOW()
+         SET status = 'REJECTED', response_at = NOW()
          WHERE order_id = $1 AND driver_id = $2 AND status = 'PENDING'`,
         [orderId, order.driver_id],
       );
@@ -275,7 +322,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
         (order_id, driver_id, status, sent_at, timeout_at)
        VALUES ($1, $2, 'PENDING', NOW(), NOW() + ($3 * INTERVAL '1 second'))
        ON CONFLICT (order_id, driver_id) DO UPDATE
-       SET status = 'PENDING', sent_at = NOW(), responded_at = NULL,
+        SET status = 'PENDING', sent_at = NOW(), response_at = NULL,
            timeout_at = NOW() + ($3 * INTERVAL '1 second')`,
       [orderId, driverId, timeoutSeconds],
     );
@@ -325,7 +372,7 @@ async function expireTimedOutAttempts(): Promise<void> {
 
     for (const attempt of result.rows) {
       await client.query(
-        "UPDATE order_driver_attempts SET status = 'TIMEOUT', responded_at = NOW() WHERE id = $1 AND status = 'PENDING'",
+        "UPDATE order_driver_attempts SET status = 'TIMEOUT' WHERE id = $1 AND status = 'PENDING'",
         [attempt.id],
       );
       const orderUpdate = await client.query(

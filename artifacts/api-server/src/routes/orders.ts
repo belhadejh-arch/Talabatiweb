@@ -17,7 +17,7 @@ import {
   AssignDriverBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { assignSpecificDriverForOrder } from "../lib/driverDispatch";
+import { assignSpecificDriverForOrder, retryOrderDispatch } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
 
@@ -183,7 +183,7 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
   if (parsed.data.status === "ACCEPTED" && order.driverId) {
     await db.execute(sql`
       UPDATE order_driver_attempts
-      SET status = 'ACCEPTED', responded_at = NOW()
+       SET status = 'ACCEPTED', response_at = NOW()
       WHERE order_id = ${id} AND driver_id = ${order.driverId} AND status = 'PENDING'
     `);
   }
@@ -237,6 +237,18 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
   const detail = await getOrderDetail(id);
 
   res.json(detail);
+});
+
+router.post("/orders/:id/redispatch", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
+  if (!order) { res.status(404).json({ error: "Not found" }); return; }
+
+  const result = await retryOrderDispatch(id);
+  res.json({ ...result, orderId: id });
 });
 
 export default router;

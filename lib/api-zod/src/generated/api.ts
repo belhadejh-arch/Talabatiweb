@@ -828,6 +828,7 @@ export const ListAllDriversResponseItem = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
   "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
@@ -857,6 +858,7 @@ export const ListDriversResponseItem = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
   "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
@@ -879,9 +881,11 @@ export const CreateDriverParams = zod.object({
 
 
 
+
 export const CreateDriverBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string(),
+  "whatsappNumber": zod.string().min(1),
   "telegramChatId": zod.string().optional(),
   "address": zod.string().optional(),
   "vehicleType": zod.string().optional(),
@@ -894,6 +898,7 @@ export const CreateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
   "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
@@ -915,6 +920,7 @@ export const UpdateDriverParams = zod.object({
 export const UpdateDriverBody = zod.object({
   "name": zod.string().optional(),
   "phone": zod.string().optional(),
+  "whatsappNumber": zod.string().nullish(),
   "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
@@ -927,6 +933,7 @@ export const UpdateDriverResponse = zod.object({
   "restaurantId": zod.number(),
   "name": zod.string(),
   "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
   "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
@@ -961,7 +968,7 @@ export const GetDriverHistoryResponseItem = zod.object({
   "driverId": zod.number(),
   "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'TIMEOUT']),
   "sentAt": zod.coerce.date(),
-  "respondedAt": zod.coerce.date().nullish(),
+  "responseAt": zod.coerce.date().nullish(),
   "timeoutAt": zod.coerce.date(),
   "customerName": zod.string().optional(),
   "customerPhone": zod.string().optional(),
@@ -1185,7 +1192,8 @@ export const GetOrderDeliveryStatusResponseItem = zod.object({
   "channel": zod.enum(['TELEGRAM', 'WHATSAPP']),
   "status": zod.enum(['SENT', 'FAILED']),
   "errorMessage": zod.string().nullish(),
-  "sentAt": zod.coerce.date()
+  "sentAt": zod.coerce.date(),
+  "responseAt": zod.coerce.date().nullish()
 })
 export const GetOrderDeliveryStatusResponse = zod.array(GetOrderDeliveryStatusResponseItem)
 
@@ -1304,7 +1312,7 @@ export const GetPublicMenuResponse = zod.object({
 
 
 /**
- * @summary Place a delivery order (guest checkout)
+ * @summary Place a delivery or reservation order (guest checkout)
  */
 export const PlaceOrderParams = zod.object({
   "slug": zod.coerce.string()

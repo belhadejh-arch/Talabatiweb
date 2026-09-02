@@ -8,6 +8,7 @@ export const driversTable = pgTable("drivers", {
   restaurantId: integer("restaurant_id").notNull().references(() => restaurantsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
+  whatsappNumber: text("whatsapp_number"),
   telegramChatId: text("telegram_chat_id"),
   status: text("status").notNull().default("INACTIVE"),
   address: text("address"),

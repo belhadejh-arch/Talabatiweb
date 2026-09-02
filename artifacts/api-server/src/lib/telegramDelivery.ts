@@ -42,6 +42,9 @@ export async function ensureTelegramSchema(): Promise<void> {
           ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 
         ALTER TABLE drivers
+          ADD COLUMN IF NOT EXISTS whatsapp_number TEXT;
+
+        ALTER TABLE drivers
           ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
 
         ALTER TABLE drivers
@@ -60,8 +63,12 @@ export async function ensureTelegramSchema(): Promise<void> {
           channel TEXT NOT NULL,
           status TEXT NOT NULL,
           error_message TEXT,
-          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          response_at TIMESTAMPTZ
         );
+
+        ALTER TABLE ${TABLE_NAME}
+          ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ;
 
         CREATE TABLE IF NOT EXISTS order_driver_attempts (
           id SERIAL PRIMARY KEY,
@@ -69,9 +76,19 @@ export async function ensureTelegramSchema(): Promise<void> {
           driver_id INTEGER NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
           status TEXT NOT NULL DEFAULT 'PENDING',
           sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          responded_at TIMESTAMPTZ,
+          response_at TIMESTAMPTZ,
           timeout_at TIMESTAMPTZ NOT NULL
         );
+
+        ALTER TABLE order_driver_attempts
+          ADD COLUMN IF NOT EXISTS response_at TIMESTAMPTZ;
+
+        ALTER TABLE order_driver_attempts
+          ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ;
+
+        UPDATE order_driver_attempts
+        SET response_at = COALESCE(response_at, responded_at)
+        WHERE response_at IS NULL AND responded_at IS NOT NULL;
 
         CREATE UNIQUE INDEX IF NOT EXISTS order_driver_attempt_order_driver_idx
           ON order_driver_attempts(order_id, driver_id);
@@ -102,15 +119,15 @@ async function logDeliveryResult(
   await ensureTelegramSchema();
   await pool.query(
     `
-      INSERT INTO ${TABLE_NAME} (order_id, driver_id, channel, status, error_message, sent_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+       INSERT INTO ${TABLE_NAME} (order_id, driver_id, channel, status, error_message, sent_at, response_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
     `,
     [orderId, driverId, channel, result.success ? "SENT" : "FAILED", result.errorMessage || null],
   );
 }
 
 export async function notifyDriverOnAllChannels(
-  driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
+  driver: { id: number; restaurantId: number; phone: string; whatsappNumber: string | null; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
 ): Promise<DriverDeliveryResults> {
   const [currentDriver] = await db.select().from(driversTable).where(eq(driversTable.id, driver.id));
@@ -145,7 +162,7 @@ export async function notifyDriverOnAllChannels(
     }),
     sendWhatsAppToDriver({
       ...payload,
-      driverPhone: driver.phone,
+        driverPhone: currentDriver.whatsappNumber || "",
     }),
   ]);
 
@@ -158,7 +175,7 @@ export async function notifyDriverOnAllChannels(
 }
 
 export async function safeNotifyDriverOnAllChannels(
-  driver: { id: number; restaurantId: number; phone: string; telegramChatId: string | null; isActive: boolean; status: string },
+  driver: { id: number; restaurantId: number; phone: string; whatsappNumber: string | null; telegramChatId: string | null; isActive: boolean; status: string },
   payload: Omit<DriverDeliveryPayload, "driverPhone" | "telegramChatId">,
 ): Promise<DriverDeliveryResults | null> {
   try {

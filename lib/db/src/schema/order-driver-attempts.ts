@@ -10,7 +10,7 @@ export const orderDriverAttemptsTable = pgTable(
     driverId: integer("driver_id").notNull().references(() => driversTable.id, { onDelete: "cascade" }),
     status: text("status").notNull().default("PENDING"),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
-    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    responseAt: timestamp("response_at", { withTimezone: true }),
     timeoutAt: timestamp("timeout_at", { withTimezone: true }).notNull(),
   },
   (table) => ({

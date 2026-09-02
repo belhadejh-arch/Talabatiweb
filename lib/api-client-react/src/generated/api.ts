@@ -3628,7 +3628,7 @@ export const getPlaceOrderUrl = (slug: string,) => {
 }
 
 /**
- * @summary Place a delivery order (guest checkout)
+ * @summary Place a delivery or reservation order (guest checkout)
  */
 export const placeOrder = async (slug: string,
     orderInput: OrderInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderConfirmation> => {
@@ -3678,7 +3678,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PlaceOrderMutationError = ErrorType<void>
 
     /**
- * @summary Place a delivery order (guest checkout)
+ * @summary Place a delivery or reservation order (guest checkout)
  */
 export const usePlaceOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeOrder>>, TError,{slug: string;data: BodyType<OrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -14,6 +14,7 @@ import settingsRouter from "./settings";
 import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
 import telegramRouter from "./telegram";
+import wapiRouter from "./wapi";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use(settingsRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
 router.use(telegramRouter);
+router.use(wapiRouter);
 
 export default router;

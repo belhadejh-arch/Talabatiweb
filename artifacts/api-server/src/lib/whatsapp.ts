@@ -1,11 +1,8 @@
-import { ReplitConnectors } from "@replit/connectors-sdk";
-import { db, settingsTable } from "@workspace/db";
 import { logger } from "./logger";
 
-const WHATSAPP_CONNECTOR = "whatsapp-business";
-const GRAPH_API_VERSION = "v23.0";
+const WAPI_SENDER_BASE_URL = "https://api.wapisender.com";
 
-interface WhatsAppMessagePayload {
+export type WhatsAppMessagePayload = {
   restaurantName: string;
   orderId: number;
   orderType: string;
@@ -15,123 +12,155 @@ interface WhatsAppMessagePayload {
   total: string;
   mapsUrl: string | null;
   driverPhone: string;
-}
+};
 
 export type WhatsAppSendResult = {
   success: boolean;
   errorMessage?: string;
 };
 
-/** True when running inside a Replit environment (dev workspace or a Replit deployment). */
-function isReplitRuntime(): boolean {
-  return !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL);
+function getConfig(): { apiKey: string; instance: string } | null {
+  const apiKey = process.env.WAPI_SENDER_API_KEY?.trim();
+  const instance = process.env.WAPI_SENDER_INSTANCE?.trim();
+  return apiKey && instance ? { apiKey, instance } : null;
 }
 
-/** Reads a directly configured long-lived WhatsApp Cloud API token, if any. */
-function getDirectToken(): string | undefined {
-  return process.env.WhatsApp_API_Secret || process.env.WHATSAPP_API_KEY || undefined;
+function normalizePhone(value: string): string {
+  return value.trim().replace(/[^\d]/g, "");
+}
+
+function buildOrderMessage(payload: WhatsAppMessagePayload): string {
+  const lines = [
+    payload.orderType === "RESERVATION" ? "🏪 حجز طلب جديد" : "🚨 طلب توصيل جديد",
+    "",
+    `🏪 المطعم: ${payload.restaurantName}`,
+    `📦 رقم الطلب: #${payload.orderId}`,
+    `👤 اسم العميل: ${payload.customerName}`,
+    `📞 رقم العميل: ${payload.customerPhone}`,
+    "",
+    "🍔 المنتجات والكميات:",
+    payload.items,
+    "",
+    `💰 الإجمالي: ${payload.total}`,
+    `نوع الطلب: ${payload.orderType === "RESERVATION" ? "حجز" : "توصيل"}`,
+    "",
+    `للرد: اكتب قبول #${payload.orderId} أو رفض #${payload.orderId}`,
+  ];
+
+  if (payload.orderType === "DELIVERY" && payload.mapsUrl) {
+    lines.splice(lines.length - 2, 0, `📍 موقع العميل: ${payload.mapsUrl}`);
+  }
+
+  return lines.join("\n");
 }
 
 /**
- * Sends a WhatsApp Cloud API request.
- *
- * When a directly configured token is present (WhatsApp_API_Secret), it is
- * always preferred — this lets the platform owner bypass a misbehaving
- * Replit connector by supplying their own long-lived Meta token. Otherwise,
- * inside Replit, requests go through the connected WhatsApp Business
- * connector (no secret ever touches this codebase). Outside Replit (e.g. a
- * backend deployed to Render) with no direct token configured, sending fails
- * with a clear error.
+ * Sends through WapiSender's documented direct API:
+ * POST /message/sendText/{instance}, payload { number, text }.
+ * The API key is read only by the backend from Replit Secrets.
  */
-async function callWhatsAppApi(phoneNumberId: string, body: unknown): Promise<Response> {
-  const path = `/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
-
-  const token = getDirectToken();
-  if (token) {
-    return fetch(`https://graph.facebook.com${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-  }
-
-  if (isReplitRuntime()) {
-    const connectors = new ReplitConnectors();
-    return connectors.proxy(WHATSAPP_CONNECTOR, path, { method: "POST", body });
-  }
-
-  throw new Error(
-    "WhatsApp is not configured for this runtime: no Replit connector available and no direct API token (WhatsApp_API_Secret) is set",
-  );
-}
-
 export async function sendWhatsAppToDriver(payload: WhatsAppMessagePayload): Promise<WhatsAppSendResult> {
-  const [settings] = await db.select().from(settingsTable);
+  const config = getConfig();
+  const phone = normalizePhone(payload.driverPhone);
 
-  if (!settings?.whatsappEnabled) {
-    logger.warn("WhatsApp is disabled in settings — skipping message send");
-    return { success: false, errorMessage: "WhatsApp is disabled in settings" };
+  if (!config) {
+    return { success: false, errorMessage: "WapiSender is not configured: set WAPI_SENDER_API_KEY and WAPI_SENDER_INSTANCE" };
   }
-
-  const phoneNumberId = settings.whatsappPhoneId || process.env.WHATSAPP_PHONE_ID;
-  if (!phoneNumberId) {
-    logger.warn("WhatsApp phone number ID is not configured — skipping message send");
-    return { success: false, errorMessage: "WhatsApp phone number ID is not configured" };
+  if (!phone) {
+    return { success: false, errorMessage: "Driver WhatsApp number is not configured" };
   }
-
-  const message = payload.orderType === "RESERVATION"
-    ? `🏪 حجز طلب جديد
-
-🏪 المطعم: ${payload.restaurantName}
-📦 الطلب: #${payload.orderId}
-👤 الزبون: ${payload.customerName}
-📞 الهاتف: ${payload.customerPhone}
-
-🍔 الطلب:
-${payload.items}
-
-💰 الإجمالي:
-${payload.total}
-
-نوع الطلب:
-🏪 حجز`
-    : `🚨 طلب توصيل جديد
-
-🏪 المطعم: ${payload.restaurantName}
-📦 الطلب: #${payload.orderId}
-👤 العميل: ${payload.customerName}
-📞 الهاتف: ${payload.customerPhone}
-
-🍔 الطلب:
-${payload.items}
-
-💰 الإجمالي:
-${payload.total}
-
-📍 موقع العميل:
-${payload.mapsUrl}`;
 
   try {
-    const response = await callWhatsAppApi(phoneNumberId, {
-      messaging_product: "whatsapp",
-      to: payload.driverPhone,
-      type: "text",
-      text: { body: message },
-    });
+    const response = await fetch(
+      `${WAPI_SENDER_BASE_URL}/message/sendText/${encodeURIComponent(config.instance)}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          apikey: config.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          number: phone,
+          text: buildOrderMessage(payload),
+        }),
+      },
+    );
 
+    const responseBody = await response.text().catch(() => "");
     if (!response.ok) {
-      const errorBody = await response.text().catch(() => "");
-      logger.error({ status: response.status, errorBody }, "WhatsApp API error");
-      return { success: false, errorMessage: errorBody || `WhatsApp API returned HTTP ${response.status}` };
+      logger.error({ status: response.status, responseBody, orderId: payload.orderId }, "WapiSender API error");
+      return { success: false, errorMessage: responseBody || `WapiSender returned HTTP ${response.status}` };
     }
 
-    logger.info({ orderId: payload.orderId }, "WhatsApp message sent to driver");
+    logger.info({ orderId: payload.orderId, driverPhone: phone }, "WapiSender message sent to driver");
     return { success: true };
-  } catch (err) {
-    logger.error({ err }, "Failed to send WhatsApp message");
-    return { success: false, errorMessage: err instanceof Error ? err.message : "Unknown WhatsApp error" };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown WapiSender error";
+    logger.error({ err: error, orderId: payload.orderId }, "Failed to send WapiSender message");
+    return { success: false, errorMessage };
   }
+}
+
+export type WapiWebhookMessage = {
+  from: string;
+  text: string;
+  messageId?: string;
+};
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function findFirstString(values: unknown[]): string | null {
+  for (const value of values) {
+    const result = stringValue(value);
+    if (result) return result;
+  }
+  return null;
+}
+
+/**
+ * Accepts the common Wapi/Evolution-style inbound webhook shapes while
+ * ignoring status events and messages that cannot be tied to an order.
+ */
+export function parseWapiWebhookMessage(body: unknown): WapiWebhookMessage | null {
+  if (!body || typeof body !== "object") return null;
+  const root = body as Record<string, unknown>;
+  const data = root.data && typeof root.data === "object" ? root.data as Record<string, unknown> : root;
+  const message = data.message && typeof data.message === "object" ? data.message as Record<string, unknown> : data;
+  const key = message.key && typeof message.key === "object" ? message.key as Record<string, unknown> : {};
+  const textNode = message.message && typeof message.message === "object"
+    ? message.message as Record<string, unknown>
+    : message;
+
+  const from = findFirstString([
+    key.remoteJid,
+    message.from,
+    data.from,
+    root.from,
+  ])?.replace(/@s\.whatsapp\.net$/, "");
+  const text = findFirstString([
+    textNode.conversation,
+    (textNode.extendedTextMessage as Record<string, unknown> | undefined)?.text,
+    message.text,
+    data.text,
+    root.text,
+  ]);
+
+  if (!from || !text || from === "status") return null;
+  return {
+    from: normalizePhone(from),
+    text,
+    messageId: findFirstString([key.id, message.id, data.messageId, root.messageId]) ?? undefined,
+  };
+}
+
+export function parseDriverOrderResponse(text: string): { orderId: number; response: "ACCEPTED" | "REJECTED" } | null {
+  const normalized = text.trim().toLowerCase();
+  const accepted = /(?:قبول|موافق|accept|accepted|yes|نعم)/i.test(normalized);
+  const rejected = /(?:رفض|رافض|reject|rejected|no|لا)/i.test(normalized);
+  const match = normalized.match(/#?\s*(\d{1,12})\b/);
+  if ((!accepted && !rejected) || !match || accepted === rejected) return null;
+  return { orderId: Number(match[1]), response: accepted ? "ACCEPTED" : "REJECTED" };
 }

@@ -12,6 +12,7 @@ export const deliveryMessageLogsTable = pgTable("delivery_message_logs", {
   status: text("status").notNull(),
   errorMessage: text("error_message"),
   sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  responseAt: timestamp("response_at", { withTimezone: true }),
 });
 
 export const insertDeliveryMessageLogSchema = createInsertSchema(deliveryMessageLogsTable).omit({ id: true });

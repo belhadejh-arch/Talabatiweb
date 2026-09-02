@@ -1610,6 +1610,7 @@ components:
         restaurantId: { type: number }
         name: { type: string }
         phone: { type: string }
+        whatsappNumber: { type: ["string", "null"] }
         telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
@@ -1621,10 +1622,11 @@ components:
 
     DriverInput:
       type: object
-      required: [name, phone]
+      required: [name, phone, whatsappNumber]
       properties:
         name: { type: string, minLength: 1 }
         phone: { type: string }
+        whatsappNumber: { type: string, minLength: 1 }
         telegramChatId: { type: string }
         address: { type: string }
         vehicleType: { type: string }
@@ -1636,6 +1638,7 @@ components:
       properties:
         name: { type: string }
         phone: { type: string }
+        whatsappNumber: { type: ["string", "null"] }
         telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
@@ -1662,7 +1665,7 @@ components:
         driverId: { type: number }
         status: { type: string, enum: [PENDING, ACCEPTED, REJECTED, TIMEOUT] }
         sentAt: { type: string, format: date-time }
-        respondedAt: { type: ["string", "null"], format: date-time }
+        responseAt: { type: ["string", "null"], format: date-time }
         timeoutAt: { type: string, format: date-time }
         customerName: { type: string }
         customerPhone: { type: string }
@@ -1687,6 +1690,7 @@ components:
         status: { type: string, enum: [SENT, FAILED] }
         errorMessage: { type: ["string", "null"] }
         sentAt: { type: string, format: date-time }
+        responseAt: { type: ["string", "null"], format: date-time }
 
     # ── Order ───────────────────────────────────────────────────────────────────
     Order:

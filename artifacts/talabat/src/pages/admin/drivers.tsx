@@ -7,13 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { orderStatusLabel } from "@/lib/labels";
 import { formatCurrency } from "@/lib/currency";
 
-type DriverForm = { name: string; phone: string; address: string; restaurantId: string };
+type DriverForm = { name: string; phone: string; whatsappNumber: string; address: string; restaurantId: string };
 type PlatformDriver = {
   id: number;
   restaurantId: number;
   restaurantName: string;
   name: string;
   phone: string;
+  whatsappNumber?: string | null;
   telegramChatId?: string | null;
   address?: string | null;
   isActive: boolean;
@@ -27,7 +28,7 @@ type DriverAttempt = {
   orderId: number;
   status: "PENDING" | "ACCEPTED" | "REJECTED" | "TIMEOUT";
   sentAt: string;
-  respondedAt?: string | null;
+  responseAt?: string | null;
   timeoutAt?: string | null;
   customerName: string;
   customerPhone: string;
@@ -36,7 +37,7 @@ type DriverAttempt = {
   orderCreatedAt: string;
 };
 
-const empty: DriverForm = { name: "", phone: "", address: "", restaurantId: "" };
+const empty: DriverForm = { name: "", phone: "", whatsappNumber: "", address: "", restaurantId: "" };
 
 export default function AdminDrivers() {
   const [form, setForm] = useState<DriverForm>(empty);
@@ -156,6 +157,7 @@ export default function AdminDrivers() {
     const commonData = {
       name: form.name,
       phone: form.phone,
+      whatsappNumber: form.whatsappNumber,
       address: form.address || undefined,
     };
     if (editingId) {
@@ -172,7 +174,7 @@ export default function AdminDrivers() {
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold">إدارة السائقين</h2>
-        <p className="mt-1 text-sm text-muted-foreground">افتح البوت ليظهر Chat ID هنا، ثم اربطه بالسائق وفعّل الحساب من هذه الشاشة.</p>
+       <p className="mt-1 text-sm text-muted-foreground">يسجّل السائق برقم هاتف ورقم WhatsApp مستقل، ثم يمكنك تفعيل الحساب بعد تجهيز إحدى قنوات الإرسال.</p>
       </div>
 
       <Card>
@@ -180,7 +182,8 @@ export default function AdminDrivers() {
         <CardContent>
           <form onSubmit={submit} className="grid gap-3 sm:gap-4 md:grid-cols-2">
             <Input placeholder="الاسم واللقب" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-            <Input placeholder="رقم الهاتف / WhatsApp" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
+            <Input placeholder="رقم الهاتف" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
+            <Input placeholder="رقم WhatsApp مع مفتاح الدولة" type="tel" value={form.whatsappNumber} onChange={e => setForm({ ...form, whatsappNumber: e.target.value })} required />
             <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
             <select className="h-10 rounded-md border bg-background px-3" value={form.restaurantId} onChange={e => setForm({ ...form, restaurantId: e.target.value })} required>
               <option value="">اختر المطعم</option>
@@ -188,7 +191,7 @@ export default function AdminDrivers() {
             </select>
             <div className="md:col-span-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">طريقة تفعيل السائق</p>
-              <p>يفتح السائق البوت ويرسل /start، ثم يجلب المدير المحادثات، يختار السائق المناسب ويربط Chat ID، وبعدها يضغط «تفعيل» من الجدول.</p>
+               <p>يمكن استقبال الطلب عبر WapiSender باستخدام رقم WhatsApp، أو عبر Telegram بعد ربط Chat ID. يجب أن يكون السائق ACTIVE حتى يستقبل طلبات جديدة.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" disabled={create.isPending || update.isPending}>{editingId ? "حفظ التعديلات" : "إضافة السائق"}</Button>
@@ -227,7 +230,7 @@ export default function AdminDrivers() {
           {loadingDrivers ? <p className="py-8 text-center text-muted-foreground">جاري التحميل...</p> : drivers.length === 0 ? <p className="py-8 text-center text-muted-foreground">لا يوجد سائقون</p> : (
             <Table>
               <TableHeader><TableRow>
-                <TableHead>السائق</TableHead><TableHead>المطعم</TableHead><TableHead>الهاتف / WhatsApp</TableHead><TableHead>Telegram</TableHead><TableHead>النشاط</TableHead><TableHead>النتائج</TableHead><TableHead>إجراءات</TableHead>
+                 <TableHead>السائق</TableHead><TableHead>المطعم</TableHead><TableHead>الهاتف</TableHead><TableHead>WhatsApp</TableHead><TableHead>Telegram</TableHead><TableHead>النشاط</TableHead><TableHead>النتائج</TableHead><TableHead>إجراءات</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {drivers.map(driver => {
@@ -235,7 +238,8 @@ export default function AdminDrivers() {
                   return <TableRow key={driver.id}>
                     <TableCell className="font-medium">{driver.name}</TableCell>
                     <TableCell>{driver.restaurantName}</TableCell>
-                    <TableCell dir="ltr" className="text-right">{driver.phone}</TableCell>
+                     <TableCell dir="ltr" className="text-right">{driver.phone}</TableCell>
+                     <TableCell dir="ltr" className="text-right">{driver.whatsappNumber || "غير مسجل"}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
                         <span className={driver.telegramChatId ? "text-emerald-600" : "text-muted-foreground"}>{driver.telegramChatId ? `متصل (${driver.telegramChatId})` : "غير مربوط"}</span>
@@ -249,9 +253,9 @@ export default function AdminDrivers() {
                       <span className="text-amber-600">مهلة: {driver.timeoutCount}</span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, address: driver.address || "", restaurantId: String(driver.restaurantId) }); }}>تعديل</Button>
+                       <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, whatsappNumber: driver.whatsappNumber || "", address: driver.address || "", restaurantId: String(driver.restaurantId) }); }}>تعديل</Button>
                       <Button size="sm" variant="outline" className="mr-1" onClick={() => void openHistory(driver)}>السجل</Button>
-                      <Button size="sm" className="mr-1" variant={driver.status === "ACTIVE" ? "secondary" : "default"} disabled={activityId === driver.id || (!driver.telegramChatId && driver.status === "INACTIVE")} onClick={() => void setActivity(driver, driver.status !== "ACTIVE")}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
+                       <Button size="sm" className="mr-1" variant={driver.status === "ACTIVE" ? "secondary" : "default"} disabled={activityId === driver.id || (!driver.telegramChatId && !driver.whatsappNumber && driver.status === "INACTIVE")} onClick={() => void setActivity(driver, driver.status !== "ACTIVE")}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
                       <Button size="sm" variant="destructive" className="mr-1" disabled={remove.isPending} onClick={() => {
                         if (!confirm("حذف السائق نهائياً؟")) return;
                         remove.mutate({ id: driver.id }, {
@@ -284,7 +288,7 @@ export default function AdminDrivers() {
                 <TableCell>{formatCurrency(attempt.totalAmount)}</TableCell>
                 <TableCell>{attempt.status === "ACCEPTED" ? "مقبول" : attempt.status === "REJECTED" ? "مرفوض" : attempt.status === "TIMEOUT" ? "انتهت المهلة" : attempt.status === "PENDING" ? "بانتظار الرد" : orderStatusLabel(attempt.orderStatus as never)}</TableCell>
                 <TableCell>{new Date(attempt.sentAt).toLocaleString("ar-LY")}</TableCell>
-                <TableCell>{attempt.respondedAt ? new Date(attempt.respondedAt).toLocaleString("ar-LY") : "—"}</TableCell>
+                 <TableCell>{attempt.responseAt ? new Date(attempt.responseAt).toLocaleString("ar-LY") : "—"}</TableCell>
                 <TableCell>{attempt.timeoutAt ? new Date(attempt.timeoutAt).toLocaleString("ar-LY") : "—"}</TableCell>
               </TableRow>)}</TableBody>
             </Table>

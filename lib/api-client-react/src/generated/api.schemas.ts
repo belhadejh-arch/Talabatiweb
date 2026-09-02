@@ -371,6 +371,8 @@ export interface Driver {
   name: string;
   phone: string;
   /** @nullable */
+  whatsappNumber?: string | null;
+  /** @nullable */
   telegramChatId?: string | null;
   /** @nullable */
   address?: string | null;
@@ -388,6 +390,8 @@ export interface DriverInput {
   /** @minLength 1 */
   name: string;
   phone: string;
+  /** @minLength 1 */
+  whatsappNumber: string;
   telegramChatId?: string;
   address?: string;
   vehicleType?: string;
@@ -398,6 +402,8 @@ export interface DriverInput {
 export interface DriverPatch {
   name?: string;
   phone?: string;
+  /** @nullable */
+  whatsappNumber?: string | null;
   /** @nullable */
   telegramChatId?: string | null;
   /** @nullable */
@@ -433,7 +439,7 @@ export interface DriverOrderAttempt {
   status: DriverOrderAttemptStatus;
   sentAt: string;
   /** @nullable */
-  respondedAt?: string | null;
+  responseAt?: string | null;
   timeoutAt: string;
   customerName?: string;
   customerPhone?: string;
@@ -471,6 +477,8 @@ export interface DeliveryMessageLog {
   /** @nullable */
   errorMessage?: string | null;
   sentAt: string;
+  /** @nullable */
+  responseAt?: string | null;
 }
 
 export type OrderOrderType = typeof OrderOrderType[keyof typeof OrderOrderType];
