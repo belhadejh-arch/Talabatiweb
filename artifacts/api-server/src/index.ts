@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startDriverDispatchWorker } from "./lib/driverDispatch";
+import { ensureRuntimeSchema } from "./lib/ensureRuntimeSchema";
 
 const rawPort = process.env["PORT"];
 
@@ -16,12 +17,21 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
+async function startServer(): Promise<void> {
+  await ensureRuntimeSchema();
 
-  logger.info({ port }, "Server listening");
-  startDriverDispatchWorker();
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+
+    logger.info({ port }, "Server listening");
+    startDriverDispatchWorker();
+  });
+}
+
+startServer().catch((error) => {
+  logger.fatal({ err: error }, "Unable to prepare database before starting server");
+  process.exit(1);
 });
