@@ -226,6 +226,16 @@ export async function ensureRuntimeSchema(): Promise<void> {
     SET timeout_at = COALESCE(timeout_at, NOW())
   `);
 
+  // Reservation orders intentionally have no delivery coordinates. Older
+  // deployments created these columns as required delivery-only fields.
+  await pool.query(`
+    ALTER TABLE orders
+      ALTER COLUMN driver_id DROP NOT NULL,
+      ALTER COLUMN latitude DROP NOT NULL,
+      ALTER COLUMN longitude DROP NOT NULL,
+      ALTER COLUMN maps_url DROP NOT NULL
+  `);
+
   await pool.query(`
     ALTER TABLE drivers
       ALTER COLUMN serial_number SET NOT NULL,
