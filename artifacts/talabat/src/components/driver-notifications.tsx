@@ -14,6 +14,13 @@ type DriverNotification = {
   createdAt: string;
 };
 
+type DriverOrderEvent = {
+  type?: string;
+  notificationId?: number | null;
+  orderId?: number;
+  message?: string;
+};
+
 type PushRegistration = ServiceWorkerRegistration & {
   pushManager: PushManager;
 };
@@ -50,10 +57,8 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     try {
       const response = await request("/api/driver/notifications");
       const notifications: DriverNotification[] = response.data || [];
-      if (initialized.current) {
-        const incoming = notifications.find((notification) => !notification.isRead && !knownIds.current.has(notification.id));
-        if (incoming) setLatest(incoming);
-      }
+      const incoming = notifications.find((notification) => !notification.isRead && !knownIds.current.has(notification.id));
+      if (incoming) setLatest(incoming);
       knownIds.current = new Set(notifications.map((notification) => notification.id));
       initialized.current = true;
     } catch {
@@ -109,7 +114,29 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     if (!enabled) return;
     void loadNotifications();
-    const timer = window.setInterval(() => void loadNotifications(), 10000);
+    const timer = window.setInterval(() => void loadNotifications(), 30000);
+    const eventSource = new EventSource(`${base}/api/driver/events`, { withCredentials: true });
+    eventSource.onopen = () => { void loadNotifications(); };
+    eventSource.onmessage = (event) => {
+      let data: DriverOrderEvent;
+      try {
+        data = JSON.parse(event.data) as DriverOrderEvent;
+      } catch {
+        return;
+      }
+      if (data.type !== "NEW_DRIVER_ORDER" || !data.orderId) return;
+      setLatest({
+        id: data.notificationId ?? 0,
+        type: "NEW_DRIVER_ORDER",
+        message: data.message || "لديك طلب جديد",
+        orderId: data.orderId,
+        relatedId: data.orderId,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      });
+      window.dispatchEvent(new CustomEvent("driver-order-received", { detail: { orderId: data.orderId } }));
+      void loadNotifications();
+    };
     const onPushMessage = (event: MessageEvent<{ type?: string; payload?: { title?: string; body?: string; orderId?: number } }>) => {
       if (event.data?.type !== "NEW_DRIVER_ORDER" || !event.data.payload) return;
       setLatest({
@@ -125,9 +152,10 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     navigator.serviceWorker?.addEventListener("message", onPushMessage);
     return () => {
       window.clearInterval(timer);
+      eventSource.close();
       navigator.serviceWorker?.removeEventListener("message", onPushMessage);
     };
-  }, [enabled, loadNotifications]);
+  }, [base, enabled, loadNotifications]);
 
   useEffect(() => {
     if (!enabled) return;

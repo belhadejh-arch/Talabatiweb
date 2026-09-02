@@ -7,8 +7,28 @@ import {
 } from "@workspace/db";
 import { requireDriverAuth } from "../middlewares/auth";
 import { getVapidPublicKey } from "../lib/driverPush";
+import { subscribeToDriverEvents } from "../lib/driverEvents";
 
 const router: IRouter = Router();
+
+router.get("/driver/events", requireDriverAuth, (req, res): void => {
+  const driver = (req as any).driver;
+  res.status(200).set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders();
+  res.write("retry: 3000\n\n");
+
+  const unsubscribe = subscribeToDriverEvents(driver.id, res);
+  const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), 25_000);
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    unsubscribe();
+  });
+});
 
 router.get("/driver/notifications", requireDriverAuth, async (req, res): Promise<void> => {
   const driver = (req as any).driver;

@@ -160,8 +160,13 @@ export default function DriverDashboard() {
 
   useEffect(() => { void load(true); }, [load]);
   useEffect(() => {
-    const timer = window.setInterval(() => void load(), 10000);
-    return () => window.clearInterval(timer);
+    const onDriverOrderReceived = () => { void load(); };
+    window.addEventListener("driver-order-received", onDriverOrderReceived);
+    const timer = window.setInterval(() => void load(), 30000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("driver-order-received", onDriverOrderReceived);
+    };
   }, [load]);
   useEffect(() => {
     const orderId = Number(new URLSearchParams(window.location.search).get("order"));

@@ -10,6 +10,7 @@ import {
   restaurantsTable,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { publishDriverEvent } from "./driverEvents";
 
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY?.trim() || "";
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY?.trim() || "";
@@ -60,7 +61,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
   if (!order || !driver || !attempt) return;
 
   const message = `طلب جديد من ${order.restaurantName} — الطلب #${order.id}`;
-  await db.insert(notificationsTable).values({
+  const [notification] = await db.insert(notificationsTable).values({
     type: "NEW_DRIVER_ORDER",
     message,
     driverId,
@@ -68,6 +69,12 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     orderId: order.id,
     relatedId: order.id,
     relatedType: "order",
+  }).returning({ id: notificationsTable.id });
+  publishDriverEvent(driverId, {
+    type: "NEW_DRIVER_ORDER",
+    notificationId: notification?.id ?? null,
+    orderId: order.id,
+    message,
   });
 
   if (!isPushConfigured()) return;
