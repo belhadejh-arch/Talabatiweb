@@ -5,6 +5,7 @@ import {
   driverPushSubscriptionsTable,
   driversTable,
   notificationsTable,
+  orderDriverAttemptsTable,
   ordersTable,
   restaurantsTable,
 } from "@workspace/db";
@@ -38,13 +39,25 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     })
     .from(ordersTable)
     .innerJoin(restaurantsTable, eq(restaurantsTable.id, ordersTable.restaurantId))
-    .where(eq(ordersTable.id, orderId));
+    .where(and(
+      eq(ordersTable.id, orderId),
+      eq(ordersTable.driverId, driverId),
+      eq(ordersTable.status, "NEW"),
+    ));
 
   const [driver] = await db
     .select({ id: driversTable.id })
     .from(driversTable)
     .where(eq(driversTable.id, driverId));
-  if (!order || !driver) return;
+  const [attempt] = await db
+    .select({ id: orderDriverAttemptsTable.id })
+    .from(orderDriverAttemptsTable)
+    .where(and(
+      eq(orderDriverAttemptsTable.orderId, orderId),
+      eq(orderDriverAttemptsTable.driverId, driverId),
+      eq(orderDriverAttemptsTable.status, "PENDING"),
+    ));
+  if (!order || !driver || !attempt) return;
 
   const message = `طلب جديد من ${order.restaurantName} — الطلب #${order.id}`;
   await db.insert(notificationsTable).values({

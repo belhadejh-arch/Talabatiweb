@@ -1,4 +1,4 @@
-import { useGetAnalyticsSummary, useGetOrdersOverTime, useGetRevenueOverTime, useGetTopRestaurants, getGetAnalyticsSummaryQueryKey, getGetOrdersOverTimeQueryKey, getGetRevenueOverTimeQueryKey, getGetTopRestaurantsQueryKey, useGetMe } from "@workspace/api-client-react";
+import { useGetAnalyticsSummary, useGetOrdersOverTime, useGetRevenueOverTime, useGetTopRestaurants, getGetAnalyticsSummaryQueryKey, getGetOrdersOverTimeQueryKey, getGetRevenueOverTimeQueryKey, getGetTopRestaurantsQueryKey, useGetMe, useListAllDrivers } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Store, ShoppingBag, DollarSign, Activity, TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
@@ -12,12 +12,14 @@ export default function AdminDashboard() {
   const { data: ordersData } = useGetOrdersOverTime(undefined, { query: { queryKey: getGetOrdersOverTimeQueryKey() } });
   const { data: revenueData } = useGetRevenueOverTime(undefined, { query: { queryKey: getGetRevenueOverTimeQueryKey() } });
   const { data: topRestaurants } = useGetTopRestaurants(undefined, { query: { queryKey: getGetTopRestaurantsQueryKey() } });
+  const { data: allDrivers } = useListAllDrivers();
+  const activeDrivers = allDrivers?.filter((driver) => driver.status === "ACTIVE").length ?? 0;
 
   const stats = [
     {
       title: "إجمالي الإيرادات",
       value: formatCurrency(summary?.totalRevenue || 0),
-      trend: "+12.5%",
+      trend: "من قاعدة البيانات",
       icon: DollarSign,
       color: "text-emerald-500",
       bgColor: "bg-emerald-500/10"
@@ -25,7 +27,7 @@ export default function AdminDashboard() {
     {
       title: "إجمالي الطلبات",
       value: summary?.totalOrders?.toLocaleString() || 0,
-      trend: "+8.2%",
+      trend: "من قاعدة البيانات",
       icon: ShoppingBag,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10"
@@ -33,15 +35,15 @@ export default function AdminDashboard() {
     {
       title: "المطاعم النشطة",
       value: summary?.activeRestaurants?.toLocaleString() || 0,
-      trend: "+2",
+      trend: "من قاعدة البيانات",
       icon: Store,
       color: "text-primary",
       bgColor: "bg-primary/10"
     },
     {
       title: "السائقون النشطون",
-      value: summary?.activeRestaurants ? Math.floor(summary.activeRestaurants * 2.5) : 0,
-      trend: "-1",
+      value: activeDrivers,
+      trend: "من قاعدة البيانات",
       icon: Activity,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10"

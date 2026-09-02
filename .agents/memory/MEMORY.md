@@ -10,3 +10,4 @@
 - [Drizzle schema drift](drizzle-schema-drift.md) — when push requires an interactive conflict choice, use targeted reviewed DDL for additive runtime tables/columns instead of force-pushing the whole schema
 - [TALABAT workflow ownership](talabat-workflow-ports.md) — run one service owner per fixed port; legacy and artifact workflows can conflict with EADDRINUSE
 - [Raw SQL parameter discipline](raw-sql-parameters.md) — every PostgreSQL placeholder must have a matching parameter; unused placeholders fail at runtime even when TypeScript passes
+- [Imported artifact workflows](imported-artifact-workflows.md) — imported artifact metadata may lack registered workflows; manual workflows need explicit PORT values for API and Vite

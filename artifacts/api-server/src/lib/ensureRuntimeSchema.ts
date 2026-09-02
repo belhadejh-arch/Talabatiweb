@@ -90,6 +90,24 @@ export async function ensureRuntimeSchema(): Promise<void> {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS driver_push_subscriptions (
+      id serial PRIMARY KEY,
+      driver_id integer NOT NULL,
+      endpoint text NOT NULL,
+      subscription text NOT NULL,
+      device text,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT NOW(),
+      updated_at timestamptz NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS driver_push_subscriptions_endpoint_unique
+      ON driver_push_subscriptions (endpoint)
+  `);
+
+  await pool.query(`
     ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS driver_id integer,
       ADD COLUMN IF NOT EXISTS order_type text DEFAULT 'DELIVERY',

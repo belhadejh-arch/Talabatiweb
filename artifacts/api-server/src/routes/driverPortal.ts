@@ -44,7 +44,10 @@ router.get("/driver/orders", requireDriverAuth, async (req, res): Promise<void> 
        FROM orders o
        JOIN order_driver_attempts a
          ON a.order_id = o.id AND a.driver_id = $1
-      WHERE o.driver_id = $1 AND o.restaurant_id = $2
+       WHERE o.driver_id = $1
+         AND o.restaurant_id = $2
+         AND a.status IN ('PENDING', 'ACCEPTED')
+         AND o.status IN ('NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY')
       ORDER BY o.created_at DESC, o.id DESC`,
     [driver.id, driver.restaurantId],
   );

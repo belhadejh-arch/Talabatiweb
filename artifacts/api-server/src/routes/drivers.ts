@@ -193,23 +193,56 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
   res.json(result.rows.map((row) => ({ ...row, totalAmount: Number(row.totalAmount) })));
 });
 
-// Retire a driver without deleting assignment history.
+// Permanently delete a driver. Pending orders are released so the dispatcher
+// can offer them to another active driver, while completed orders remain.
 router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [driver] = await db
-    .update(driversTable)
-    .set({ isActive: false, status: "INACTIVE" })
-    .where(eq(driversTable.id, id))
-    .returning({ id: driversTable.id, restaurantId: driversTable.restaurantId });
-  if (!driver) {
-    res.status(404).json({ error: "Not found" });
-    return;
+  const client = await pool.connect();
+  let restaurantId: number | null = null;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query<{ restaurant_id: number }>(
+      "SELECT restaurant_id FROM drivers WHERE id = $1 FOR UPDATE",
+      [id],
+    );
+    const driver = result.rows[0];
+    if (!driver) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    restaurantId = driver.restaurant_id;
+
+    // Do not leave a deleted driver attached to an order. Orders that were
+    // waiting for a response become eligible for the normal DB dispatcher.
+    await client.query(
+      `UPDATE orders
+          SET driver_id = NULL,
+              status = CASE
+                WHEN status IN ('NEW', 'WAITING_FOR_DRIVER') THEN 'WAITING_FOR_DRIVER'
+                ELSE status
+              END,
+              updated_at = NOW()
+        WHERE driver_id = $1`,
+      [id],
+    );
+    await client.query("DELETE FROM notifications WHERE driver_id = $1", [id]);
+    await client.query("DELETE FROM driver_push_subscriptions WHERE driver_id = $1", [id]);
+    await client.query("DELETE FROM order_driver_attempts WHERE driver_id = $1", [id]);
+    await client.query("DELETE FROM drivers WHERE id = $1", [id]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
   }
-  await dispatchPendingOrdersForRestaurant(driver.restaurantId);
-  res.json({ ok: true, retired: true });
+
+  if (restaurantId !== null) await dispatchPendingOrdersForRestaurant(restaurantId);
+  res.status(204).send();
 });
 
 export default router;
