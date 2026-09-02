@@ -9,7 +9,6 @@ export const driversTable = pgTable("drivers", {
   name: text("name").notNull(),
   phone: text("phone").notNull(),
   whatsappNumber: text("whatsapp_number"),
-  telegramChatId: text("telegram_chat_id"),
   status: text("status").notNull().default("INACTIVE"),
   address: text("address"),
   vehicleType: text("vehicle_type"),

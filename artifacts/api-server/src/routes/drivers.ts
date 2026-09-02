@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, pool, driversTable } from "@workspace/db";
-import { and, eq, desc, ne } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import {
   CreateDriverBody,
   UpdateDriverBody,
@@ -32,7 +32,6 @@ router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
     name: driver.name,
     phone: driver.phone,
     whatsappNumber: driver.whatsapp_number,
-    telegramChatId: driver.telegram_chat_id,
     address: driver.address,
     vehicleType: driver.vehicle_type,
     vehiclePlate: driver.vehicle_plate,
@@ -97,18 +96,9 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
    const hasWhatsApp = parsed.data.whatsappNumber !== undefined
      ? Boolean(parsed.data.whatsappNumber?.trim())
      : Boolean(existing.whatsappNumber?.trim());
-   const hasTelegram = parsed.data.telegramChatId !== undefined
-     ? Boolean(parsed.data.telegramChatId?.trim())
-     : Boolean(existing.telegramChatId?.trim());
-   if (parsed.data.isActive === true && !hasTelegram && !hasWhatsApp) {
-     res.status(400).json({ error: "يجب تسجيل رقم WhatsApp أو ربط Telegram قبل تفعيل السائق" });
+   if (parsed.data.isActive === true && !hasWhatsApp) {
+      res.status(400).json({ error: "يجب تسجيل رقم WhatsApp قبل تفعيل السائق" });
     return;
-  }
-  if (parsed.data.telegramChatId) {
-    await db
-      .update(driversTable)
-      .set({ telegramChatId: null, isActive: false, status: "INACTIVE" })
-      .where(and(eq(driversTable.telegramChatId, parsed.data.telegramChatId), ne(driversTable.id, id)));
   }
 
   const updateValues = {

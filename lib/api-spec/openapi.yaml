@@ -884,7 +884,7 @@ paths:
     get:
       operationId: getOrderDeliveryStatus
       tags: [orders]
-      summary: Get Telegram and WhatsApp delivery status for an order
+      summary: Get WhatsApp delivery status for an order
       parameters:
         - name: id
           in: path
@@ -900,56 +900,111 @@ paths:
                 items:
                   $ref: "#/components/schemas/DeliveryMessageLog"
 
-  /telegram/status:
+  /wp-sender/session:
     get:
-      operationId: getTelegramStatus
-      tags: [telegram]
-      summary: Verify the configured Telegram bot
+      operationId: getWpSenderSessionConfig
+      tags: [settings]
+      summary: Get WP Sender configuration status without exposing secrets
       responses:
         "200":
-          description: Telegram bot connection status
+          description: Configuration status
           content:
             application/json:
               schema:
                 type: object
-                required: [configured, connected]
                 properties:
-                  configured: { type: boolean }
-                  connected: { type: boolean }
-                  bot:
-                    type: object
-                    properties:
-                      id: { type: number }
-                      username: { type: ["string", "null"] }
-                      firstName: { type: string }
-                  error: { type: string }
+                  apiKeyConfigured: { type: boolean }
+                  apiUrlConfigured: { type: boolean }
+                  sessionIdConfigured: { type: boolean }
+                  apiUrl: { type: string }
+                  sessionId: { type: ["string", "null"] }
 
-  /telegram/recent-chats:
+  /wp-sender/sessions:
     get:
-      operationId: getTelegramRecentChats
-      tags: [telegram]
-      summary: List recent chats that contacted the bot
+      operationId: listWpSenderSessions
+      tags: [settings]
+      summary: List WP Sender WhatsApp sessions
       responses:
-        "200":
-          description: Recent Telegram chats
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      required: [chatId, title]
-                      properties:
-                        chatId: { type: string }
-                        title: { type: string }
-                        username: { type: ["string", "null"] }
-                        linkedDriverId: { type: ["number", "null"] }
-                        linkedDriverName: { type: ["string", "null"] }
-                        linkedDriverCount: { type: number }
+        "200": { description: Sessions returned }
+
+  /wp-sender/session/create:
+    post:
+      operationId: createWpSenderSession
+      tags: [settings]
+      summary: Create a WP Sender WhatsApp session
+      responses:
+        "201": { description: Session creation initiated }
+
+  /wp-sender/session/status:
+    get:
+      operationId: getWpSenderSessionStatus
+      tags: [settings]
+      summary: Check WP Sender WhatsApp session status
+      responses:
+        "200": { description: Session status returned }
+
+  /wp-sender/session/details:
+    get:
+      operationId: getWpSenderSessionDetails
+      tags: [settings]
+      summary: Get WP Sender WhatsApp session details
+      responses:
+        "200": { description: Session details returned }
+
+  /wp-sender/session/reconnect:
+    post:
+      operationId: reconnectWpSenderSession
+      tags: [settings]
+      summary: Reconnect a WP Sender WhatsApp session
+      responses:
+        "200": { description: Reconnection requested }
+
+  /wp-sender/session/qr:
+    get:
+      operationId: getWpSenderSessionQr
+      tags: [settings]
+      summary: Get the configured WP Sender session QR code
+      parameters:
+        - name: output
+          in: query
+          schema: { type: string, enum: [image, base64, raw], default: base64 }
+      responses:
+        "200": { description: QR code returned }
+
+  /wp-sender/session/pairing-code:
+    post:
+      operationId: requestWpSenderPairingCode
+      tags: [settings]
+      summary: Request a WP Sender WhatsApp pairing code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber: { type: string }
+      responses:
+        "200": { description: Pairing code returned }
+
+  /wp-sender/session/webhook:
+    post:
+      operationId: setWpSenderWebhook
+      tags: [settings]
+      summary: Configure the WP Sender session webhook URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, webhookUrl]
+              properties:
+                sessionId: { type: string }
+                webhookUrl: { type: string }
+      responses:
+        "200": { description: Webhook configured }
 
   # ── Public storefront ────────────────────────────────────────────────────────
   /public/restaurants/{slug}:
@@ -1611,7 +1666,6 @@ components:
         name: { type: string }
         phone: { type: string }
         whatsappNumber: { type: ["string", "null"] }
-        telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
@@ -1627,7 +1681,6 @@ components:
         name: { type: string, minLength: 1 }
         phone: { type: string }
         whatsappNumber: { type: string, minLength: 1 }
-        telegramChatId: { type: string }
         address: { type: string }
         vehicleType: { type: string }
         vehiclePlate: { type: string }
@@ -1639,7 +1692,6 @@ components:
         name: { type: string }
         phone: { type: string }
         whatsappNumber: { type: ["string", "null"] }
-        telegramChatId: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
@@ -1686,7 +1738,7 @@ components:
         id: { type: number }
         orderId: { type: number }
         driverId: { type: number }
-        channel: { type: string, enum: [TELEGRAM, WHATSAPP] }
+        channel: { type: string, enum: [WHATSAPP] }
         status: { type: string, enum: [SENT, FAILED] }
         errorMessage: { type: ["string", "null"] }
         sentAt: { type: string, format: date-time }
@@ -1971,8 +2023,6 @@ components:
       properties:
         id: { type: number }
         platformName: { type: string }
-        whatsappApiKey: { type: ["string", "null"] }
-        whatsappPhoneId: { type: ["string", "null"] }
         whatsappEnabled: { type: boolean }
         defaultCurrency: { type: string }
         mapsApiKey: { type: ["string", "null"] }
@@ -1983,8 +2033,6 @@ components:
       type: object
       properties:
         platformName: { type: string }
-        whatsappApiKey: { type: ["string", "null"] }
-        whatsappPhoneId: { type: ["string", "null"] }
         whatsappEnabled: { type: boolean }
         defaultCurrency: { type: string }
         mapsApiKey: { type: ["string", "null"] }

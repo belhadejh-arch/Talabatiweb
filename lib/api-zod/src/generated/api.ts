@@ -829,7 +829,6 @@ export const ListAllDriversResponseItem = zod.object({
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
-  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -859,7 +858,6 @@ export const ListDriversResponseItem = zod.object({
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
-  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -886,7 +884,6 @@ export const CreateDriverBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string(),
   "whatsappNumber": zod.string().min(1),
-  "telegramChatId": zod.string().optional(),
   "address": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "vehiclePlate": zod.string().optional(),
@@ -899,7 +896,6 @@ export const CreateDriverResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
-  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -921,7 +917,6 @@ export const UpdateDriverBody = zod.object({
   "name": zod.string().optional(),
   "phone": zod.string().optional(),
   "whatsappNumber": zod.string().nullish(),
-  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -934,7 +929,6 @@ export const UpdateDriverResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
-  "telegramChatId": zod.string().nullish(),
   "address": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
@@ -1179,7 +1173,7 @@ export const AssignDriverResponse = zod.object({
 
 
 /**
- * @summary Get Telegram and WhatsApp delivery status for an order
+ * @summary Get WhatsApp delivery status for an order
  */
 export const GetOrderDeliveryStatusParams = zod.object({
   "id": zod.coerce.number()
@@ -1189,7 +1183,7 @@ export const GetOrderDeliveryStatusResponseItem = zod.object({
   "id": zod.number(),
   "orderId": zod.number(),
   "driverId": zod.number(),
-  "channel": zod.enum(['TELEGRAM', 'WHATSAPP']),
+  "channel": zod.enum(['WHATSAPP']),
   "status": zod.enum(['SENT', 'FAILED']),
   "errorMessage": zod.string().nullish(),
   "sentAt": zod.coerce.date(),
@@ -1199,33 +1193,78 @@ export const GetOrderDeliveryStatusResponse = zod.array(GetOrderDeliveryStatusRe
 
 
 /**
- * @summary Verify the configured Telegram bot
+ * @summary Get WP Sender configuration status without exposing secrets
  */
-export const GetTelegramStatusResponse = zod.object({
-  "configured": zod.boolean(),
-  "connected": zod.boolean(),
-  "bot": zod.object({
-  "id": zod.number().optional(),
-  "username": zod.string().nullish(),
-  "firstName": zod.string().optional()
-}).optional(),
-  "error": zod.string().optional()
+export const GetWpSenderSessionConfigResponse = zod.object({
+  "apiKeyConfigured": zod.boolean().optional(),
+  "apiUrlConfigured": zod.boolean().optional(),
+  "sessionIdConfigured": zod.boolean().optional(),
+  "apiUrl": zod.string().optional(),
+  "sessionId": zod.string().nullish()
 })
 
 
 /**
- * @summary List recent chats that contacted the bot
+ * @summary List WP Sender WhatsApp sessions
  */
-export const GetTelegramRecentChatsResponse = zod.object({
-  "data": zod.array(zod.object({
-  "chatId": zod.string(),
-  "title": zod.string(),
-  "username": zod.string().nullish(),
-  "linkedDriverId": zod.number().nullish(),
-  "linkedDriverName": zod.string().nullish(),
-  "linkedDriverCount": zod.number().optional()
-}))
+export const ListWpSenderSessionsResponse = zod.unknown()
+
+
+/**
+ * @summary Create a WP Sender WhatsApp session
+ */
+export const CreateWpSenderSessionResponse = zod.void()
+
+
+/**
+ * @summary Check WP Sender WhatsApp session status
+ */
+export const GetWpSenderSessionStatusResponse = zod.unknown()
+
+
+/**
+ * @summary Get WP Sender WhatsApp session details
+ */
+export const GetWpSenderSessionDetailsResponse = zod.unknown()
+
+
+/**
+ * @summary Reconnect a WP Sender WhatsApp session
+ */
+export const ReconnectWpSenderSessionResponse = zod.unknown()
+
+
+/**
+ * @summary Get the configured WP Sender session QR code
+ */
+export const getWpSenderSessionQrQueryOutputDefault = `base64`;
+
+export const GetWpSenderSessionQrQueryParams = zod.object({
+  "output": zod.enum(['image', 'base64', 'raw']).default(getWpSenderSessionQrQueryOutputDefault)
 })
+
+export const GetWpSenderSessionQrResponse = zod.unknown()
+
+
+/**
+ * @summary Request a WP Sender WhatsApp pairing code
+ */
+export const RequestWpSenderPairingCodeBody = zod.object({
+  "phoneNumber": zod.string()
+})
+
+export const RequestWpSenderPairingCodeResponse = zod.unknown()
+
+
+/**
+ * @summary Configure the WP Sender session webhook URL
+ */
+export const SetWpSenderWebhookBody = zod.object({
+  "sessionId": zod.string(),
+  "webhookUrl": zod.string()
+})
+
+export const SetWpSenderWebhookResponse = zod.unknown()
 
 
 /**
@@ -1534,8 +1573,6 @@ export const getSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
 export const GetSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
-  "whatsappApiKey": zod.string().nullish(),
-  "whatsappPhoneId": zod.string().nullish(),
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
@@ -1554,8 +1591,6 @@ export const updateSettingsBodyDriverResponseTimeoutSecondsMax = 86400;
 
 export const UpdateSettingsBody = zod.object({
   "platformName": zod.string().optional(),
-  "whatsappApiKey": zod.string().nullish(),
-  "whatsappPhoneId": zod.string().nullish(),
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
@@ -1570,8 +1605,6 @@ export const updateSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
 export const UpdateSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
-  "whatsappApiKey": zod.string().nullish(),
-  "whatsappPhoneId": zod.string().nullish(),
   "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),

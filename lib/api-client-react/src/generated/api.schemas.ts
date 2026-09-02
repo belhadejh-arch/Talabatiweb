@@ -373,8 +373,6 @@ export interface Driver {
   /** @nullable */
   whatsappNumber?: string | null;
   /** @nullable */
-  telegramChatId?: string | null;
-  /** @nullable */
   address?: string | null;
   /** @nullable */
   vehicleType?: string | null;
@@ -392,7 +390,6 @@ export interface DriverInput {
   phone: string;
   /** @minLength 1 */
   whatsappNumber: string;
-  telegramChatId?: string;
   address?: string;
   vehicleType?: string;
   vehiclePlate?: string;
@@ -404,8 +401,6 @@ export interface DriverPatch {
   phone?: string;
   /** @nullable */
   whatsappNumber?: string | null;
-  /** @nullable */
-  telegramChatId?: string | null;
   /** @nullable */
   address?: string | null;
   /** @nullable */
@@ -456,7 +451,6 @@ export type DeliveryMessageLogChannel = typeof DeliveryMessageLogChannel[keyof t
 
 
 export const DeliveryMessageLogChannel = {
-  TELEGRAM: 'TELEGRAM',
   WHATSAPP: 'WHATSAPP',
 } as const;
 
@@ -768,10 +762,6 @@ export interface NotificationListResponse {
 export interface Settings {
   id: number;
   platformName?: string;
-  /** @nullable */
-  whatsappApiKey?: string | null;
-  /** @nullable */
-  whatsappPhoneId?: string | null;
   whatsappEnabled?: boolean;
   defaultCurrency?: string;
   /** @nullable */
@@ -786,10 +776,6 @@ export interface Settings {
 
 export interface SettingsPatch {
   platformName?: string;
-  /** @nullable */
-  whatsappApiKey?: string | null;
-  /** @nullable */
-  whatsappPhoneId?: string | null;
   whatsappEnabled?: boolean;
   defaultCurrency?: string;
   /** @nullable */
@@ -829,34 +815,35 @@ page?: number;
 limit?: number;
 };
 
-export type GetTelegramStatus200Bot = {
-  id?: number;
+export type GetWpSenderSessionConfig200 = {
+  apiKeyConfigured?: boolean;
+  apiUrlConfigured?: boolean;
+  sessionIdConfigured?: boolean;
+  apiUrl?: string;
   /** @nullable */
-  username?: string | null;
-  firstName?: string;
+  sessionId?: string | null;
 };
 
-export type GetTelegramStatus200 = {
-  configured: boolean;
-  connected: boolean;
-  bot?: GetTelegramStatus200Bot;
-  error?: string;
+export type GetWpSenderSessionQrParams = {
+output?: GetWpSenderSessionQrOutput;
 };
 
-export type GetTelegramRecentChats200DataItem = {
-  chatId: string;
-  title: string;
-  /** @nullable */
-  username?: string | null;
-  /** @nullable */
-  linkedDriverId?: number | null;
-  /** @nullable */
-  linkedDriverName?: string | null;
-  linkedDriverCount?: number;
+export type GetWpSenderSessionQrOutput = typeof GetWpSenderSessionQrOutput[keyof typeof GetWpSenderSessionQrOutput];
+
+
+export const GetWpSenderSessionQrOutput = {
+  image: 'image',
+  base64: 'base64',
+  raw: 'raw',
+} as const;
+
+export type RequestWpSenderPairingCodeBody = {
+  phoneNumber: string;
 };
 
-export type GetTelegramRecentChats200 = {
-  data: GetTelegramRecentChats200DataItem[];
+export type SetWpSenderWebhookBody = {
+  sessionId: string;
+  webhookUrl: string;
 };
 
 export type GetAnalyticsSummaryParams = {

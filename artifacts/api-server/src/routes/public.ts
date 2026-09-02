@@ -362,17 +362,15 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   try {
     const assignment = await dispatchNextDriverForOrder(order.id);
     if (assignment.assigned) {
-      const channelSent = assignment.notification
-        ? assignment.notification.telegram.success || assignment.notification.whatsapp.success
-        : false;
+       const channelSent = assignment.notification?.success ?? false;
       dispatchMessage = channelSent
         ? "تم إنشاء الطلب وإرساله إلى السائق بنجاح"
-        : "تم إنشاء الطلب، لكن تعذر إرسال الإشعار للسائق. راجع إعدادات Telegram أو WhatsApp.";
+         : "تم إنشاء الطلب، لكن تعذر إرسال الإشعار للسائق. راجع إعدادات WP Sender.";
     } else {
       dispatchMessage = "تم إنشاء الطلب، وسيتم إرساله للسائق عند توفر سائق نشط ومهيأ.";
       await db.insert(notificationsTable).values({
         type: "NO_DRIVER",
-        message: `لا يوجد سائق ACTIVE ومهيأ بقناة إرسال لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
+         message: `لا يوجد سائق ACTIVE برقم WhatsApp صالح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
         relatedId: order.id,
         relatedType: "order",
       });

@@ -43,10 +43,10 @@ import type {
   GetOrdersOverTimeParams,
   GetPeakHoursParams,
   GetRevenueOverTimeParams,
-  GetTelegramRecentChats200,
-  GetTelegramStatus200,
   GetTopProductsParams,
   GetTopRestaurantsParams,
+  GetWpSenderSessionConfig200,
+  GetWpSenderSessionQrParams,
   HealthStatus,
   HourStat,
   ListNotificationsParams,
@@ -71,11 +71,13 @@ import type {
   ProductStat,
   PublicMenu,
   PublicRestaurant,
+  RequestWpSenderPairingCodeBody,
   Restaurant,
   RestaurantInput,
   RestaurantListResponse,
   RestaurantPatch,
   RestaurantStat,
+  SetWpSenderWebhookBody,
   Settings,
   SettingsPatch,
   StatusUpdate,
@@ -3243,7 +3245,7 @@ export const getGetOrderDeliveryStatusUrl = (id: number,) => {
 }
 
 /**
- * @summary Get Telegram and WhatsApp delivery status for an order
+ * @summary Get WhatsApp delivery status for an order
  */
 export const getOrderDeliveryStatus = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<DeliveryMessageLog[]> => {
 
@@ -3290,7 +3292,7 @@ export type GetOrderDeliveryStatusQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get Telegram and WhatsApp delivery status for an order
+ * @summary Get WhatsApp delivery status for an order
  */
 
 export function useGetOrderDeliveryStatus<TData = Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError = ErrorType<unknown>>(
@@ -3311,20 +3313,20 @@ export function useGetOrderDeliveryStatus<TData = Awaited<ReturnType<typeof getO
 
 
 
-export const getGetTelegramStatusUrl = () => {
+export const getGetWpSenderSessionConfigUrl = () => {
 
 
 
 
-  return `/api/telegram/status`
+  return `/api/wp-sender/session`
 }
 
 /**
- * @summary Verify the configured Telegram bot
+ * @summary Get WP Sender configuration status without exposing secrets
  */
-export const getTelegramStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetTelegramStatus200> => {
+export const getWpSenderSessionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetWpSenderSessionConfig200> => {
 
-  return customFetch<GetTelegramStatus200>(getGetTelegramStatusUrl(),
+  return customFetch<GetWpSenderSessionConfig200>(getGetWpSenderSessionConfigUrl(),
   {
     ...options,
     method: 'GET'
@@ -3337,45 +3339,45 @@ export const getTelegramStatus = async ( options?: Parameters<typeof customFetch
 
 
 
-export const getGetTelegramStatusQueryKey = () => {
+export const getGetWpSenderSessionConfigQueryKey = () => {
     return [
-    `/api/telegram/status`
+    `/api/wp-sender/session`
     ] as const;
     }
 
 
-export const getGetTelegramStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetWpSenderSessionConfigQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTelegramStatusQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionConfigQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTelegramStatus>>> = ({ signal }) => getTelegramStatus({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionConfig>>> = ({ signal }) => getWpSenderSessionConfig({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetTelegramStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTelegramStatus>>>
-export type GetTelegramStatusQueryError = ErrorType<unknown>
+export type GetWpSenderSessionConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionConfig>>>
+export type GetWpSenderSessionConfigQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Verify the configured Telegram bot
+ * @summary Get WP Sender configuration status without exposing secrets
  */
 
-export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegramStatus>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetWpSenderSessionConfig<TData = Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetTelegramStatusQueryOptions(options)
+  const queryOptions = getGetWpSenderSessionConfigQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -3388,20 +3390,20 @@ export function useGetTelegramStatus<TData = Awaited<ReturnType<typeof getTelegr
 
 
 
-export const getGetTelegramRecentChatsUrl = () => {
+export const getListWpSenderSessionsUrl = () => {
 
 
 
 
-  return `/api/telegram/recent-chats`
+  return `/api/wp-sender/sessions`
 }
 
 /**
- * @summary List recent chats that contacted the bot
+ * @summary List WP Sender WhatsApp sessions
  */
-export const getTelegramRecentChats = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetTelegramRecentChats200> => {
+export const listWpSenderSessions = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
-  return customFetch<GetTelegramRecentChats200>(getGetTelegramRecentChatsUrl(),
+  return customFetch<void>(getListWpSenderSessionsUrl(),
   {
     ...options,
     method: 'GET'
@@ -3414,45 +3416,45 @@ export const getTelegramRecentChats = async ( options?: Parameters<typeof custom
 
 
 
-export const getGetTelegramRecentChatsQueryKey = () => {
+export const getListWpSenderSessionsQueryKey = () => {
     return [
-    `/api/telegram/recent-chats`
+    `/api/wp-sender/sessions`
     ] as const;
     }
 
 
-export const getGetTelegramRecentChatsQueryOptions = <TData = Awaited<ReturnType<typeof getTelegramRecentChats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListWpSenderSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listWpSenderSessions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTelegramRecentChatsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListWpSenderSessionsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTelegramRecentChats>>> = ({ signal }) => getTelegramRecentChats({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWpSenderSessions>>> = ({ signal }) => listWpSenderSessions({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetTelegramRecentChatsQueryResult = NonNullable<Awaited<ReturnType<typeof getTelegramRecentChats>>>
-export type GetTelegramRecentChatsQueryError = ErrorType<unknown>
+export type ListWpSenderSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listWpSenderSessions>>>
+export type ListWpSenderSessionsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List recent chats that contacted the bot
+ * @summary List WP Sender WhatsApp sessions
  */
 
-export function useGetTelegramRecentChats<TData = Awaited<ReturnType<typeof getTelegramRecentChats>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTelegramRecentChats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListWpSenderSessions<TData = Awaited<ReturnType<typeof listWpSenderSessions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetTelegramRecentChatsQueryOptions(options)
+  const queryOptions = getListWpSenderSessionsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -3464,6 +3466,528 @@ export function useGetTelegramRecentChats<TData = Awaited<ReturnType<typeof getT
 
 
 
+
+export const getCreateWpSenderSessionUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/create`
+}
+
+/**
+ * @summary Create a WP Sender WhatsApp session
+ */
+export const createWpSenderSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getCreateWpSenderSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateWpSenderSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext> => {
+
+const mutationKey = ['createWpSenderSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWpSenderSession>>, void> = () => {
+
+
+          return  createWpSenderSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWpSenderSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createWpSenderSession>>>
+
+    export type CreateWpSenderSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a WP Sender WhatsApp session
+ */
+export const useCreateWpSenderSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWpSenderSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateWpSenderSessionMutationOptions(options));
+    }
+
+export const getGetWpSenderSessionStatusUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/status`
+}
+
+/**
+ * @summary Check WP Sender WhatsApp session status
+ */
+export const getWpSenderSessionStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getGetWpSenderSessionStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWpSenderSessionStatusQueryKey = () => {
+    return [
+    `/api/wp-sender/session/status`
+    ] as const;
+    }
+
+
+export const getGetWpSenderSessionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionStatus>>> = ({ signal }) => getWpSenderSessionStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWpSenderSessionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionStatus>>>
+export type GetWpSenderSessionStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Check WP Sender WhatsApp session status
+ */
+
+export function useGetWpSenderSessionStatus<TData = Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWpSenderSessionStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetWpSenderSessionDetailsUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/details`
+}
+
+/**
+ * @summary Get WP Sender WhatsApp session details
+ */
+export const getWpSenderSessionDetails = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getGetWpSenderSessionDetailsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWpSenderSessionDetailsQueryKey = () => {
+    return [
+    `/api/wp-sender/session/details`
+    ] as const;
+    }
+
+
+export const getGetWpSenderSessionDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionDetailsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionDetails>>> = ({ signal }) => getWpSenderSessionDetails({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWpSenderSessionDetailsQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionDetails>>>
+export type GetWpSenderSessionDetailsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get WP Sender WhatsApp session details
+ */
+
+export function useGetWpSenderSessionDetails<TData = Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWpSenderSessionDetailsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReconnectWpSenderSessionUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/reconnect`
+}
+
+/**
+ * @summary Reconnect a WP Sender WhatsApp session
+ */
+export const reconnectWpSenderSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getReconnectWpSenderSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReconnectWpSenderSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext> => {
+
+const mutationKey = ['reconnectWpSenderSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconnectWpSenderSession>>, void> = () => {
+
+
+          return  reconnectWpSenderSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReconnectWpSenderSessionMutationResult = NonNullable<Awaited<ReturnType<typeof reconnectWpSenderSession>>>
+
+    export type ReconnectWpSenderSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reconnect a WP Sender WhatsApp session
+ */
+export const useReconnectWpSenderSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reconnectWpSenderSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReconnectWpSenderSessionMutationOptions(options));
+    }
+
+export const getGetWpSenderSessionQrUrl = (params?: GetWpSenderSessionQrParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/wp-sender/session/qr?${stringifiedParams}` : `/api/wp-sender/session/qr`
+}
+
+/**
+ * @summary Get the configured WP Sender session QR code
+ */
+export const getWpSenderSessionQr = async (params?: GetWpSenderSessionQrParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getGetWpSenderSessionQrUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWpSenderSessionQrQueryKey = (params?: GetWpSenderSessionQrParams,) => {
+    return [
+    `/api/wp-sender/session/qr`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWpSenderSessionQrQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError = ErrorType<unknown>>(params?: GetWpSenderSessionQrParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionQrQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionQr>>> = ({ signal }) => getWpSenderSessionQr(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWpSenderSessionQrQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionQr>>>
+export type GetWpSenderSessionQrQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the configured WP Sender session QR code
+ */
+
+export function useGetWpSenderSessionQr<TData = Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError = ErrorType<unknown>>(
+ params?: GetWpSenderSessionQrParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWpSenderSessionQrQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestWpSenderPairingCodeUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/pairing-code`
+}
+
+/**
+ * @summary Request a WP Sender WhatsApp pairing code
+ */
+export const requestWpSenderPairingCode = async (requestWpSenderPairingCodeBody: RequestWpSenderPairingCodeBody, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRequestWpSenderPairingCodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(requestWpSenderPairingCodeBody)
+  }
+);}
+
+
+
+
+
+export const getRequestWpSenderPairingCodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext> => {
+
+const mutationKey = ['requestWpSenderPairingCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, {data: BodyType<RequestWpSenderPairingCodeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestWpSenderPairingCode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestWpSenderPairingCodeMutationResult = NonNullable<Awaited<ReturnType<typeof requestWpSenderPairingCode>>>
+    export type RequestWpSenderPairingCodeMutationBody = BodyType<RequestWpSenderPairingCodeBody>
+    export type RequestWpSenderPairingCodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request a WP Sender WhatsApp pairing code
+ */
+export const useRequestWpSenderPairingCode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestWpSenderPairingCode>>,
+        TError,
+        {data: BodyType<RequestWpSenderPairingCodeBody>},
+        TContext
+      > => {
+      return useMutation(getRequestWpSenderPairingCodeMutationOptions(options));
+    }
+
+export const getSetWpSenderWebhookUrl = () => {
+
+
+
+
+  return `/api/wp-sender/session/webhook`
+}
+
+/**
+ * @summary Configure the WP Sender session webhook URL
+ */
+export const setWpSenderWebhook = async (setWpSenderWebhookBody: SetWpSenderWebhookBody, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getSetWpSenderWebhookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setWpSenderWebhookBody)
+  }
+);}
+
+
+
+
+
+export const getSetWpSenderWebhookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext> => {
+
+const mutationKey = ['setWpSenderWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setWpSenderWebhook>>, {data: BodyType<SetWpSenderWebhookBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setWpSenderWebhook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetWpSenderWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof setWpSenderWebhook>>>
+    export type SetWpSenderWebhookMutationBody = BodyType<SetWpSenderWebhookBody>
+    export type SetWpSenderWebhookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Configure the WP Sender session webhook URL
+ */
+export const useSetWpSenderWebhook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setWpSenderWebhook>>,
+        TError,
+        {data: BodyType<SetWpSenderWebhookBody>},
+        TContext
+      > => {
+      return useMutation(getSetWpSenderWebhookMutationOptions(options));
+    }
 
 export const getGetPublicRestaurantUrl = (slug: string,) => {
 

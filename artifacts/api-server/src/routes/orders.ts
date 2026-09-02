@@ -222,7 +222,7 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
 
   const assigned = await assignSpecificDriverForOrder(id, parsed.data.driverId);
   if (!assigned) {
-    res.status(409).json({ error: "تعذر إسناد الطلب، ربما تم تحديثه من Telegram أو انتهت صلاحيته" });
+    res.status(409).json({ error: "تعذر إسناد الطلب، ربما تم تحديثه أو انتهت صلاحيته" });
     return;
   }
 

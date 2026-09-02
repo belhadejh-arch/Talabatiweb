@@ -5,7 +5,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { ensureTelegramSchema } from "./lib/telegramDelivery";
+import { ensureDeliverySchema } from "./lib/delivery";
 
 const app: Express = express();
 
@@ -74,10 +74,10 @@ app.get("/health", (_req, res) => {
 
 app.use(async (req, res, next) => {
   try {
-    await ensureTelegramSchema();
+      await ensureDeliverySchema();
     next();
   } catch (error) {
-    req.log.error({ err: error }, "Failed to initialize Telegram delivery schema");
+    req.log.error({ err: error }, "Failed to initialize delivery schema");
     res.status(503).json({ error: "Service initialization failed" });
   }
 });

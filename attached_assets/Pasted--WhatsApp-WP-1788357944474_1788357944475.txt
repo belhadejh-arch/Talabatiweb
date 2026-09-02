@@ -1,0 +1,247 @@
+أريد تعديل منصة "طلبات | طلباتي" لربط إرسال طلبات العملاء تلقائيًا إلى WhatsApp السائقين باستخدام WP Sender Developer API فقط.
+
+موقع مزود الخدمة:
+https://www.wpsenderx.com/
+
+التوثيق:
+WP Sender Developer API 1.0.0
+
+المصادقة:
+X-API-Key
+
+Endpoint إرسال الرسائل:
+POST /messages/send
+
+مهم جدًا:
+لا تستخدم WapiSender.
+لا تستخدم Telegram.
+لا تستخدم Instance الخاص بـ WapiSender.
+
+احذف Telegram بالكامل من المشروع:
+- Telegram Bot
+- Chat ID
+- /start
+- Telegram activation
+- Telegram conversations
+- Replit identity token
+- telegram_chat_id
+- أي Telegram UI
+- أي Telegram backend/service متعلق بالسائقين.
+
+========================
+WHATSAPP / WP SENDER
+========================
+
+أضف إعدادات WP Sender في Backend فقط.
+
+استخدم Replit Secrets / Environment Variables:
+
+WP_SENDER_API_KEY
+WP_SENDER_API_URL
+WP_SENDER_SESSION_ID
+
+ممنوع وضع API Key في Frontend أو GitHub.
+
+استخدم X-API-Key في جميع طلبات API.
+
+لا تضع API Key الحقيقي داخل الكود.
+
+اجعل API URL قابلًا للتعديل من Environment Variables لأن التوثيق يعرض localhost:5000/api كمثال، وفي الإنتاج يجب استخدام Production API URL الخاص بـWP Sender.
+
+========================
+WHATSAPP SESSION
+========================
+
+استخدم WP Sender WhatsApp Session API.
+
+يجب أن يستطيع النظام:
+- إنشاء WhatsApp Session عند الحاجة.
+- معرفة Session ID.
+- فحص حالة الاتصال.
+- إعادة الاتصال إذا انقطع الاتصال.
+- معرفة هل Session متصلة أم لا.
+
+استخدم endpoints الموجودة في توثيق WP Sender:
+
+POST /whatsapp-session/create
+
+GET /whatsapp-session/list
+
+GET /whatsapp-session/{sessionId}/status
+
+GET /whatsapp-session/{sessionId}/details
+
+POST /whatsapp-session/{sessionId}/reconnect
+
+GET /whatsapp-session/{sessionId}/qr
+
+POST /whatsapp-session/{sessionId}/pairing-code
+
+لا تفترض Payload غير موجود في التوثيق.
+اقرأ OpenAPI schema الموجود في /api-docs.json واستخدم الـrequest body والحقول المحددة فيه بالضبط.
+
+========================
+السائقون
+========================
+
+أريد تبسيط نظام السائقين.
+
+في إدارة السائقين يجب أن تكون البيانات:
+
+- الاسم الكامل
+- رقم الهاتف
+- رقم WhatsApp
+- المطعم المرتبط بالسائق
+- الحالة: نشط / غير نشط
+
+رقم WhatsApp يجب أن يحفظ في PostgreSQL.
+
+احذف كل ما يتعلق بـTelegram من واجهة السائقين وقاعدة البيانات والكود.
+
+========================
+إرسال الطلب
+========================
+
+عند إنشاء طلب جديد:
+
+1. احفظ الطلب في PostgreSQL أولًا.
+2. احصل على restaurant_id الخاص بالطلب.
+3. ابحث عن السائقين ACTIVE التابعين لنفس المطعم.
+4. اختر السائق المناسب.
+5. استخدم رقم WhatsApp المحفوظ للسائق.
+6. أرسل الطلب تلقائيًا عبر WP Sender API.
+7. سجّل نتيجة الإرسال في PostgreSQL.
+
+استخدم:
+
+POST /messages/send
+
+مع:
+X-API-Key: قيمة WP_SENDER_API_KEY
+
+اقرأ schema الخاص بـ /messages/send من OpenAPI قبل كتابة الكود.
+لا تخمّن أسماء الحقول أو Payload.
+
+========================
+رسالة السائق
+========================
+
+للطلب DELIVERY:
+
+🚨 طلب توصيل جديد
+
+🏪 المطعم: {restaurantName}
+
+📦 رقم الطلب: #{orderNumber}
+
+👤 العميل: {customerName}
+
+📞 الهاتف: {customerPhone}
+
+🍔 الطلب:
+{items}
+
+💰 الإجمالي: {total} د.ل
+
+📍 موقع العميل:
+{googleMapsUrl}
+
+للطلب RESERVATION:
+
+🚨 حجز طلب جديد
+
+🏪 المطعم: {restaurantName}
+
+📦 رقم الطلب: #{orderNumber}
+
+👤 العميل: {customerName}
+
+📞 الهاتف: {customerPhone}
+
+🍔 الطلب:
+{items}
+
+💰 الإجمالي: {total} د.ل
+
+🏪 نوع الطلب: حجز
+
+لا ترسل GPS أو موقع للـRESERVATION.
+
+========================
+تسجيل الإرسال
+========================
+
+أضف سجلًا في PostgreSQL:
+
+order_id
+driver_id
+phone
+sent_at
+response_at
+status
+error_message
+
+الحالات:
+
+SENT
+FAILED
+
+إذا فشل WhatsApp:
+- لا تحذف الطلب.
+- لا تفقد الطلب.
+- سجّل الخطأ.
+- يمكن إعادة الإرسال.
+
+========================
+التوزيع
+========================
+
+لا ترسل الطلب إلى جميع السائقين في نفس الوقت.
+
+عند وصول طلب:
+
+ORDER
+↓
+PostgreSQL
+↓
+restaurant_id
+↓
+ACTIVE drivers
+↓
+اختيار سائق
+↓
+WP Sender
+↓
+WhatsApp driver
+
+السائق غير ACTIVE لا يستقبل طلبات جديدة.
+
+السائق يجب أن يكون تابعًا لنفس restaurant_id الخاص بالطلب.
+
+إذا كان هناك أكثر من سائق ACTIVE، استخدم آلية توزيع واضحة ومتوازنة.
+
+========================
+اختبار
+========================
+
+اختبر:
+
+1. إضافة سائق.
+2. إضافة رقم WhatsApp للسائق.
+3. ربطه بمطعم.
+4. جعله ACTIVE.
+5. إنشاء طلب من المطعم.
+6. التأكد من حفظ الطلب PostgreSQL.
+7. إرسال WhatsApp للسائق تلقائيًا.
+8. تسجيل نتيجة الإرسال.
+9. اختبار FAILED عند فشل API.
+10. التأكد أن الطلب لا يضيع عند فشل WhatsApp.
+
+مهم جدًا:
+لا تستخدم Mock Data.
+لا تستخدم Telegram.
+لا تستخدم WapiSender.
+لا تخزن API Key في Frontend.
+لا تخزن API Key في GitHub.
+لا تخمّن API payload.
+استخدم OpenAPI schema الرسمي الموجود في /api-docs.json.

@@ -9,6 +9,5 @@ export * from "./drivers";
 export * from "./orders";
 export * from "./notifications";
 export * from "./delivery-message-logs";
-export * from "./telegram-contacts";
 export * from "./settings";
 export * from "./order-driver-attempts";

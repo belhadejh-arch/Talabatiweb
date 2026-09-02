@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { getBaseUrl, useCreateDriver, useDeleteDriver, useListRestaurants, useUpdateDriver } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { orderStatusLabel } from "@/lib/labels";
 import { formatCurrency } from "@/lib/currency";
 
-type DriverForm = { name: string; phone: string; whatsappNumber: string; address: string; restaurantId: string };
+type DriverForm = { name: string; phone: string; whatsappNumber: string; restaurantId: string };
 type PlatformDriver = {
   id: number;
   restaurantId: number;
@@ -15,8 +15,6 @@ type PlatformDriver = {
   name: string;
   phone: string;
   whatsappNumber?: string | null;
-  telegramChatId?: string | null;
-  address?: string | null;
   isActive: boolean;
   status: "ACTIVE" | "INACTIVE";
   acceptedCount: number;
@@ -37,7 +35,7 @@ type DriverAttempt = {
   orderCreatedAt: string;
 };
 
-const empty: DriverForm = { name: "", phone: "", whatsappNumber: "", address: "", restaurantId: "" };
+const empty: DriverForm = { name: "", phone: "", whatsappNumber: "", restaurantId: "" };
 
 export default function AdminDrivers() {
   const [form, setForm] = useState<DriverForm>(empty);
@@ -47,16 +45,6 @@ export default function AdminDrivers() {
   const [history, setHistory] = useState<DriverAttempt[]>([]);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [telegramStatus, setTelegramStatus] = useState<{ connected: boolean; bot?: { username: string | null }; error?: string } | null>(null);
-  const [recentChats, setRecentChats] = useState<Array<{
-    chatId: string;
-    title: string;
-    username: string | null;
-    linkedDriverId: number | null;
-    linkedDriverName: string | null;
-    linkedDriverCount: number;
-  }>>([]);
-  const [loadingChats, setLoadingChats] = useState(false);
   const [activityId, setActivityId] = useState<number | null>(null);
   const { data: restaurants } = useListRestaurants({ limit: 100 });
   const create = useCreateDriver();
@@ -79,11 +67,6 @@ export default function AdminDrivers() {
 
   useEffect(() => {
     void loadDrivers();
-    void loadRecentChats();
-    fetch(`${base}/api/telegram/status`, { credentials: "include" })
-      .then(async (response) => response.ok ? response.json() : null)
-      .then((data) => data && setTelegramStatus(data))
-      .catch(() => setTelegramStatus({ connected: false, error: "تعذر الاتصال بالبوت" }));
   }, [base]);
 
   const openHistory = async (driver: PlatformDriver) => {
@@ -120,37 +103,7 @@ export default function AdminDrivers() {
     }
   };
 
-  const linkTelegramChat = async (chatId: string, driverId: number) => {
-    try {
-      const response = await fetch(`${base}/api/drivers/${driverId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegramChatId: chatId }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || "تعذر ربط حساب Telegram");
-      await Promise.all([loadDrivers(), loadRecentChats()]);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "تعذر ربط حساب Telegram");
-    }
-  };
-
-  const loadRecentChats = async () => {
-    setLoadingChats(true);
-    try {
-      const response = await fetch(`${base}/api/telegram/recent-chats`, { credentials: "include" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || "تعذر جلب محادثات Telegram");
-      setRecentChats(data?.data ?? []);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "تعذر جلب المحادثات");
-    } finally {
-      setLoadingChats(false);
-    }
-  };
-
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: FormEvent) => {
     e.preventDefault();
     const restaurantId = Number(form.restaurantId);
     if (!restaurantId) return;
@@ -158,7 +111,6 @@ export default function AdminDrivers() {
       name: form.name,
       phone: form.phone,
       whatsappNumber: form.whatsappNumber,
-      address: form.address || undefined,
     };
     if (editingId) {
       update.mutate({ id: editingId, data: commonData }, { onSuccess: () => { setEditingId(null); setForm(empty); void loadDrivers(); } });
@@ -167,14 +119,11 @@ export default function AdminDrivers() {
     }
   };
 
-  const driverLink = (driverId: number) =>
-    telegramStatus?.bot?.username ? `https://t.me/${telegramStatus.bot.username}?start=driver_${driverId}` : null;
-
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold">إدارة السائقين</h2>
-       <p className="mt-1 text-sm text-muted-foreground">يسجّل السائق برقم هاتف ورقم WhatsApp مستقل، ثم يمكنك تفعيل الحساب بعد تجهيز إحدى قنوات الإرسال.</p>
+        <p className="mt-1 text-sm text-muted-foreground">يسجّل السائق برقم هاتف ورقم WhatsApp مستقل، ولا يستقبل الطلبات إلا بعد تفعيله.</p>
       </div>
 
       <Card>
@@ -184,42 +133,18 @@ export default function AdminDrivers() {
             <Input placeholder="الاسم واللقب" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
             <Input placeholder="رقم الهاتف" type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
             <Input placeholder="رقم WhatsApp مع مفتاح الدولة" type="tel" value={form.whatsappNumber} onChange={e => setForm({ ...form, whatsappNumber: e.target.value })} required />
-            <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
             <select className="h-10 rounded-md border bg-background px-3" value={form.restaurantId} onChange={e => setForm({ ...form, restaurantId: e.target.value })} required>
               <option value="">اختر المطعم</option>
               {restaurants?.data.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
             <div className="md:col-span-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">طريقة تفعيل السائق</p>
-               <p>يمكن استقبال الطلب عبر WapiSender باستخدام رقم WhatsApp، أو عبر Telegram بعد ربط Chat ID. يجب أن يكون السائق ACTIVE حتى يستقبل طلبات جديدة.</p>
+                <p>تصل الطلبات إلى رقم WhatsApp المسجل عبر WP Sender. يجب أن يكون السائق ACTIVE وأن يكون تابعًا لنفس المطعم حتى يستقبل طلبات جديدة.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" disabled={create.isPending || update.isPending}>{editingId ? "حفظ التعديلات" : "إضافة السائق"}</Button>
               {editingId && <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(empty); }}>إلغاء</Button>}
             </div>
-            <Button type="button" variant="outline" onClick={() => void loadRecentChats()} disabled={loadingChats}>
-              {loadingChats ? "جاري الجلب..." : "جلب محادثات Telegram"}
-            </Button>
-            {recentChats.length > 0 && <div className="md:col-span-2 rounded-md border p-3 space-y-2">
-              <p className="text-sm font-medium">حسابات Telegram التي فتحت البوت — اختر السائق لربط الحساب</p>
-              <div className="space-y-2">
-                {recentChats.map(chat => <div key={chat.chatId} className="grid gap-2 rounded border p-2 text-sm sm:grid-cols-[1fr_auto_auto] sm:items-center">
-                  <span>{chat.title}{chat.username ? ` (${chat.username})` : ""}<br /><span dir="ltr" className="text-xs text-muted-foreground">Chat ID: {chat.chatId}</span></span>
-                  <select
-                    className="h-9 rounded-md border bg-background px-2"
-                    defaultValue={chat.linkedDriverId ? String(chat.linkedDriverId) : ""}
-                    onChange={e => { if (e.target.value) void linkTelegramChat(chat.chatId, Number(e.target.value)); }}
-                  >
-                    <option value="">اختر السائق</option>
-                    {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name} — {driver.restaurantName}</option>)}
-                  </select>
-                  <span className={chat.linkedDriverId ? "text-emerald-600" : "text-amber-600"}>{chat.linkedDriverName ? chat.linkedDriverCount > 1 ? `مربوط بأكثر من سائق — الافتراضي: ${chat.linkedDriverName}` : `مربوط: ${chat.linkedDriverName}` : "غير مربوط"}</span>
-                </div>)}
-              </div>
-            </div>}
-            {telegramStatus && <p className="md:col-span-2 text-xs text-muted-foreground">
-              Telegram Bot: {telegramStatus.connected ? `متصل${telegramStatus.bot?.username ? ` (@${telegramStatus.bot.username})` : ""}` : `غير متصل${telegramStatus.error ? ` — ${telegramStatus.error}` : ""}`}
-            </p>}
           </form>
         </CardContent>
       </Card>
@@ -230,22 +155,15 @@ export default function AdminDrivers() {
           {loadingDrivers ? <p className="py-8 text-center text-muted-foreground">جاري التحميل...</p> : drivers.length === 0 ? <p className="py-8 text-center text-muted-foreground">لا يوجد سائقون</p> : (
             <Table>
               <TableHeader><TableRow>
-                 <TableHead>السائق</TableHead><TableHead>المطعم</TableHead><TableHead>الهاتف</TableHead><TableHead>WhatsApp</TableHead><TableHead>Telegram</TableHead><TableHead>النشاط</TableHead><TableHead>النتائج</TableHead><TableHead>إجراءات</TableHead>
+                 <TableHead>السائق</TableHead><TableHead>المطعم</TableHead><TableHead>الهاتف</TableHead><TableHead>WhatsApp</TableHead><TableHead>النشاط</TableHead><TableHead>النتائج</TableHead><TableHead>إجراءات</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {drivers.map(driver => {
-                  const link = driverLink(driver.id);
                   return <TableRow key={driver.id}>
                     <TableCell className="font-medium">{driver.name}</TableCell>
                     <TableCell>{driver.restaurantName}</TableCell>
                      <TableCell dir="ltr" className="text-right">{driver.phone}</TableCell>
                      <TableCell dir="ltr" className="text-right">{driver.whatsappNumber || "غير مسجل"}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <span className={driver.telegramChatId ? "text-emerald-600" : "text-muted-foreground"}>{driver.telegramChatId ? `متصل (${driver.telegramChatId})` : "غير مربوط"}</span>
-                        {link && <a className="block text-xs text-primary underline" href={link} target="_blank" rel="noreferrer">رابط الربط</a>}
-                      </div>
-                    </TableCell>
                     <TableCell><span className={driver.status === "ACTIVE" ? "text-emerald-600" : "text-red-600"}>{driver.status === "ACTIVE" ? "🟢 ACTIVE" : "🔴 INACTIVE"}</span></TableCell>
                     <TableCell className="whitespace-nowrap text-xs">
                       <span className="text-emerald-600">مقبول: {driver.acceptedCount}</span><br />
@@ -253,9 +171,9 @@ export default function AdminDrivers() {
                       <span className="text-amber-600">مهلة: {driver.timeoutCount}</span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                       <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, whatsappNumber: driver.whatsappNumber || "", address: driver.address || "", restaurantId: String(driver.restaurantId) }); }}>تعديل</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setEditingId(driver.id); setForm({ name: driver.name, phone: driver.phone, whatsappNumber: driver.whatsappNumber || "", restaurantId: String(driver.restaurantId) }); }}>تعديل</Button>
                       <Button size="sm" variant="outline" className="mr-1" onClick={() => void openHistory(driver)}>السجل</Button>
-                       <Button size="sm" className="mr-1" variant={driver.status === "ACTIVE" ? "secondary" : "default"} disabled={activityId === driver.id || (!driver.telegramChatId && !driver.whatsappNumber && driver.status === "INACTIVE")} onClick={() => void setActivity(driver, driver.status !== "ACTIVE")}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
+                        <Button size="sm" className="mr-1" variant={driver.status === "ACTIVE" ? "secondary" : "default"} disabled={activityId === driver.id || (!driver.whatsappNumber && driver.status === "INACTIVE")} onClick={() => void setActivity(driver, driver.status !== "ACTIVE")}>{activityId === driver.id ? "..." : driver.status === "ACTIVE" ? "إيقاف" : "تفعيل"}</Button>
                       <Button size="sm" variant="destructive" className="mr-1" disabled={remove.isPending} onClick={() => {
                         if (!confirm("حذف السائق نهائياً؟")) return;
                         remove.mutate({ id: driver.id }, {
