@@ -87,6 +87,260 @@ export const ChangeEmailResponse = zod.object({
 
 
 /**
+ * @summary Driver login by six-digit serial number
+ */
+export const driverLoginBodySerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const DriverLoginBody = zod.object({
+  "serialNumber": zod.string().regex(driverLoginBodySerialNumberRegExp)
+})
+
+export const driverLoginResponseDriverOneSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const DriverLoginResponse = zod.object({
+  "driver": zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(driverLoginResponseDriverOneSerialNumberRegExp),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "vehiclePlate": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
+  "totalDeliveries": zod.number(),
+  "createdAt": zod.coerce.date().optional()
+}).and(zod.object({
+  "restaurantName": zod.string(),
+  "restaurantLogoUrl": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary End the driver session
+ */
+export const DriverLogoutResponse = zod.unknown()
+
+
+/**
+ * @summary Get the authenticated driver profile
+ */
+export const getDriverMeResponseOneSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const GetDriverMeResponse = zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(getDriverMeResponseOneSerialNumberRegExp),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "whatsappNumber": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
+  "vehicleType": zod.string().nullish(),
+  "vehiclePlate": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "status": zod.enum(['ACTIVE', 'INACTIVE']),
+  "totalDeliveries": zod.number(),
+  "createdAt": zod.coerce.date().optional()
+}).and(zod.object({
+  "restaurantName": zod.string(),
+  "restaurantLogoUrl": zod.string().nullish()
+}))
+
+
+/**
+ * @summary List orders assigned to the authenticated driver
+ */
+export const ListDriverOrdersResponse = zod.object({
+  "data": zod.array(zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "restaurantName": zod.string().optional(),
+  "orderType": zod.enum(['DELIVERY', 'RESERVATION']),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "notes": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "mapsUrl": zod.string().nullish(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
+  "totalAmount": zod.number(),
+  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "driverId": zod.number().nullish(),
+  "driverName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "canRespond": zod.boolean()
+})))
+})
+
+
+/**
+ * @summary Get an assigned order
+ */
+export const GetDriverOrderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDriverOrderResponse = zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "restaurantName": zod.string().optional(),
+  "orderType": zod.enum(['DELIVERY', 'RESERVATION']),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "notes": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "mapsUrl": zod.string().nullish(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
+  "totalAmount": zod.number(),
+  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "driverId": zod.number().nullish(),
+  "driverName": zod.string().nullish(),
+  "driverPhone": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "subtotal": zod.number(),
+  "selectedAddons": zod.array(zod.object({
+  "addonId": zod.number(),
+  "addonName": zod.string(),
+  "price": zod.number()
+})).optional()
+})),
+  "statusHistory": zod.array(zod.object({
+  "status": zod.string(),
+  "changedAt": zod.coerce.date(),
+  "note": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Accept or reject an assigned order
+ */
+export const RespondToDriverOrderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespondToDriverOrderBody = zod.object({
+  "response": zod.enum(['ACCEPTED', 'REJECTED'])
+})
+
+export const RespondToDriverOrderResponse = zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "restaurantName": zod.string().optional(),
+  "orderType": zod.enum(['DELIVERY', 'RESERVATION']),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "notes": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "mapsUrl": zod.string().nullish(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
+  "totalAmount": zod.number(),
+  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "driverId": zod.number().nullish(),
+  "driverName": zod.string().nullish(),
+  "driverPhone": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "subtotal": zod.number(),
+  "selectedAddons": zod.array(zod.object({
+  "addonId": zod.number(),
+  "addonName": zod.string(),
+  "price": zod.number()
+})).optional()
+})),
+  "statusHistory": zod.array(zod.object({
+  "status": zod.string(),
+  "changedAt": zod.coerce.date(),
+  "note": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update the delivery status of an assigned order
+ */
+export const UpdateDriverOrderStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateDriverOrderStatusBody = zod.object({
+  "status": zod.enum(['OUT_FOR_DELIVERY', 'DELIVERED'])
+})
+
+export const UpdateDriverOrderStatusResponse = zod.object({
+  "id": zod.number(),
+  "restaurantId": zod.number(),
+  "restaurantName": zod.string().optional(),
+  "orderType": zod.enum(['DELIVERY', 'RESERVATION']),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "notes": zod.string().nullish(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "mapsUrl": zod.string().nullish(),
+  "subtotal": zod.number().optional(),
+  "deliveryFee": zod.number().optional(),
+  "totalAmount": zod.number(),
+  "status": zod.enum(['NEW', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']),
+  "driverId": zod.number().nullish(),
+  "driverName": zod.string().nullish(),
+  "driverPhone": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sizeId": zod.number().nullish(),
+  "sizeName": zod.string().nullish(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "subtotal": zod.number(),
+  "selectedAddons": zod.array(zod.object({
+  "addonId": zod.number(),
+  "addonName": zod.string(),
+  "price": zod.number()
+})).optional()
+})),
+  "statusHistory": zod.array(zod.object({
+  "status": zod.string(),
+  "changedAt": zod.coerce.date(),
+  "note": zod.string().nullish()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List all restaurants
  */
 export const listRestaurantsQueryPageDefault = 1;
@@ -823,13 +1077,19 @@ export const DeleteAddonResponse = zod.void()
 /**
  * @summary List all platform drivers with delivery outcome counters
  */
+export const listAllDriversResponseOneSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
 export const ListAllDriversResponseItem = zod.object({
   "id": zod.number(),
   "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(listAllDriversResponseOneSerialNumberRegExp),
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
   "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -852,13 +1112,19 @@ export const ListDriversParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const listDriversResponseSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
 export const ListDriversResponseItem = zod.object({
   "id": zod.number(),
   "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(listDriversResponseSerialNumberRegExp),
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
   "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -879,24 +1145,31 @@ export const CreateDriverParams = zod.object({
 
 
 
-
 export const CreateDriverBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string(),
-  "whatsappNumber": zod.string().min(1),
+  "whatsappNumber": zod.string().optional(),
   "address": zod.string().optional(),
+  "birthDate": zod.string().optional(),
+  "profileImageUrl": zod.string().optional(),
   "vehicleType": zod.string().optional(),
   "vehiclePlate": zod.string().optional(),
   "isActive": zod.boolean().optional()
 })
 
+export const createDriverResponseSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
 export const CreateDriverResponse = zod.object({
   "id": zod.number(),
   "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(createDriverResponseSerialNumberRegExp),
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
   "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -918,18 +1191,26 @@ export const UpdateDriverBody = zod.object({
   "phone": zod.string().optional(),
   "whatsappNumber": zod.string().nullish(),
   "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean().optional()
 })
 
+export const updateDriverResponseSerialNumberRegExp = new RegExp('^[0-9]{6}$');
+
+
 export const UpdateDriverResponse = zod.object({
   "id": zod.number(),
   "restaurantId": zod.number(),
+  "serialNumber": zod.string().regex(updateDriverResponseSerialNumberRegExp),
   "name": zod.string(),
   "phone": zod.string(),
   "whatsappNumber": zod.string().nullish(),
   "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "profileImageUrl": zod.string().nullish(),
   "vehicleType": zod.string().nullish(),
   "vehiclePlate": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -1170,100 +1451,6 @@ export const AssignDriverResponse = zod.object({
 })),
   "createdAt": zod.coerce.date()
 })
-
-
-/**
- * @summary Get WhatsApp delivery status for an order
- */
-export const GetOrderDeliveryStatusParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetOrderDeliveryStatusResponseItem = zod.object({
-  "id": zod.number(),
-  "orderId": zod.number(),
-  "driverId": zod.number(),
-  "channel": zod.enum(['WHATSAPP']),
-  "status": zod.enum(['SENT', 'FAILED']),
-  "errorMessage": zod.string().nullish(),
-  "sentAt": zod.coerce.date(),
-  "responseAt": zod.coerce.date().nullish()
-})
-export const GetOrderDeliveryStatusResponse = zod.array(GetOrderDeliveryStatusResponseItem)
-
-
-/**
- * @summary Get WP Sender configuration status without exposing secrets
- */
-export const GetWpSenderSessionConfigResponse = zod.object({
-  "apiKeyConfigured": zod.boolean().optional(),
-  "apiUrlConfigured": zod.boolean().optional(),
-  "apiUrl": zod.string().optional(),
-  "sessionId": zod.string().nullish()
-})
-
-
-/**
- * @summary List WP Sender WhatsApp sessions
- */
-export const ListWpSenderSessionsResponse = zod.unknown()
-
-
-/**
- * @summary Create a WP Sender WhatsApp session
- */
-export const CreateWpSenderSessionResponse = zod.void()
-
-
-/**
- * @summary Check WP Sender WhatsApp session status
- */
-export const GetWpSenderSessionStatusResponse = zod.unknown()
-
-
-/**
- * @summary Get WP Sender WhatsApp session details
- */
-export const GetWpSenderSessionDetailsResponse = zod.unknown()
-
-
-/**
- * @summary Reconnect a WP Sender WhatsApp session
- */
-export const ReconnectWpSenderSessionResponse = zod.unknown()
-
-
-/**
- * @summary Get the configured WP Sender session QR code
- */
-export const getWpSenderSessionQrQueryOutputDefault = `base64`;
-
-export const GetWpSenderSessionQrQueryParams = zod.object({
-  "output": zod.enum(['image', 'base64', 'raw']).default(getWpSenderSessionQrQueryOutputDefault)
-})
-
-export const GetWpSenderSessionQrResponse = zod.unknown()
-
-
-/**
- * @summary Request a WP Sender WhatsApp pairing code
- */
-export const RequestWpSenderPairingCodeBody = zod.object({
-  "phoneNumber": zod.string()
-})
-
-export const RequestWpSenderPairingCodeResponse = zod.unknown()
-
-
-/**
- * @summary Configure the WP Sender session webhook URL
- */
-export const SetWpSenderWebhookBody = zod.object({
-  "sessionId": zod.string(),
-  "webhookUrl": zod.string()
-})
-
-export const SetWpSenderWebhookResponse = zod.unknown()
 
 
 /**
@@ -1572,7 +1759,6 @@ export const getSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
 export const GetSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
-  "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
   "driverResponseTimeoutSeconds": zod.number().min(getSettingsResponseDriverResponseTimeoutSecondsMin).max(getSettingsResponseDriverResponseTimeoutSecondsMax).optional(),
@@ -1590,7 +1776,6 @@ export const updateSettingsBodyDriverResponseTimeoutSecondsMax = 86400;
 
 export const UpdateSettingsBody = zod.object({
   "platformName": zod.string().optional(),
-  "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
   "driverResponseTimeoutSeconds": zod.number().min(updateSettingsBodyDriverResponseTimeoutSecondsMin).max(updateSettingsBodyDriverResponseTimeoutSecondsMax).optional()
@@ -1604,7 +1789,6 @@ export const updateSettingsResponseDriverResponseTimeoutSecondsMax = 86400;
 export const UpdateSettingsResponse = zod.object({
   "id": zod.number(),
   "platformName": zod.string().optional(),
-  "whatsappEnabled": zod.boolean().optional(),
   "defaultCurrency": zod.string().optional(),
   "mapsApiKey": zod.string().nullish(),
   "driverResponseTimeoutSeconds": zod.number().min(updateSettingsResponseDriverResponseTimeoutSecondsMin).max(updateSettingsResponseDriverResponseTimeoutSecondsMax).optional(),

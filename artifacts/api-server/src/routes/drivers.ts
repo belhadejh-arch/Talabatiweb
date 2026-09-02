@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, pool, driversTable } from "@workspace/db";
+import { db, pool, driversTable, restaurantsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { randomInt } from "node:crypto";
 import {
   CreateDriverBody,
   UpdateDriverBody,
@@ -9,6 +10,19 @@ import { requireAuth } from "../middlewares/auth";
 import { dispatchPendingOrdersForRestaurant } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
+
+async function createUniqueSerialNumber(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const serialNumber = String(randomInt(100000, 1000000));
+    const [existing] = await db
+      .select({ id: driversTable.id })
+      .from(driversTable)
+      .where(eq(driversTable.serialNumber, serialNumber))
+      .limit(1);
+    if (!existing) return serialNumber;
+  }
+  throw new Error("Unable to generate a unique driver serial number");
+}
 
 // Platform-wide driver list with assignment outcome counters.
 router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
@@ -32,6 +46,9 @@ router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
     name: driver.name,
     phone: driver.phone,
     whatsappNumber: driver.whatsapp_number,
+     serialNumber: driver.serial_number,
+     birthDate: driver.birth_date,
+     profileImageUrl: driver.profile_image_url,
     address: driver.address,
     vehicleType: driver.vehicle_type,
     vehiclePlate: driver.vehicle_plate,
@@ -66,6 +83,11 @@ router.post("/restaurants/:id/drivers", requireAuth, async (req, res): Promise<v
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const restaurantId = parseInt(raw, 10);
   if (isNaN(restaurantId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [restaurant] = await db
+    .select({ id: restaurantsTable.id })
+    .from(restaurantsTable)
+    .where(eq(restaurantsTable.id, restaurantId));
+  if (!restaurant) { res.status(404).json({ error: "المطعم غير موجود" }); return; }
 
   const parsed = CreateDriverBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
@@ -74,6 +96,7 @@ router.post("/restaurants/:id/drivers", requireAuth, async (req, res): Promise<v
     .insert(driversTable)
     .values({
       ...parsed.data,
+      serialNumber: await createUniqueSerialNumber(),
       restaurantId,
       isActive: false,
       status: "INACTIVE",
@@ -93,14 +116,6 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const [existing] = await db.select().from(driversTable).where(eq(driversTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-   const hasWhatsApp = parsed.data.whatsappNumber !== undefined
-     ? Boolean(parsed.data.whatsappNumber?.trim())
-     : Boolean(existing.whatsappNumber?.trim());
-   if (parsed.data.isActive === true && !hasWhatsApp) {
-      res.status(400).json({ error: "يجب تسجيل رقم WhatsApp قبل تفعيل السائق" });
-    return;
-  }
-
   const updateValues = {
     ...parsed.data,
     ...(parsed.data.isActive !== undefined

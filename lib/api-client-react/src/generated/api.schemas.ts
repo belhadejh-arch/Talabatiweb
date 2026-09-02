@@ -368,12 +368,18 @@ export const DriverStatus = {
 export interface Driver {
   id: number;
   restaurantId: number;
+  /** @pattern ^[0-9]{6}$ */
+  serialNumber: string;
   name: string;
   phone: string;
   /** @nullable */
   whatsappNumber?: string | null;
   /** @nullable */
   address?: string | null;
+  /** @nullable */
+  birthDate?: string | null;
+  /** @nullable */
+  profileImageUrl?: string | null;
   /** @nullable */
   vehicleType?: string | null;
   /** @nullable */
@@ -388,9 +394,10 @@ export interface DriverInput {
   /** @minLength 1 */
   name: string;
   phone: string;
-  /** @minLength 1 */
-  whatsappNumber: string;
+  whatsappNumber?: string;
   address?: string;
+  birthDate?: string;
+  profileImageUrl?: string;
   vehicleType?: string;
   vehiclePlate?: string;
   isActive?: boolean;
@@ -403,6 +410,10 @@ export interface DriverPatch {
   whatsappNumber?: string | null;
   /** @nullable */
   address?: string | null;
+  /** @nullable */
+  birthDate?: string | null;
+  /** @nullable */
+  profileImageUrl?: string | null;
   /** @nullable */
   vehicleType?: string | null;
   /** @nullable */
@@ -447,32 +458,43 @@ export interface DriverAssignment {
   driverId: number;
 }
 
-export type DeliveryMessageLogChannel = typeof DeliveryMessageLogChannel[keyof typeof DeliveryMessageLogChannel];
+export interface DriverLoginInput {
+  /** @pattern ^[0-9]{6}$ */
+  serialNumber: string;
+}
+
+export type DriverSession = Driver & ({
+  restaurantName: string;
+  /** @nullable */
+  restaurantLogoUrl?: string | null;
+});
+
+export interface DriverAuthResponse {
+  driver: DriverSession;
+}
+
+export type DriverOrderResponseInputResponse = typeof DriverOrderResponseInputResponse[keyof typeof DriverOrderResponseInputResponse];
 
 
-export const DeliveryMessageLogChannel = {
-  WHATSAPP: 'WHATSAPP',
+export const DriverOrderResponseInputResponse = {
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
 } as const;
 
-export type DeliveryMessageLogStatus = typeof DeliveryMessageLogStatus[keyof typeof DeliveryMessageLogStatus];
+export interface DriverOrderResponseInput {
+  response: DriverOrderResponseInputResponse;
+}
+
+export type DriverOrderStatusInputStatus = typeof DriverOrderStatusInputStatus[keyof typeof DriverOrderStatusInputStatus];
 
 
-export const DeliveryMessageLogStatus = {
-  SENT: 'SENT',
-  FAILED: 'FAILED',
+export const DriverOrderStatusInputStatus = {
+  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
+  DELIVERED: 'DELIVERED',
 } as const;
 
-export interface DeliveryMessageLog {
-  id: number;
-  orderId: number;
-  driverId: number;
-  channel: DeliveryMessageLogChannel;
-  status: DeliveryMessageLogStatus;
-  /** @nullable */
-  errorMessage?: string | null;
-  sentAt: string;
-  /** @nullable */
-  responseAt?: string | null;
+export interface DriverOrderStatusInput {
+  status: DriverOrderStatusInputStatus;
 }
 
 export type OrderOrderType = typeof OrderOrderType[keyof typeof OrderOrderType];
@@ -520,6 +542,14 @@ export interface Order {
   /** @nullable */
   driverName?: string | null;
   createdAt: string;
+}
+
+export type DriverOrder = Order & {
+  canRespond: boolean;
+};
+
+export interface DriverOrderListResponse {
+  data: DriverOrder[];
 }
 
 export type OrderDetailOrderType = typeof OrderDetailOrderType[keyof typeof OrderDetailOrderType];
@@ -762,7 +792,6 @@ export interface NotificationListResponse {
 export interface Settings {
   id: number;
   platformName?: string;
-  whatsappEnabled?: boolean;
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
@@ -776,7 +805,6 @@ export interface Settings {
 
 export interface SettingsPatch {
   platformName?: string;
-  whatsappEnabled?: boolean;
   defaultCurrency?: string;
   /** @nullable */
   mapsApiKey?: string | null;
@@ -813,36 +841,6 @@ dateTo?: string;
 search?: string;
 page?: number;
 limit?: number;
-};
-
-export type GetWpSenderSessionConfig200 = {
-  apiKeyConfigured?: boolean;
-  apiUrlConfigured?: boolean;
-  apiUrl?: string;
-  /** @nullable */
-  sessionId?: string | null;
-};
-
-export type GetWpSenderSessionQrParams = {
-output?: GetWpSenderSessionQrOutput;
-};
-
-export type GetWpSenderSessionQrOutput = typeof GetWpSenderSessionQrOutput[keyof typeof GetWpSenderSessionQrOutput];
-
-
-export const GetWpSenderSessionQrOutput = {
-  image: 'image',
-  base64: 'base64',
-  raw: 'raw',
-} as const;
-
-export type RequestWpSenderPairingCodeBody = {
-  phoneNumber: string;
-};
-
-export type SetWpSenderWebhookBody = {
-  sessionId: string;
-  webhookUrl: string;
 };
 
 export type GetAnalyticsSummaryParams = {

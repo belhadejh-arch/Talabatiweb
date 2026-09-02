@@ -10,7 +10,7 @@ const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
-  folder?: "products" | "categories" | "restaurants";
+  folder?: "products" | "categories" | "restaurants" | "drivers";
   label?: string;
   className?: string;
 }

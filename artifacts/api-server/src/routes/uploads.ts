@@ -23,7 +23,7 @@ const upload = multer({
   },
 });
 
-const ALLOWED_FOLDERS = new Set<string>(["products", "categories", "restaurants"]);
+const ALLOWED_FOLDERS = new Set<string>(["products", "categories", "restaurants", "drivers"]);
 
 /**
  * POST /uploads/image

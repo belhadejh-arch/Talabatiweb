@@ -117,6 +117,129 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminUser"
 
+  /driver-auth/login:
+    post:
+      operationId: driverLogin
+      tags: [drivers]
+      summary: Driver login by six-digit serial number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverLoginInput"
+      responses:
+        "200":
+          description: Driver session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverAuthResponse"
+        "401":
+          description: Invalid or inactive driver account
+
+  /driver-auth/logout:
+    post:
+      operationId: driverLogout
+      tags: [drivers]
+      summary: End the driver session
+      responses:
+        "200": { description: Logged out }
+
+  /driver-auth/me:
+    get:
+      operationId: getDriverMe
+      tags: [drivers]
+      summary: Get the authenticated driver profile
+      responses:
+        "200":
+          description: Current driver
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverSession"
+        "401": { description: Driver session required }
+
+  /driver/orders:
+    get:
+      operationId: listDriverOrders
+      tags: [drivers]
+      summary: List orders assigned to the authenticated driver
+      responses:
+        "200":
+          description: Driver orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverOrderListResponse"
+
+  /driver/orders/{id}:
+    get:
+      operationId: getDriverOrder
+      tags: [drivers]
+      summary: Get an assigned order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Assigned order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "404": { description: Order not assigned to this driver }
+
+  /driver/orders/{id}/respond:
+    post:
+      operationId: respondToDriverOrder
+      tags: [drivers]
+      summary: Accept or reject an assigned order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverOrderResponseInput"
+      responses:
+        "200":
+          description: Order response saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+
+  /driver/orders/{id}/status:
+    patch:
+      operationId: updateDriverOrderStatus
+      tags: [drivers]
+      summary: Update the delivery status of an assigned order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: number }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DriverOrderStatusInput"
+      responses:
+        "200":
+          description: Delivery status saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+
   # ── Restaurants ──────────────────────────────────────────────────────────────
   /restaurants:
     get:
@@ -880,131 +1003,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/OrderDetail"
 
-  /orders/{id}/delivery-status:
-    get:
-      operationId: getOrderDeliveryStatus
-      tags: [orders]
-      summary: Get WhatsApp delivery status for an order
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: number }
-      responses:
-        "200":
-          description: Delivery channel attempts
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DeliveryMessageLog"
-
-  /wp-sender/session:
-    get:
-      operationId: getWpSenderSessionConfig
-      tags: [settings]
-      summary: Get WP Sender configuration status without exposing secrets
-      responses:
-        "200":
-          description: Configuration status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  apiKeyConfigured: { type: boolean }
-                  apiUrlConfigured: { type: boolean }
-                  apiUrl: { type: string }
-                  sessionId: { type: ["string", "null"] }
-
-  /wp-sender/sessions:
-    get:
-      operationId: listWpSenderSessions
-      tags: [settings]
-      summary: List WP Sender WhatsApp sessions
-      responses:
-        "200": { description: Sessions returned }
-
-  /wp-sender/session/create:
-    post:
-      operationId: createWpSenderSession
-      tags: [settings]
-      summary: Create a WP Sender WhatsApp session
-      responses:
-        "201": { description: Session creation initiated }
-
-  /wp-sender/session/status:
-    get:
-      operationId: getWpSenderSessionStatus
-      tags: [settings]
-      summary: Check WP Sender WhatsApp session status
-      responses:
-        "200": { description: Session status returned }
-
-  /wp-sender/session/details:
-    get:
-      operationId: getWpSenderSessionDetails
-      tags: [settings]
-      summary: Get WP Sender WhatsApp session details
-      responses:
-        "200": { description: Session details returned }
-
-  /wp-sender/session/reconnect:
-    post:
-      operationId: reconnectWpSenderSession
-      tags: [settings]
-      summary: Reconnect a WP Sender WhatsApp session
-      responses:
-        "200": { description: Reconnection requested }
-
-  /wp-sender/session/qr:
-    get:
-      operationId: getWpSenderSessionQr
-      tags: [settings]
-      summary: Get the configured WP Sender session QR code
-      parameters:
-        - name: output
-          in: query
-          schema: { type: string, enum: [image, base64, raw], default: base64 }
-      responses:
-        "200": { description: QR code returned }
-
-  /wp-sender/session/pairing-code:
-    post:
-      operationId: requestWpSenderPairingCode
-      tags: [settings]
-      summary: Request a WP Sender WhatsApp pairing code
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [phoneNumber]
-              properties:
-                phoneNumber: { type: string }
-      responses:
-        "200": { description: Pairing code returned }
-
-  /wp-sender/session/webhook:
-    post:
-      operationId: setWpSenderWebhook
-      tags: [settings]
-      summary: Configure the WP Sender session webhook URL
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [sessionId, webhookUrl]
-              properties:
-                sessionId: { type: string }
-                webhookUrl: { type: string }
-      responses:
-        "200": { description: Webhook configured }
-
   # ── Public storefront ────────────────────────────────────────────────────────
   /public/restaurants/{slug}:
     get:
@@ -1658,14 +1656,17 @@ components:
     # ── Driver ──────────────────────────────────────────────────────────────────
     Driver:
       type: object
-      required: [id, restaurantId, name, phone, isActive, status, totalDeliveries]
+      required: [id, restaurantId, serialNumber, name, phone, isActive, status, totalDeliveries]
       properties:
         id: { type: number }
         restaurantId: { type: number }
+        serialNumber: { type: string, pattern: "^[0-9]{6}$" }
         name: { type: string }
         phone: { type: string }
         whatsappNumber: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
+        birthDate: { type: ["string", "null"] }
+        profileImageUrl: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
         isActive: { type: boolean }
@@ -1675,12 +1676,14 @@ components:
 
     DriverInput:
       type: object
-      required: [name, phone, whatsappNumber]
+      required: [name, phone]
       properties:
         name: { type: string, minLength: 1 }
         phone: { type: string }
-        whatsappNumber: { type: string, minLength: 1 }
+        whatsappNumber: { type: string }
         address: { type: string }
+        birthDate: { type: string }
+        profileImageUrl: { type: string }
         vehicleType: { type: string }
         vehiclePlate: { type: string }
         isActive: { type: boolean }
@@ -1692,6 +1695,8 @@ components:
         phone: { type: string }
         whatsappNumber: { type: ["string", "null"] }
         address: { type: ["string", "null"] }
+        birthDate: { type: ["string", "null"] }
+        profileImageUrl: { type: ["string", "null"] }
         vehicleType: { type: ["string", "null"] }
         vehiclePlate: { type: ["string", "null"] }
         isActive: { type: boolean }
@@ -1730,18 +1735,56 @@ components:
       properties:
         driverId: { type: number }
 
-    DeliveryMessageLog:
+    DriverLoginInput:
       type: object
-      required: [id, orderId, driverId, channel, status, sentAt]
+      required: [serialNumber]
       properties:
-        id: { type: number }
-        orderId: { type: number }
-        driverId: { type: number }
-        channel: { type: string, enum: [WHATSAPP] }
-        status: { type: string, enum: [SENT, FAILED] }
-        errorMessage: { type: ["string", "null"] }
-        sentAt: { type: string, format: date-time }
-        responseAt: { type: ["string", "null"], format: date-time }
+        serialNumber: { type: string, pattern: "^[0-9]{6}$" }
+
+    DriverSession:
+      allOf:
+        - $ref: "#/components/schemas/Driver"
+        - type: object
+          required: [restaurantName]
+          properties:
+            restaurantName: { type: string }
+            restaurantLogoUrl: { type: ["string", "null"] }
+
+    DriverAuthResponse:
+      type: object
+      required: [driver]
+      properties:
+        driver:
+          $ref: "#/components/schemas/DriverSession"
+
+    DriverOrderResponseInput:
+      type: object
+      required: [response]
+      properties:
+        response: { type: string, enum: [ACCEPTED, REJECTED] }
+
+    DriverOrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [OUT_FOR_DELIVERY, DELIVERED] }
+
+    DriverOrder:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          required: [canRespond]
+          properties:
+            canRespond: { type: boolean }
+
+    DriverOrderListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DriverOrder"
 
     # ── Order ───────────────────────────────────────────────────────────────────
     Order:
@@ -2022,7 +2065,6 @@ components:
       properties:
         id: { type: number }
         platformName: { type: string }
-        whatsappEnabled: { type: boolean }
         defaultCurrency: { type: string }
         mapsApiKey: { type: ["string", "null"] }
         driverResponseTimeoutSeconds: { type: number, minimum: 30, maximum: 86400 }
@@ -2032,7 +2074,6 @@ components:
       type: object
       properties:
         platformName: { type: string }
-        whatsappEnabled: { type: boolean }
         defaultCurrency: { type: string }
         mapsApiKey: { type: ["string", "null"] }
         driverResponseTimeoutSeconds: { type: number, minimum: 30, maximum: 86400 }

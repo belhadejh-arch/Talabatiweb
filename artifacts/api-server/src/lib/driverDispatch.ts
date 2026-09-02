@@ -3,78 +3,32 @@ import {
   pool,
   driversTable,
   ordersTable,
-  orderItemsTable,
-  restaurantsTable,
   settingsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-import { ensureDeliverySchema, safeNotifyDriver, type DriverDeliveryPayload } from "./delivery";
-import type { WhatsAppSendResult } from "./wpSender";
 
 const DEFAULT_TIMEOUT_SECONDS = 180;
 const DISPATCH_INTERVAL_MS = 10_000;
 
 type DispatchResult =
-  | { assigned: true; orderId: number; driverId: number; notification: WhatsAppSendResult | null }
+  | { assigned: true; orderId: number; driverId: number }
   | { assigned: false; reason: "not_pending" | "no_driver" };
 
 async function getTimeoutSeconds(): Promise<number> {
-  const [settings] = await db.select({ timeout: settingsTable.driverResponseTimeoutSeconds }).from(settingsTable).limit(1);
-  const value = settings?.timeout ?? DEFAULT_TIMEOUT_SECONDS;
-  return Math.max(30, Math.min(86_400, Number(value) || DEFAULT_TIMEOUT_SECONDS));
-}
-
-async function isWhatsAppDispatchEnabled(): Promise<boolean> {
   const [settings] = await db
-    .select({
-      whatsappEnabled: settingsTable.whatsappEnabled,
-    })
+    .select({ timeout: settingsTable.driverResponseTimeoutSeconds })
     .from(settingsTable)
     .limit(1);
-
-  return settings?.whatsappEnabled ?? false;
-}
-
-async function notifyAssignedDriver(orderId: number, driverId: number): Promise<WhatsAppSendResult | null> {
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
-  if (!order) return null;
-
-  const [restaurant] = await db
-    .select({ id: restaurantsTable.id, name: restaurantsTable.name })
-    .from(restaurantsTable)
-    .where(eq(restaurantsTable.id, order.restaurantId))
-    .limit(1);
-  if (!restaurant) return null;
-
-  const items = await db
-    .select({ name: orderItemsTable.productName, quantity: orderItemsTable.quantity, sizeName: orderItemsTable.sizeName })
-    .from(orderItemsTable)
-    .where(eq(orderItemsTable.orderId, orderId));
-
-  const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, driverId)).limit(1);
-  if (!driver) return null;
-
-  return safeNotifyDriver(driver, {
-    restaurantName: restaurant.name,
-    restaurantId: restaurant.id,
-    orderId: order.id,
-    orderType: order.orderType,
-    customerName: order.customerName,
-    customerPhone: order.customerPhone,
-    items: items.map((item) => `${item.name}${item.sizeName ? ` (${item.sizeName})` : ""} x${item.quantity}`).join(", ") || "—",
-    total: `${Number(order.totalAmount).toFixed(2)} د.ل`,
-    mapsUrl: order.mapsUrl,
-  });
+  return settings?.timeout ?? DEFAULT_TIMEOUT_SECONDS;
 }
 
 /**
  * Atomically selects the next eligible driver and creates one PENDING
- * attempt. The notification is sent only after the transaction commits.
+ * attempt. The driver sees the assignment in the internal dashboard.
  */
 export async function dispatchNextDriverForOrder(orderId: number): Promise<DispatchResult> {
   const timeoutSeconds = await getTimeoutSeconds();
-  if (!(await isWhatsAppDispatchEnabled())) return { assigned: false, reason: "no_driver" };
   const client = await pool.connect();
 
   try {
@@ -100,8 +54,6 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
        WHERE d.restaurant_id = $1
          AND d.is_active = true
            AND d.status = 'ACTIVE'
-           AND d.whatsapp_number IS NOT NULL
-           AND TRIM(d.whatsapp_number) <> ''
          AND NOT EXISTS (
            SELECT 1 FROM order_driver_attempts a
            WHERE a.order_id = $2 AND a.driver_id = d.id
@@ -134,8 +86,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     await client.query("COMMIT");
 
-    const notification = await notifyAssignedDriver(order.id, driver.id);
-    return { assigned: true, orderId: order.id, driverId: driver.id, notification };
+    return { assigned: true, orderId: order.id, driverId: driver.id };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -289,8 +240,6 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       `SELECT id FROM drivers
        WHERE id = $1 AND restaurant_id = $2
           AND is_active = true AND status = 'ACTIVE'
-          AND whatsapp_number IS NOT NULL
-          AND TRIM(whatsapp_number) <> ''
        FOR UPDATE`,
       [driverId, order.restaurant_id],
     );
@@ -328,7 +277,6 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     await client.query("COMMIT");
 
-    await notifyAssignedDriver(orderId, driverId);
     return true;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -399,7 +347,6 @@ export function startDriverDispatchWorker(): void {
 
   const run = async () => {
     try {
-       await ensureDeliverySchema();
       await expireTimedOutAttempts();
       await dispatchPendingOrders();
     } catch (error) {

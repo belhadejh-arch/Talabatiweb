@@ -13,7 +13,8 @@ import notificationsRouter from "./notifications";
 import settingsRouter from "./settings";
 import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
-import wpSenderRouter from "./wpSender";
+import driverAuthRouter from "./driverAuth";
+import driverPortalRouter from "./driverPortal";
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.use(notificationsRouter);
 router.use(settingsRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
- router.use(wpSenderRouter);
+router.use(driverAuthRouter);
+router.use(driverPortalRouter);
 
 export default router;

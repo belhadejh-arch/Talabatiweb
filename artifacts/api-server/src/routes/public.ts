@@ -355,29 +355,24 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     relatedType: "order",
   });
 
-  // The order is durable before dispatch starts. Wait for the assignment and
-  // channel send attempt so the confirmation means the driver was notified
-  // (or the response clearly explains that no eligible driver was available).
+  // The order is durable before internal dashboard assignment starts.
   let dispatchMessage = "تم إنشاء الطلب بنجاح";
   try {
     const assignment = await dispatchNextDriverForOrder(order.id);
     if (assignment.assigned) {
-       const channelSent = assignment.notification?.success ?? false;
-      dispatchMessage = channelSent
-        ? "تم إنشاء الطلب وإرساله إلى السائق بنجاح"
-         : "تم إنشاء الطلب، لكن تعذر إرسال الإشعار للسائق. راجع إعدادات WP Sender.";
+       dispatchMessage = "تم إنشاء الطلب وتعيينه للسائق داخل المنصة";
     } else {
-      dispatchMessage = "تم إنشاء الطلب، وسيتم إرساله للسائق عند توفر سائق نشط ومهيأ.";
+       dispatchMessage = "تم إنشاء الطلب، وسيظهر للسائق عند توفر سائق نشط.";
       await db.insert(notificationsTable).values({
         type: "NO_DRIVER",
-         message: `لا يوجد سائق ACTIVE برقم WhatsApp صالح لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
+          message: `لا يوجد سائق ACTIVE لمطعم "${restaurant.name}" للطلب #${order.id} — سيبقى الطلب محفوظًا حتى يتوفر سائق.`,
         relatedId: order.id,
         relatedType: "order",
       });
     }
   } catch (error) {
     logger.error({ err: error, orderId: order.id }, "Failed to dispatch newly-created order");
-    dispatchMessage = "تم إنشاء الطلب، وسيُعاد إرسال الإشعار للسائق تلقائيًا.";
+    dispatchMessage = "تم إنشاء الطلب، وسيُعاد تعيينه داخل المنصة تلقائيًا.";
   }
 
   res.status(201).json({

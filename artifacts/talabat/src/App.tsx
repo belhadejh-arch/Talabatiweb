@@ -24,6 +24,8 @@ import AdminSubscriptions from '@/pages/admin/subscriptions';
 import AdminAnalytics from '@/pages/admin/analytics';
 import AdminNotifications from '@/pages/admin/notifications';
 import AdminSettings from '@/pages/admin/settings';
+import DriverLogin from '@/pages/driver/login';
+import DriverDashboard from '@/pages/driver/dashboard';
 
 // Import public pages
 import PublicRestaurant from '@/pages/public/restaurant';
@@ -43,10 +45,17 @@ function Redirect({ to }: { to: string }) {
 function Router() {
   const [location] = useLocation();
   const isAdmin = location.startsWith('/admin');
+  const isDriver = location.startsWith('/driver');
 
   return (
     <RoutedErrorBoundary>
-      {isAdmin ? (
+      {isDriver ? (
+        <Switch>
+          <Route path="/driver/login" component={DriverLogin} />
+          <Route path="/driver/dashboard" component={DriverDashboard} />
+          <Route component={() => <Redirect to="/driver/login" />} />
+        </Switch>
+      ) : isAdmin ? (
         <Switch>
           <Route path="/admin/login" component={AdminLogin} />
 

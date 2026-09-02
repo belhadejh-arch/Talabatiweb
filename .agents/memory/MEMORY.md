@@ -5,7 +5,6 @@
 - [shadcn FormLabel requires FormField context](shadcn-formlabel-context.md) — using FormLabel outside a FormField/FormItem crashes the page; use plain Label for non-field labels
 - [Replit connectors-sdk / Object Storage runtime constraint](replit-connectors-runtime.md) — both only work inside a Replit runtime; external deploys (Render/Vercel) need a raw API-key fallback or to keep that piece on Replit
 - [Portable image storage](portable-image-storage.md) — external API hosts need a persistent PostgreSQL fallback when Replit Object Storage sidecar auth is unavailable
-- [TALABAT WP Sender integration](talabat-wp-sender.md) — derive production URL from the provider OpenAPI, keep the API key backend-only, and persist the session ID in PostgreSQL
 - [TALABAT product sizes vs addons](talabat-product-sizes.md) — sizes are exclusive/replace base price, addons are additive; cart id must encode both or combos collide
 - [pnpm workspace lib typecheck](pnpm-workspace-lib-typecheck.md) — editing lib/* package source needs a `tsc -p lib/<pkg>/tsconfig.json` rebuild or consumers typecheck against stale dist/*.d.ts
 - [Drizzle schema drift](drizzle-schema-drift.md) — when push requires an interactive conflict choice, use targeted reviewed DDL for additive runtime tables/columns instead of force-pushing the whole schema

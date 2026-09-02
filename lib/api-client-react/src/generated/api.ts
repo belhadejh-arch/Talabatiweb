@@ -29,13 +29,18 @@ import type {
   Category,
   CategoryInput,
   CategoryPatch,
-  DeliveryMessageLog,
   Driver,
   DriverAssignment,
+  DriverAuthResponse,
   DriverInput,
+  DriverLoginInput,
   DriverOrderAttempt,
+  DriverOrderListResponse,
+  DriverOrderResponseInput,
+  DriverOrderStatusInput,
   DriverPatch,
   DriverPlatform,
+  DriverSession,
   DriverStat,
   EmailChangeInput,
   GetAnalyticsSummaryParams,
@@ -45,8 +50,6 @@ import type {
   GetRevenueOverTimeParams,
   GetTopProductsParams,
   GetTopRestaurantsParams,
-  GetWpSenderSessionConfig200,
-  GetWpSenderSessionQrParams,
   HealthStatus,
   HourStat,
   ListNotificationsParams,
@@ -71,13 +74,11 @@ import type {
   ProductStat,
   PublicMenu,
   PublicRestaurant,
-  RequestWpSenderPairingCodeBody,
   Restaurant,
   RestaurantInput,
   RestaurantListResponse,
   RestaurantPatch,
   RestaurantStat,
-  SetWpSenderWebhookBody,
   Settings,
   SettingsPatch,
   StatusUpdate,
@@ -551,6 +552,523 @@ export const useChangeEmail = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getChangeEmailMutationOptions(options));
+    }
+
+export const getDriverLoginUrl = () => {
+
+
+
+
+  return `/api/driver-auth/login`
+}
+
+/**
+ * @summary Driver login by six-digit serial number
+ */
+export const driverLogin = async (driverLoginInput: DriverLoginInput, options?: Parameters<typeof customFetch>[1]): Promise<DriverAuthResponse> => {
+
+  return customFetch<DriverAuthResponse>(getDriverLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(driverLoginInput)
+  }
+);}
+
+
+
+
+
+export const getDriverLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof driverLogin>>, TError,{data: BodyType<DriverLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof driverLogin>>, TError,{data: BodyType<DriverLoginInput>}, TContext> => {
+
+const mutationKey = ['driverLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof driverLogin>>, {data: BodyType<DriverLoginInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  driverLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DriverLoginMutationResult = NonNullable<Awaited<ReturnType<typeof driverLogin>>>
+    export type DriverLoginMutationBody = BodyType<DriverLoginInput>
+    export type DriverLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Driver login by six-digit serial number
+ */
+export const useDriverLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof driverLogin>>, TError,{data: BodyType<DriverLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof driverLogin>>,
+        TError,
+        {data: BodyType<DriverLoginInput>},
+        TContext
+      > => {
+      return useMutation(getDriverLoginMutationOptions(options));
+    }
+
+export const getDriverLogoutUrl = () => {
+
+
+
+
+  return `/api/driver-auth/logout`
+}
+
+/**
+ * @summary End the driver session
+ */
+export const driverLogout = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDriverLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDriverLogoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof driverLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof driverLogout>>, TError,void, TContext> => {
+
+const mutationKey = ['driverLogout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof driverLogout>>, void> = () => {
+
+
+          return  driverLogout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DriverLogoutMutationResult = NonNullable<Awaited<ReturnType<typeof driverLogout>>>
+
+    export type DriverLogoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary End the driver session
+ */
+export const useDriverLogout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof driverLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof driverLogout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDriverLogoutMutationOptions(options));
+    }
+
+export const getGetDriverMeUrl = () => {
+
+
+
+
+  return `/api/driver-auth/me`
+}
+
+/**
+ * @summary Get the authenticated driver profile
+ */
+export const getDriverMe = async ( options?: Parameters<typeof customFetch>[1]): Promise<DriverSession> => {
+
+  return customFetch<DriverSession>(getGetDriverMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDriverMeQueryKey = () => {
+    return [
+    `/api/driver-auth/me`
+    ] as const;
+    }
+
+
+export const getGetDriverMeQueryOptions = <TData = Awaited<ReturnType<typeof getDriverMe>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDriverMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDriverMe>>> = ({ signal }) => getDriverMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDriverMe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDriverMeQueryResult = NonNullable<Awaited<ReturnType<typeof getDriverMe>>>
+export type GetDriverMeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the authenticated driver profile
+ */
+
+export function useGetDriverMe<TData = Awaited<ReturnType<typeof getDriverMe>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDriverMeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListDriverOrdersUrl = () => {
+
+
+
+
+  return `/api/driver/orders`
+}
+
+/**
+ * @summary List orders assigned to the authenticated driver
+ */
+export const listDriverOrders = async ( options?: Parameters<typeof customFetch>[1]): Promise<DriverOrderListResponse> => {
+
+  return customFetch<DriverOrderListResponse>(getListDriverOrdersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDriverOrdersQueryKey = () => {
+    return [
+    `/api/driver/orders`
+    ] as const;
+    }
+
+
+export const getListDriverOrdersQueryOptions = <TData = Awaited<ReturnType<typeof listDriverOrders>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDriverOrdersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDriverOrders>>> = ({ signal }) => listDriverOrders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDriverOrders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDriverOrdersQueryResult = NonNullable<Awaited<ReturnType<typeof listDriverOrders>>>
+export type ListDriverOrdersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List orders assigned to the authenticated driver
+ */
+
+export function useListDriverOrders<TData = Awaited<ReturnType<typeof listDriverOrders>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDriverOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDriverOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDriverOrderUrl = (id: number,) => {
+
+
+
+
+  return `/api/driver/orders/${id}`
+}
+
+/**
+ * @summary Get an assigned order
+ */
+export const getDriverOrder = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<OrderDetail> => {
+
+  return customFetch<OrderDetail>(getGetDriverOrderUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDriverOrderQueryKey = (id: number,) => {
+    return [
+    `/api/driver/orders/${id}`
+    ] as const;
+    }
+
+
+export const getGetDriverOrderQueryOptions = <TData = Awaited<ReturnType<typeof getDriverOrder>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverOrder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDriverOrderQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDriverOrder>>> = ({ signal }) => getDriverOrder(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDriverOrder>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDriverOrderQueryResult = NonNullable<Awaited<ReturnType<typeof getDriverOrder>>>
+export type GetDriverOrderQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an assigned order
+ */
+
+export function useGetDriverOrder<TData = Awaited<ReturnType<typeof getDriverOrder>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDriverOrder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDriverOrderQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRespondToDriverOrderUrl = (id: number,) => {
+
+
+
+
+  return `/api/driver/orders/${id}/respond`
+}
+
+/**
+ * @summary Accept or reject an assigned order
+ */
+export const respondToDriverOrder = async (id: number,
+    driverOrderResponseInput: DriverOrderResponseInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderDetail> => {
+
+  return customFetch<OrderDetail>(getRespondToDriverOrderUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(driverOrderResponseInput)
+  }
+);}
+
+
+
+
+
+export const getRespondToDriverOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToDriverOrder>>, TError,{id: number;data: BodyType<DriverOrderResponseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respondToDriverOrder>>, TError,{id: number;data: BodyType<DriverOrderResponseInput>}, TContext> => {
+
+const mutationKey = ['respondToDriverOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respondToDriverOrder>>, {id: number;data: BodyType<DriverOrderResponseInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  respondToDriverOrder(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RespondToDriverOrderMutationResult = NonNullable<Awaited<ReturnType<typeof respondToDriverOrder>>>
+    export type RespondToDriverOrderMutationBody = BodyType<DriverOrderResponseInput>
+    export type RespondToDriverOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Accept or reject an assigned order
+ */
+export const useRespondToDriverOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToDriverOrder>>, TError,{id: number;data: BodyType<DriverOrderResponseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof respondToDriverOrder>>,
+        TError,
+        {id: number;data: BodyType<DriverOrderResponseInput>},
+        TContext
+      > => {
+      return useMutation(getRespondToDriverOrderMutationOptions(options));
+    }
+
+export const getUpdateDriverOrderStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/driver/orders/${id}/status`
+}
+
+/**
+ * @summary Update the delivery status of an assigned order
+ */
+export const updateDriverOrderStatus = async (id: number,
+    driverOrderStatusInput: DriverOrderStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<OrderDetail> => {
+
+  return customFetch<OrderDetail>(getUpdateDriverOrderStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(driverOrderStatusInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateDriverOrderStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDriverOrderStatus>>, TError,{id: number;data: BodyType<DriverOrderStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDriverOrderStatus>>, TError,{id: number;data: BodyType<DriverOrderStatusInput>}, TContext> => {
+
+const mutationKey = ['updateDriverOrderStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDriverOrderStatus>>, {id: number;data: BodyType<DriverOrderStatusInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDriverOrderStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDriverOrderStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateDriverOrderStatus>>>
+    export type UpdateDriverOrderStatusMutationBody = BodyType<DriverOrderStatusInput>
+    export type UpdateDriverOrderStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update the delivery status of an assigned order
+ */
+export const useUpdateDriverOrderStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDriverOrderStatus>>, TError,{id: number;data: BodyType<DriverOrderStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDriverOrderStatus>>,
+        TError,
+        {id: number;data: BodyType<DriverOrderStatusInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDriverOrderStatusMutationOptions(options));
     }
 
 export const getListRestaurantsUrl = (params?: ListRestaurantsParams,) => {
@@ -3234,759 +3752,6 @@ export const useAssignDriver = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAssignDriverMutationOptions(options));
-    }
-
-export const getGetOrderDeliveryStatusUrl = (id: number,) => {
-
-
-
-
-  return `/api/orders/${id}/delivery-status`
-}
-
-/**
- * @summary Get WhatsApp delivery status for an order
- */
-export const getOrderDeliveryStatus = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<DeliveryMessageLog[]> => {
-
-  return customFetch<DeliveryMessageLog[]>(getGetOrderDeliveryStatusUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetOrderDeliveryStatusQueryKey = (id: number,) => {
-    return [
-    `/api/orders/${id}/delivery-status`
-    ] as const;
-    }
-
-
-export const getGetOrderDeliveryStatusQueryOptions = <TData = Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetOrderDeliveryStatusQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderDeliveryStatus>>> = ({ signal }) => getOrderDeliveryStatus(id, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetOrderDeliveryStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderDeliveryStatus>>>
-export type GetOrderDeliveryStatusQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get WhatsApp delivery status for an order
- */
-
-export function useGetOrderDeliveryStatus<TData = Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderDeliveryStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetOrderDeliveryStatusQueryOptions(id,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetWpSenderSessionConfigUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session`
-}
-
-/**
- * @summary Get WP Sender configuration status without exposing secrets
- */
-export const getWpSenderSessionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetWpSenderSessionConfig200> => {
-
-  return customFetch<GetWpSenderSessionConfig200>(getGetWpSenderSessionConfigUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetWpSenderSessionConfigQueryKey = () => {
-    return [
-    `/api/wp-sender/session`
-    ] as const;
-    }
-
-
-export const getGetWpSenderSessionConfigQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionConfigQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionConfig>>> = ({ signal }) => getWpSenderSessionConfig({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetWpSenderSessionConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionConfig>>>
-export type GetWpSenderSessionConfigQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get WP Sender configuration status without exposing secrets
- */
-
-export function useGetWpSenderSessionConfig<TData = Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetWpSenderSessionConfigQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getListWpSenderSessionsUrl = () => {
-
-
-
-
-  return `/api/wp-sender/sessions`
-}
-
-/**
- * @summary List WP Sender WhatsApp sessions
- */
-export const listWpSenderSessions = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getListWpSenderSessionsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListWpSenderSessionsQueryKey = () => {
-    return [
-    `/api/wp-sender/sessions`
-    ] as const;
-    }
-
-
-export const getListWpSenderSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listWpSenderSessions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListWpSenderSessionsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWpSenderSessions>>> = ({ signal }) => listWpSenderSessions({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListWpSenderSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listWpSenderSessions>>>
-export type ListWpSenderSessionsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List WP Sender WhatsApp sessions
- */
-
-export function useListWpSenderSessions<TData = Awaited<ReturnType<typeof listWpSenderSessions>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWpSenderSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListWpSenderSessionsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getCreateWpSenderSessionUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/create`
-}
-
-/**
- * @summary Create a WP Sender WhatsApp session
- */
-export const createWpSenderSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getCreateWpSenderSessionUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getCreateWpSenderSessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext> => {
-
-const mutationKey = ['createWpSenderSession'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWpSenderSession>>, void> = () => {
-
-
-          return  createWpSenderSession(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateWpSenderSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createWpSenderSession>>>
-
-    export type CreateWpSenderSessionMutationError = ErrorType<unknown>
-
-    /**
- * @summary Create a WP Sender WhatsApp session
- */
-export const useCreateWpSenderSession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createWpSenderSession>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getCreateWpSenderSessionMutationOptions(options));
-    }
-
-export const getGetWpSenderSessionStatusUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/status`
-}
-
-/**
- * @summary Check WP Sender WhatsApp session status
- */
-export const getWpSenderSessionStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getGetWpSenderSessionStatusUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetWpSenderSessionStatusQueryKey = () => {
-    return [
-    `/api/wp-sender/session/status`
-    ] as const;
-    }
-
-
-export const getGetWpSenderSessionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionStatusQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionStatus>>> = ({ signal }) => getWpSenderSessionStatus({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetWpSenderSessionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionStatus>>>
-export type GetWpSenderSessionStatusQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Check WP Sender WhatsApp session status
- */
-
-export function useGetWpSenderSessionStatus<TData = Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetWpSenderSessionStatusQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetWpSenderSessionDetailsUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/details`
-}
-
-/**
- * @summary Get WP Sender WhatsApp session details
- */
-export const getWpSenderSessionDetails = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getGetWpSenderSessionDetailsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetWpSenderSessionDetailsQueryKey = () => {
-    return [
-    `/api/wp-sender/session/details`
-    ] as const;
-    }
-
-
-export const getGetWpSenderSessionDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionDetailsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionDetails>>> = ({ signal }) => getWpSenderSessionDetails({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetWpSenderSessionDetailsQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionDetails>>>
-export type GetWpSenderSessionDetailsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get WP Sender WhatsApp session details
- */
-
-export function useGetWpSenderSessionDetails<TData = Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionDetails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetWpSenderSessionDetailsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getReconnectWpSenderSessionUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/reconnect`
-}
-
-/**
- * @summary Reconnect a WP Sender WhatsApp session
- */
-export const reconnectWpSenderSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getReconnectWpSenderSessionUrl(),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getReconnectWpSenderSessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext> => {
-
-const mutationKey = ['reconnectWpSenderSession'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconnectWpSenderSession>>, void> = () => {
-
-
-          return  reconnectWpSenderSession(requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ReconnectWpSenderSessionMutationResult = NonNullable<Awaited<ReturnType<typeof reconnectWpSenderSession>>>
-
-    export type ReconnectWpSenderSessionMutationError = ErrorType<unknown>
-
-    /**
- * @summary Reconnect a WP Sender WhatsApp session
- */
-export const useReconnectWpSenderSession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectWpSenderSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof reconnectWpSenderSession>>,
-        TError,
-        void,
-        TContext
-      > => {
-      return useMutation(getReconnectWpSenderSessionMutationOptions(options));
-    }
-
-export const getGetWpSenderSessionQrUrl = (params?: GetWpSenderSessionQrParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/wp-sender/session/qr?${stringifiedParams}` : `/api/wp-sender/session/qr`
-}
-
-/**
- * @summary Get the configured WP Sender session QR code
- */
-export const getWpSenderSessionQr = async (params?: GetWpSenderSessionQrParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getGetWpSenderSessionQrUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetWpSenderSessionQrQueryKey = (params?: GetWpSenderSessionQrParams,) => {
-    return [
-    `/api/wp-sender/session/qr`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetWpSenderSessionQrQueryOptions = <TData = Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError = ErrorType<unknown>>(params?: GetWpSenderSessionQrParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetWpSenderSessionQrQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWpSenderSessionQr>>> = ({ signal }) => getWpSenderSessionQr(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetWpSenderSessionQrQueryResult = NonNullable<Awaited<ReturnType<typeof getWpSenderSessionQr>>>
-export type GetWpSenderSessionQrQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get the configured WP Sender session QR code
- */
-
-export function useGetWpSenderSessionQr<TData = Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError = ErrorType<unknown>>(
- params?: GetWpSenderSessionQrParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWpSenderSessionQr>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetWpSenderSessionQrQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getRequestWpSenderPairingCodeUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/pairing-code`
-}
-
-/**
- * @summary Request a WP Sender WhatsApp pairing code
- */
-export const requestWpSenderPairingCode = async (requestWpSenderPairingCodeBody: RequestWpSenderPairingCodeBody, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getRequestWpSenderPairingCodeUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(requestWpSenderPairingCodeBody)
-  }
-);}
-
-
-
-
-
-export const getRequestWpSenderPairingCodeMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext> => {
-
-const mutationKey = ['requestWpSenderPairingCode'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, {data: BodyType<RequestWpSenderPairingCodeBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  requestWpSenderPairingCode(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RequestWpSenderPairingCodeMutationResult = NonNullable<Awaited<ReturnType<typeof requestWpSenderPairingCode>>>
-    export type RequestWpSenderPairingCodeMutationBody = BodyType<RequestWpSenderPairingCodeBody>
-    export type RequestWpSenderPairingCodeMutationError = ErrorType<unknown>
-
-    /**
- * @summary Request a WP Sender WhatsApp pairing code
- */
-export const useRequestWpSenderPairingCode = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestWpSenderPairingCode>>, TError,{data: BodyType<RequestWpSenderPairingCodeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof requestWpSenderPairingCode>>,
-        TError,
-        {data: BodyType<RequestWpSenderPairingCodeBody>},
-        TContext
-      > => {
-      return useMutation(getRequestWpSenderPairingCodeMutationOptions(options));
-    }
-
-export const getSetWpSenderWebhookUrl = () => {
-
-
-
-
-  return `/api/wp-sender/session/webhook`
-}
-
-/**
- * @summary Configure the WP Sender session webhook URL
- */
-export const setWpSenderWebhook = async (setWpSenderWebhookBody: SetWpSenderWebhookBody, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
-
-  return customFetch<void>(getSetWpSenderWebhookUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(setWpSenderWebhookBody)
-  }
-);}
-
-
-
-
-
-export const getSetWpSenderWebhookMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext> => {
-
-const mutationKey = ['setWpSenderWebhook'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setWpSenderWebhook>>, {data: BodyType<SetWpSenderWebhookBody>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  setWpSenderWebhook(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SetWpSenderWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof setWpSenderWebhook>>>
-    export type SetWpSenderWebhookMutationBody = BodyType<SetWpSenderWebhookBody>
-    export type SetWpSenderWebhookMutationError = ErrorType<unknown>
-
-    /**
- * @summary Configure the WP Sender session webhook URL
- */
-export const useSetWpSenderWebhook = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setWpSenderWebhook>>, TError,{data: BodyType<SetWpSenderWebhookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof setWpSenderWebhook>>,
-        TError,
-        {data: BodyType<SetWpSenderWebhookBody>},
-        TContext
-      > => {
-      return useMutation(getSetWpSenderWebhookMutationOptions(options));
     }
 
 export const getGetPublicRestaurantUrl = (slug: string,) => {

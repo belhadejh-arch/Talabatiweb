@@ -36,7 +36,6 @@ async function seed() {
     await db.insert(settingsTable).values({
       platformName: "TALABAT",
       defaultCurrency: "SAR",
-      whatsappEnabled: false,
     });
     console.log("✅ Created platform settings");
   }

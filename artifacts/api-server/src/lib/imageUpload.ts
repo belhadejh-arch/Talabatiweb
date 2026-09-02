@@ -23,7 +23,7 @@ function parseObjectPath(path: string): { bucketName: string; objectName: string
   return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
 }
 
-export type ImageFolder = "products" | "categories" | "restaurants";
+export type ImageFolder = "products" | "categories" | "restaurants" | "drivers";
 
 /**
  * Thrown when the uploaded file itself is not a valid/decodable image

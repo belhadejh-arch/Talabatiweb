@@ -8,7 +8,6 @@ import {
   driversTable,
   restaurantsTable,
   notificationsTable,
-  deliveryMessageLogsTable,
 } from "@workspace/db";
 import { eq, desc, and, gte, lte, ilike, count, sql, or } from "drizzle-orm";
 import {
@@ -21,7 +20,7 @@ import { assignSpecificDriverForOrder, retryOrderDispatch } from "../lib/driverD
 
 const router: IRouter = Router();
 
-async function getOrderDetail(orderId: number) {
+export async function getOrderDetail(orderId: number) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   if (!order) return null;
 
@@ -140,21 +139,6 @@ router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
   const detail = await getOrderDetail(id);
   if (!detail) { res.status(404).json({ error: "Not found" }); return; }
   res.json(detail);
-});
-
-// Delivery channel audit trail for an order
-router.get("/orders/:id/delivery-status", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-
-  const logs = await db
-    .select()
-    .from(deliveryMessageLogsTable)
-    .where(eq(deliveryMessageLogsTable.orderId, id))
-    .orderBy(desc(deliveryMessageLogsTable.sentAt), desc(deliveryMessageLogsTable.id));
-
-  res.json(logs);
 });
 
 // Update order status

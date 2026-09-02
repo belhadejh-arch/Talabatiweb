@@ -28,6 +28,9 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
+  await new Promise<void>((resolve, reject) => {
+    (req as any).session.regenerate((error: Error | null) => error ? reject(error) : resolve());
+  });
   (req as any).session.adminId = admin.id;
   (req as any).session.adminRole = admin.role;
 
