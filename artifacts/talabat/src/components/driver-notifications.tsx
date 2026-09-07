@@ -25,6 +25,18 @@ type PushRegistration = ServiceWorkerRegistration & {
   pushManager: PushManager;
 };
 
+type Webpushr = ((...args: unknown[]) => void) & {
+  q?: unknown[][];
+};
+
+declare global {
+  interface Window {
+    webpushr?: Webpushr;
+  }
+}
+
+const WEBPUSHR_KEY = "BImcTHO99Xs6miQTz8NiSjN9jx5MNGTePvGa1EVY0LktVLTWfAlOzjbvtp3VaWZVApCpn72Z_jqWaYqlLeRBZHA";
+
 function decodeVapidKey(value: string): ArrayBuffer {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -41,6 +53,34 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const [pushWarning, setPushWarning] = useState("");
   const knownIds = useRef<Set<number>>(new Set());
   const initialized = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    if (window.webpushr) {
+      window.webpushr("setup", { key: WEBPUSHR_KEY });
+      return;
+    }
+
+    const webpushr = ((...args: unknown[]) => {
+      webpushr.q = webpushr.q || [];
+      webpushr.q.push(args);
+    }) as Webpushr;
+    window.webpushr = webpushr;
+
+    const script = document.createElement("script");
+    script.id = "webpushr-jssdk";
+    script.async = true;
+    script.src = "https://cdn.webpushr.com/app.min.js";
+    const firstScript = document.getElementsByTagName("script")[0];
+    if (firstScript?.parentNode) {
+      firstScript.parentNode.insertBefore(script, firstScript);
+    } else {
+      document.head.appendChild(script);
+    }
+
+    webpushr("setup", { key: WEBPUSHR_KEY });
+  }, [enabled]);
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
     const response = await fetch(`${base}${path}`, {
