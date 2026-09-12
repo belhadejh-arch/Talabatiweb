@@ -49,9 +49,10 @@ type OneSignalInstance = {
 };
 
 async function waitForOneSignalSubscription(oneSignal: OneSignalInstance): Promise<string | null> {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    const subscriptionId = oneSignal.User.PushSubscription.id;
-    if (subscriptionId) return subscriptionId;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const pushSubscription = oneSignal.User.PushSubscription;
+    const subscriptionId = pushSubscription.id;
+    if (subscriptionId && pushSubscription.optedIn === true) return subscriptionId;
     await new Promise((resolve) => window.setTimeout(resolve, 500));
   }
   return null;

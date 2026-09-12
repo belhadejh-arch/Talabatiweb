@@ -86,8 +86,22 @@ async function sendOneSignalNotification(input: {
     status: response.status,
     response: responseBody,
   };
+  const oneSignalErrors = responseBody && typeof responseBody === "object" && "errors" in responseBody
+    ? responseBody.errors
+    : null;
+  const hasOneSignalErrors =
+    (Array.isArray(oneSignalErrors) && oneSignalErrors.length > 0) ||
+    (oneSignalErrors !== null &&
+      typeof oneSignalErrors === "object" &&
+      Object.keys(oneSignalErrors).length > 0) ||
+    (typeof oneSignalErrors === "string" && oneSignalErrors.length > 0);
+  const hasEmptyNotificationId =
+    responseBody &&
+    typeof responseBody === "object" &&
+    "id" in responseBody &&
+    !responseBody.id;
 
-  if (!response.ok) {
+  if (!response.ok || hasOneSignalErrors || hasEmptyNotificationId) {
     logger.error(responseLog, "OneSignal push request failed");
     throw new Error(`OneSignal returned ${response.status}: ${responseText.slice(0, 500)}`);
   }
@@ -143,6 +157,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     .where(and(
       eq(driverOneSignalSubscriptionsTable.driverId, driverId),
       eq(driverOneSignalSubscriptionsTable.appId, oneSignalAppId),
+      eq(driverOneSignalSubscriptionsTable.externalId, String(driverId)),
       eq(driverOneSignalSubscriptionsTable.optedIn, true),
     ))
     .orderBy(driverOneSignalSubscriptionsTable.updatedAt)
