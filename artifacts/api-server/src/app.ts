@@ -3,6 +3,8 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import cookieParser from "cookie-parser";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -48,6 +50,7 @@ const sessionSecret = process.env.SESSION_SECRET || process.env.AUTH_SECRET;
 if (isProduction && !sessionSecret) {
   throw new Error("SESSION_SECRET or AUTH_SECRET is required in production");
 }
+const PgSession = connectPgSimple(session);
 
 // When the frontend and backend are on different origins (e.g. Vercel +
 // Render), the session cookie must be SameSite=None + Secure to be sent on
@@ -58,13 +61,20 @@ app.use(
   session({
     name: "talabat.sid",
     secret: sessionSecret || "talabat-dev-only-secret",
+    store: new PgSession({
+      pool,
+      tableName: "talabat_sessions",
+      createTableIfMissing: false,
+      pruneSessionInterval: 60 * 60,
+    }),
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 365 * 24 * 60 * 60 * 1000, // Keep the driver signed in for one year; logout remains explicit.
     },
   }),
 );

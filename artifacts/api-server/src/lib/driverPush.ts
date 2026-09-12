@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import {
   db,
+  driverOneSignalSubscriptionsTable,
   driversTable,
   notificationsTable,
   orderDriverAttemptsTable,
@@ -36,6 +37,7 @@ async function sendOneSignalNotification(input: {
   title: string;
   message: string;
   url: string;
+  subscriptionIds: string[];
 }): Promise<void> {
   if (!isOneSignalConfigured()) {
     logger.warn(
@@ -45,6 +47,9 @@ async function sendOneSignalNotification(input: {
     return;
   }
 
+  const audience = input.subscriptionIds.length > 0
+    ? { include_subscription_ids: input.subscriptionIds }
+    : { include_aliases: { external_id: [String(input.driverId)] } };
   const response = await fetch("https://api.onesignal.com/notifications", {
     method: "POST",
     headers: {
@@ -54,7 +59,7 @@ async function sendOneSignalNotification(input: {
     body: JSON.stringify({
       app_id: oneSignalAppId,
       target_channel: "push",
-      include_aliases: { external_id: [String(input.driverId)] },
+      ...audience,
       headings: { en: input.title, ar: input.title },
       contents: { en: input.message, ar: input.message },
       url: input.url,
@@ -132,6 +137,24 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     ));
   if (!order || !driver || !attempt) return;
 
+  const subscriptions = await db
+    .select({ subscriptionId: driverOneSignalSubscriptionsTable.subscriptionId })
+    .from(driverOneSignalSubscriptionsTable)
+    .where(and(
+      eq(driverOneSignalSubscriptionsTable.driverId, driverId),
+      eq(driverOneSignalSubscriptionsTable.appId, oneSignalAppId),
+      eq(driverOneSignalSubscriptionsTable.optedIn, true),
+    ))
+    .orderBy(driverOneSignalSubscriptionsTable.updatedAt)
+    .limit(20);
+  const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
+  if (subscriptionIds.length === 0) {
+    logger.warn(
+      { driverId, orderId },
+      "No opted-in OneSignal subscription is registered; falling back to driver external_id",
+    );
+  }
+
   const typeLabel = order.orderType === "RESERVATION" ? "حجز" : "توصيل";
   const message = [
     `الطلب #${order.id}`,
@@ -163,5 +186,6 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     title: "🚨 طلب جديد",
     message,
     url: driverOrderUrl(order.id),
+    subscriptionIds,
   });
 }

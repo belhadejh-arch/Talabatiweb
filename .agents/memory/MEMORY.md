@@ -12,3 +12,4 @@
 - [Raw SQL parameter discipline](raw-sql-parameters.md) — every PostgreSQL placeholder must have a matching parameter; unused placeholders fail at runtime even when TypeScript passes
 - [Imported artifact workflows](imported-artifact-workflows.md) — imported artifact metadata may lack registered workflows; manual workflows need explicit PORT values for API and Vite
 - [OneSignal driver push](onesignal-push.md) — REST key validity must be verified separately from missing subscriptions; invalid keys return HTTP 401
+- [Driver session persistence](driver-session-persistence.md) — Render needs PostgreSQL-backed sessions; in-memory sessions disappear on restart or instance movement

@@ -127,6 +127,19 @@ export async function ensureRuntimeSchema(): Promise<void> {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS talabat_sessions (
+      sid varchar NOT NULL PRIMARY KEY,
+      sess json NOT NULL,
+      expire timestamp(6) NOT NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS talabat_sessions_expire_idx
+      ON talabat_sessions (expire)
+  `);
+
+  await pool.query(`
     ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS driver_id integer,
       ADD COLUMN IF NOT EXISTS order_type text DEFAULT 'DELIVERY',

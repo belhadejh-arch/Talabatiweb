@@ -48,6 +48,15 @@ type OneSignalInstance = {
   };
 };
 
+async function waitForOneSignalSubscription(oneSignal: OneSignalInstance): Promise<string | null> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const subscriptionId = oneSignal.User.PushSubscription.id;
+    if (subscriptionId) return subscriptionId;
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+  return null;
+}
+
 declare global {
   interface Window {
     OneSignalDeferred?: Array<(oneSignal: OneSignalInstance) => void | Promise<void>>;
@@ -66,6 +75,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const oneSignalRef = useRef<OneSignalInstance | null>(null);
   const oneSignalAppIdRef = useRef("");
   const driverIdRef = useRef<number | null>(null);
+  const registerSubscriptionRef = useRef<(() => Promise<void>) | null>(null);
   const subscriptionChangeRef = useRef<((change: { current?: { id?: string | null; optedIn?: boolean | null } }) => void) | null>(null);
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
@@ -101,7 +111,10 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
       const OneSignal = oneSignalRef.current;
       if (!OneSignal) throw new Error("OneSignal is not initialized");
       const permission = await OneSignal.Notifications.requestPermission();
-      if (permission) await OneSignal.User.PushSubscription.optIn();
+      if (permission) {
+        await OneSignal.User.PushSubscription.optIn();
+        await registerSubscriptionRef.current?.();
+      }
       if (permission) {
         setPushPrompt(false);
         setPushWarning("");
@@ -174,6 +187,9 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
         ]);
         driverIdRef.current = Number(driver.id);
         oneSignalAppIdRef.current = String(config.appId);
+        if (!config.configured) {
+          setPushWarning("⚠️ إعدادات إشعارات الطلبات غير مكتملة في الخادم.");
+        }
 
         const deferred = window.OneSignalDeferred || (window.OneSignalDeferred = []);
         deferred.push(async (OneSignal) => {
@@ -190,9 +206,11 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
             await OneSignal.login(String(driverIdRef.current));
 
             const registerSubscription = async () => {
-              const subscriptionId = OneSignal.User.PushSubscription.id;
+              const subscriptionId = await waitForOneSignalSubscription(OneSignal);
               const currentDriverId = driverIdRef.current;
-              if (!subscriptionId || !currentDriverId) return;
+              if (!subscriptionId || !currentDriverId) {
+                throw new Error("OneSignal subscription ID was not created");
+              }
               await request("/api/driver/push/onesignal-subscription", {
                 method: "POST",
                 body: JSON.stringify({
@@ -203,6 +221,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
                 }),
               });
             };
+            registerSubscriptionRef.current = registerSubscription;
 
             const onSubscriptionChange = () => {
               void registerSubscription().catch(() => {
@@ -239,6 +258,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
         OneSignal.User.PushSubscription.removeEventListener?.("change", listener);
       }
       subscriptionChangeRef.current = null;
+      registerSubscriptionRef.current = null;
     };
   }, [enabled, request]);
 
