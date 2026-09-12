@@ -11,3 +11,4 @@
 - [TALABAT workflow ownership](talabat-workflow-ports.md) — run one service owner per fixed port; legacy and artifact workflows can conflict with EADDRINUSE
 - [Raw SQL parameter discipline](raw-sql-parameters.md) — every PostgreSQL placeholder must have a matching parameter; unused placeholders fail at runtime even when TypeScript passes
 - [Imported artifact workflows](imported-artifact-workflows.md) — imported artifact metadata may lack registered workflows; manual workflows need explicit PORT values for API and Vite
+- [OneSignal driver push](onesignal-push.md) — REST key validity must be verified separately from missing subscriptions; invalid keys return HTTP 401
