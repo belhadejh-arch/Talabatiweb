@@ -21,28 +21,22 @@ type DriverOrderEvent = {
   message?: string;
 };
 
-type PushRegistration = ServiceWorkerRegistration & {
-  pushManager: PushManager;
-};
-
-type Webpushr = ((...args: unknown[]) => void) & {
-  q?: unknown[][];
+type OneSignalInstance = {
+  login: (externalId: string) => Promise<void>;
+  Notifications: {
+    requestPermission: () => Promise<boolean>;
+  };
+  User: {
+    PushSubscription: {
+      optIn: () => Promise<void>;
+    };
+  };
 };
 
 declare global {
   interface Window {
-    webpushr?: Webpushr;
+    OneSignalDeferred?: Array<(oneSignal: OneSignalInstance) => void | Promise<void>>;
   }
-}
-
-const WEBPUSHR_KEY = "BImcTHO99Xs6miQTz8NiSjN9jx5MNGTePvGa1EVY0LktVLTWfAlOzjbvtp3VaWZVApCpn72Z_jqWaYqlLeRBZHA";
-
-function decodeVapidKey(value: string): ArrayBuffer {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  const bytes = Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
-  return bytes.buffer.slice(0) as ArrayBuffer;
 }
 
 export default function DriverNotifications({ enabled }: { enabled: boolean }) {
@@ -53,34 +47,6 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const [pushWarning, setPushWarning] = useState("");
   const knownIds = useRef<Set<number>>(new Set());
   const initialized = useRef(false);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    if (window.webpushr) {
-      window.webpushr("setup", { key: WEBPUSHR_KEY });
-      return;
-    }
-
-    const webpushr = ((...args: unknown[]) => {
-      webpushr.q = webpushr.q || [];
-      webpushr.q.push(args);
-    }) as Webpushr;
-    window.webpushr = webpushr;
-
-    const script = document.createElement("script");
-    script.id = "webpushr-jssdk";
-    script.async = true;
-    script.src = "https://cdn.webpushr.com/app.min.js";
-    const firstScript = document.getElementsByTagName("script")[0];
-    if (firstScript?.parentNode) {
-      firstScript.parentNode.insertBefore(script, firstScript);
-    } else {
-      document.head.appendChild(script);
-    }
-
-    webpushr("setup", { key: WEBPUSHR_KEY });
-  }, [enabled]);
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
     const response = await fetch(`${base}${path}`, {
@@ -106,50 +72,38 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     }
   }, [request]);
 
-  const saveSubscription = useCallback(async (registration: PushRegistration, publicKey: string) => {
-    let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: decodeVapidKey(publicKey),
-      });
-    }
-    await request("/api/driver/push/subscription", {
-      method: "POST",
-      body: JSON.stringify({
-        subscription: subscription.toJSON(),
-        device: navigator.userAgent.slice(0, 255),
-      }),
-    });
-    setPushPrompt(false);
-    setPushWarning("");
-  }, [request]);
-
   const enablePush = useCallback(async () => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (!("Notification" in window)) {
       setPushWarning("هذا المتصفح لا يدعم إشعارات Push.");
       return;
     }
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
+      const permission = await new Promise<boolean>((resolve, reject) => {
+        if (!window.OneSignalDeferred) {
+          reject(new Error("OneSignal is not loaded"));
+          return;
+        }
+        window.OneSignalDeferred.push(async (OneSignal) => {
+          try {
+            resolve(await OneSignal.Notifications.requestPermission());
+            await OneSignal.User.PushSubscription.optIn();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+      if (permission) {
+        setPushPrompt(false);
+        setPushWarning("");
+      } else {
         setPushPrompt(false);
         setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات حتى لا تفوتك الطلبات الجديدة.");
-        return;
       }
-      const response = await request("/api/driver/push/vapid-public-key");
-      if (!response.publicKey) {
-        setPushPrompt(false);
-        setPushWarning("⚠️ إشعارات الطلبات غير مهيأة على الخادم حاليًا.");
-        return;
-      }
-      const registration = await navigator.serviceWorker.ready as PushRegistration;
-      await saveSubscription(registration, response.publicKey);
     } catch {
       setPushPrompt(false);
-      setPushWarning("⚠️ تعذر تفعيل إشعارات الطلبات. يمكنك متابعة استخدام المنصة.");
+      setPushWarning("⚠️ تعذر تحميل OneSignal. يمكنك متابعة استخدام المنصة ثم المحاولة مرة أخرى.");
     }
-  }, [request, saveSubscription]);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -199,33 +153,29 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
 
   useEffect(() => {
     if (!enabled) return;
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — هذا المتصفح لا يدعم Web Push.");
-      return;
-    }
     const setup = async () => {
       try {
-        const registration = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}driver-sw.js`, {
-          scope: import.meta.env.BASE_URL,
-        }) as PushRegistration;
-        const response = await request("/api/driver/push/vapid-public-key");
-        if (!response.publicKey) {
-          setPushWarning("⚠️ إشعارات الطلبات غير مهيأة على الخادم حاليًا.");
+        const driver = await request("/api/driver-auth/me");
+        if (!window.OneSignalDeferred) {
+          setPushWarning("⚠️ تعذر تحميل OneSignal. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.");
           return;
         }
-        if (Notification.permission === "denied") {
-          setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات من إعدادات المتصفح حتى لا تفوتك الطلبات الجديدة.");
-        } else if (Notification.permission === "granted") {
-          await saveSubscription(registration, response.publicKey);
-        } else {
-          setPushPrompt(true);
-        }
+        window.OneSignalDeferred.push(async (OneSignal) => {
+          await OneSignal.login(String(driver.id));
+          if (Notification.permission === "denied") {
+            setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات من إعدادات المتصفح.");
+          } else if (Notification.permission === "granted") {
+            await OneSignal.User.PushSubscription.optIn();
+          } else {
+            setPushPrompt(true);
+          }
+        });
       } catch {
-        setPushWarning("⚠️ تعذر تجهيز إشعارات الطلبات. يمكنك متابعة استخدام المنصة.");
+        // The dashboard owns the auth redirect and error state.
       }
     };
     void setup();
-  }, [enabled, request, saveSubscription]);
+  }, [enabled, request]);
 
   if (!enabled) return null;
 

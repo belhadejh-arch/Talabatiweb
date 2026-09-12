@@ -6,7 +6,7 @@ import {
   notificationsTable,
 } from "@workspace/db";
 import { requireDriverAuth } from "../middlewares/auth";
-import { getVapidPublicKey } from "../lib/driverPush";
+import { getOneSignalAppId, isOneSignalConfigured } from "../lib/driverPush";
 import { subscribeToDriverEvents } from "../lib/driverEvents";
 
 const router: IRouter = Router();
@@ -67,8 +67,8 @@ router.post("/driver/notifications/read-all", requireDriverAuth, async (req, res
   res.json({ ok: true });
 });
 
-router.get("/driver/push/vapid-public-key", requireDriverAuth, (_req, res): void => {
-  res.json({ publicKey: getVapidPublicKey(), configured: Boolean(getVapidPublicKey()) });
+router.get("/driver/push/onesignal-config", requireDriverAuth, (_req, res): void => {
+  res.json({ appId: getOneSignalAppId(), configured: isOneSignalConfigured() });
 });
 
 router.post("/driver/push/subscription", requireDriverAuth, async (req, res): Promise<void> => {

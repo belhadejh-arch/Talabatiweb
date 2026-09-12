@@ -7,7 +7,7 @@ export const settingsTable = pgTable("settings", {
   platformName: text("platform_name").notNull().default("TALABAT"),
   defaultCurrency: text("default_currency").notNull().default("LYD"),
   mapsApiKey: text("maps_api_key"),
-  driverResponseTimeoutSeconds: integer("driver_response_timeout_seconds").notNull().default(180),
+  driverResponseTimeoutSeconds: integer("driver_response_timeout_seconds").notNull().default(300),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

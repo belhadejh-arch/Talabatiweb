@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { notifyAssignedDriver } from "./driverPush";
 
-const DEFAULT_TIMEOUT_SECONDS = 180;
+const DEFAULT_TIMEOUT_SECONDS = 300;
 const DISPATCH_INTERVAL_MS = 10_000;
 
 type DispatchResult =
@@ -76,9 +76,9 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
 
     await client.query(
       `INSERT INTO order_driver_attempts
-        (order_id, driver_id, status, sent_at, timeout_at)
-       VALUES ($1, $2, 'PENDING', NOW(), NOW() + ($3 * INTERVAL '1 second'))`,
-      [order.id, driver.id, timeoutSeconds],
+        (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))`,
+      [order.id, driver.id, order.restaurant_id, timeoutSeconds],
     );
     await client.query(
       "UPDATE orders SET driver_id = $2, updated_at = NOW() WHERE id = $1",
@@ -210,7 +210,7 @@ export async function retryOrderDispatch(orderId: number): Promise<DispatchResul
     if (order.driver_id) {
       await client.query(
         `UPDATE order_driver_attempts
-         SET status = 'FAILED'
+          SET status = 'REJECTED', response_at = NOW()
          WHERE order_id = $1 AND driver_id = $2 AND status = 'PENDING'`,
         [orderId, order.driver_id],
       );
@@ -273,12 +273,13 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
 
     await client.query(
       `INSERT INTO order_driver_attempts
-        (order_id, driver_id, status, sent_at, timeout_at)
-       VALUES ($1, $2, 'PENDING', NOW(), NOW() + ($3 * INTERVAL '1 second'))
+        (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
        ON CONFLICT (order_id, driver_id) DO UPDATE
-        SET status = 'PENDING', sent_at = NOW(), response_at = NULL,
-           timeout_at = NOW() + ($3 * INTERVAL '1 second')`,
-      [orderId, driverId, timeoutSeconds],
+        SET restaurant_id = EXCLUDED.restaurant_id,
+            status = 'PENDING', sent_at = NOW(), response_at = NULL,
+            timeout_at = NOW() + ($4 * INTERVAL '1 second')`,
+      [orderId, driverId, order.restaurant_id, timeoutSeconds],
     );
     await client.query(
         "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1",

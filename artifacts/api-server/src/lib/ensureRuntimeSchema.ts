@@ -82,6 +82,7 @@ export async function ensureRuntimeSchema(): Promise<void> {
       id serial PRIMARY KEY,
       order_id integer NOT NULL,
       driver_id integer NOT NULL,
+      restaurant_id integer NOT NULL,
       status text NOT NULL DEFAULT 'PENDING',
       sent_at timestamptz NOT NULL DEFAULT NOW(),
       response_at timestamptz,
@@ -148,8 +149,22 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     ALTER TABLE order_driver_attempts
+      ADD COLUMN IF NOT EXISTS restaurant_id integer,
       ADD COLUMN IF NOT EXISTS response_at timestamptz,
       ADD COLUMN IF NOT EXISTS timeout_at timestamptz DEFAULT NOW()
+  `);
+
+  await pool.query(`
+    UPDATE order_driver_attempts a
+       SET restaurant_id = o.restaurant_id
+      FROM orders o
+     WHERE a.order_id = o.id
+       AND a.restaurant_id IS NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE order_driver_attempts
+      ALTER COLUMN restaurant_id SET NOT NULL
   `);
 
   await pool.query(`
