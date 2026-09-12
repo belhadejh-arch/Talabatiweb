@@ -22,13 +22,28 @@ type DriverOrderEvent = {
 };
 
 type OneSignalInstance = {
+  init: (options: {
+    appId: string;
+    safari_web_id?: string;
+    notifyButton?: { enable: boolean };
+  }) => Promise<void>;
   login: (externalId: string) => Promise<void>;
   Notifications: {
     requestPermission: () => Promise<boolean>;
   };
   User: {
     PushSubscription: {
+      id?: string | null;
+      optedIn?: boolean | null;
       optIn: () => Promise<void>;
+      addEventListener?: (
+        event: "change",
+        listener: (change: { current?: { id?: string | null; optedIn?: boolean | null } }) => void,
+      ) => void;
+      removeEventListener?: (
+        event: "change",
+        listener: (change: { current?: { id?: string | null; optedIn?: boolean | null } }) => void,
+      ) => void;
     };
   };
 };
@@ -47,6 +62,11 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const [pushWarning, setPushWarning] = useState("");
   const knownIds = useRef<Set<number>>(new Set());
   const initialized = useRef(false);
+  const oneSignalSetupStarted = useRef(false);
+  const oneSignalRef = useRef<OneSignalInstance | null>(null);
+  const oneSignalAppIdRef = useRef("");
+  const driverIdRef = useRef<number | null>(null);
+  const subscriptionChangeRef = useRef<((change: { current?: { id?: string | null; optedIn?: boolean | null } }) => void) | null>(null);
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
     const response = await fetch(`${base}${path}`, {
@@ -78,20 +98,10 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
       return;
     }
     try {
-      const permission = await new Promise<boolean>((resolve, reject) => {
-        if (!window.OneSignalDeferred) {
-          reject(new Error("OneSignal is not loaded"));
-          return;
-        }
-        window.OneSignalDeferred.push(async (OneSignal) => {
-          try {
-            resolve(await OneSignal.Notifications.requestPermission());
-            await OneSignal.User.PushSubscription.optIn();
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
+      const OneSignal = oneSignalRef.current;
+      if (!OneSignal) throw new Error("OneSignal is not initialized");
+      const permission = await OneSignal.Notifications.requestPermission();
+      if (permission) await OneSignal.User.PushSubscription.optIn();
       if (permission) {
         setPushPrompt(false);
         setPushWarning("");
@@ -152,29 +162,84 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   }, [base, enabled, loadNotifications]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || oneSignalSetupStarted.current) return;
+    oneSignalSetupStarted.current = true;
+    let cancelled = false;
+
     const setup = async () => {
       try {
-        const driver = await request("/api/driver-auth/me");
-        if (!window.OneSignalDeferred) {
-          setPushWarning("⚠️ تعذر تحميل OneSignal. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.");
-          return;
-        }
-        window.OneSignalDeferred.push(async (OneSignal) => {
-          await OneSignal.login(String(driver.id));
-          if (Notification.permission === "denied") {
-            setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات من إعدادات المتصفح.");
-          } else if (Notification.permission === "granted") {
-            await OneSignal.User.PushSubscription.optIn();
-          } else {
-            setPushPrompt(true);
+        const [driver, config] = await Promise.all([
+          request("/api/driver-auth/me"),
+          request("/api/driver/push/onesignal-config"),
+        ]);
+        driverIdRef.current = Number(driver.id);
+        oneSignalAppIdRef.current = String(config.appId);
+
+        const deferred = window.OneSignalDeferred || (window.OneSignalDeferred = []);
+        deferred.push(async (OneSignal) => {
+          try {
+            if (cancelled) return;
+            await OneSignal.init({
+              appId: oneSignalAppIdRef.current,
+              safari_web_id: "web.onesignal.auto.26f438e4-4907-4b0f-9fba-4ab15d3b5c3b",
+              notifyButton: { enable: false },
+            });
+            if (cancelled) return;
+
+            oneSignalRef.current = OneSignal;
+            await OneSignal.login(String(driverIdRef.current));
+
+            const registerSubscription = async () => {
+              const subscriptionId = OneSignal.User.PushSubscription.id;
+              const currentDriverId = driverIdRef.current;
+              if (!subscriptionId || !currentDriverId) return;
+              await request("/api/driver/push/onesignal-subscription", {
+                method: "POST",
+                body: JSON.stringify({
+                  subscriptionId,
+                  appId: oneSignalAppIdRef.current,
+                  externalId: String(currentDriverId),
+                  optedIn: OneSignal.User.PushSubscription.optedIn === true,
+                }),
+              });
+            };
+
+            const onSubscriptionChange = () => {
+              void registerSubscription().catch(() => {
+                setPushWarning("⚠️ تعذر تسجيل جهازك في OneSignal. حاول تفعيل الإشعارات مرة أخرى.");
+              });
+            };
+            subscriptionChangeRef.current = onSubscriptionChange;
+            OneSignal.User.PushSubscription.addEventListener?.("change", onSubscriptionChange);
+
+            if (Notification.permission === "denied") {
+              setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات من إعدادات المتصفح.");
+            } else if (Notification.permission === "granted") {
+              await OneSignal.User.PushSubscription.optIn();
+              await registerSubscription();
+            } else {
+              setPushPrompt(true);
+            }
+          } catch (error) {
+            console.error("OneSignal driver initialization failed", error);
+            setPushWarning("⚠️ تعذر تهيئة إشعارات OneSignal. تحقق من إعدادات المتصفح ثم أعد المحاولة.");
           }
         });
-      } catch {
-        // The dashboard owns the auth redirect and error state.
+      } catch (error) {
+        console.error("OneSignal driver setup failed", error);
+        setPushWarning("⚠️ تعذر تحميل OneSignal. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.");
       }
     };
     void setup();
+    return () => {
+      cancelled = true;
+      const OneSignal = oneSignalRef.current;
+      const listener = subscriptionChangeRef.current;
+      if (OneSignal && listener) {
+        OneSignal.User.PushSubscription.removeEventListener?.("change", listener);
+      }
+      subscriptionChangeRef.current = null;
+    };
   }, [enabled, request]);
 
   if (!enabled) return null;

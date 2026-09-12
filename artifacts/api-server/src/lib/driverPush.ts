@@ -10,7 +10,8 @@ import {
 import { logger } from "./logger";
 import { publishDriverEvent } from "./driverEvents";
 
-const oneSignalAppId = process.env.ONESIGNAL_APP_ID?.trim() || "a076a6a2-2555-42f7-89f1-5fecc8dcf449";
+const DEFAULT_ONESIGNAL_APP_ID = "a076a6a2-2555-42f7-89f1-5fecc8dcf449";
+const oneSignalAppId = process.env.ONESIGNAL_APP_ID?.trim() || DEFAULT_ONESIGNAL_APP_ID;
 const oneSignalApiKey = process.env.ONESIGNAL_REST_API_KEY?.trim() || "";
 const driverDashboardUrl = (
   process.env.DRIVER_DASHBOARD_URL?.trim() ||
@@ -65,10 +66,28 @@ async function sendOneSignalNotification(input: {
     }),
   });
 
+  const responseText = await response.text().catch(() => "");
+  let responseBody: unknown = responseText;
+  try {
+    responseBody = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    // Keep the raw response in the log when OneSignal does not return JSON.
+  }
+
+  const responseLog = {
+    driverId: input.driverId,
+    orderId: input.orderId,
+    appId: oneSignalAppId,
+    status: response.status,
+    response: responseBody,
+  };
+
   if (!response.ok) {
-    const responseText = await response.text().catch(() => "");
+    logger.error(responseLog, "OneSignal push request failed");
     throw new Error(`OneSignal returned ${response.status}: ${responseText.slice(0, 500)}`);
   }
+
+  logger.info(responseLog, "OneSignal push request completed");
 }
 
 /**

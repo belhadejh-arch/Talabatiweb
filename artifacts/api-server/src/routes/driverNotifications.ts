@@ -2,12 +2,14 @@ import { Router, type IRouter } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import {
   db,
+  driverOneSignalSubscriptionsTable,
   driverPushSubscriptionsTable,
   notificationsTable,
 } from "@workspace/db";
 import { requireDriverAuth } from "../middlewares/auth";
 import { getOneSignalAppId, isOneSignalConfigured } from "../lib/driverPush";
 import { subscribeToDriverEvents } from "../lib/driverEvents";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -97,6 +99,52 @@ router.post("/driver/push/subscription", requireDriverAuth, async (req, res): Pr
     },
   });
   res.status(201).json({ ok: true });
+});
+
+router.post("/driver/push/onesignal-subscription", requireDriverAuth, async (req, res): Promise<void> => {
+  const driver = (req as any).driver;
+  const subscriptionId = typeof req.body?.subscriptionId === "string"
+    ? req.body.subscriptionId.trim()
+    : "";
+  const appId = typeof req.body?.appId === "string" ? req.body.appId.trim() : "";
+  const externalId = typeof req.body?.externalId === "string" ? req.body.externalId.trim() : "";
+  const optedIn = req.body?.optedIn === true;
+
+  if (!subscriptionId || subscriptionId.length > 255) {
+    res.status(400).json({ error: "معرّف OneSignal Subscription غير صالح" });
+    return;
+  }
+  if (appId !== getOneSignalAppId()) {
+    res.status(400).json({ error: "OneSignal App ID غير مطابق" });
+    return;
+  }
+  if (externalId !== String(driver.id)) {
+    res.status(400).json({ error: "هوية OneSignal لا تطابق السائق الحالي" });
+    return;
+  }
+
+  await db.insert(driverOneSignalSubscriptionsTable).values({
+    driverId: driver.id,
+    appId,
+    subscriptionId,
+    externalId,
+    optedIn,
+  }).onConflictDoUpdate({
+    target: driverOneSignalSubscriptionsTable.subscriptionId,
+    set: {
+      driverId: driver.id,
+      appId,
+      externalId,
+      optedIn,
+      updatedAt: new Date(),
+    },
+  });
+
+  logger.info(
+    { driverId: driver.id, appId, subscriptionId, externalId, optedIn },
+    "OneSignal driver subscription registered",
+  );
+  res.status(201).json({ ok: true, appId, externalId, subscriptionId, optedIn });
 });
 
 router.delete("/driver/push/subscription", requireDriverAuth, async (req, res): Promise<void> => {

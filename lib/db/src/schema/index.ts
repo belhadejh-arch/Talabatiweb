@@ -11,3 +11,4 @@ export * from "./notifications";
 export * from "./settings";
 export * from "./order-driver-attempts";
 export * from "./driver-push-subscriptions";
+export * from "./driver-onesignal-subscriptions";

@@ -17,6 +17,8 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { assignSpecificDriverForOrder, retryOrderDispatch } from "../lib/driverDispatch";
+import { notifyAssignedDriver } from "../lib/driverPush";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -208,6 +210,12 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
   if (!assigned) {
     res.status(409).json({ error: "تعذر إسناد الطلب، ربما تم تحديثه أو انتهت صلاحيته" });
     return;
+  }
+
+  try {
+    await notifyAssignedDriver(parsed.data.driverId, id);
+  } catch (error) {
+    logger.error({ err: error, driverId: parsed.data.driverId, orderId: id }, "Failed to notify manually assigned driver");
   }
 
   // Create notification

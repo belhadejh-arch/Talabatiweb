@@ -109,6 +109,24 @@ export async function ensureRuntimeSchema(): Promise<void> {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS driver_onesignal_subscriptions (
+      id serial PRIMARY KEY,
+      driver_id integer NOT NULL,
+      app_id text NOT NULL,
+      subscription_id text NOT NULL,
+      external_id text NOT NULL,
+      opted_in boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT NOW(),
+      updated_at timestamptz NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS driver_onesignal_subscriptions_subscription_unique
+      ON driver_onesignal_subscriptions (subscription_id)
+  `);
+
+  await pool.query(`
     ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS driver_id integer,
       ADD COLUMN IF NOT EXISTS order_type text DEFAULT 'DELIVERY',
