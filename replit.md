@@ -22,6 +22,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `ONESIGNAL_REST_API_KEY` | api-server secret | OneSignal REST API key; never expose it to the frontend |
 | `ONESIGNAL_APP_ID` | api-server | Optional; defaults to `a076a6a2-2555-42f7-89f1-5fecc8dcf449`, and the driver page reads the same value from the API |
 | `DRIVER_DASHBOARD_URL` | api-server | Optional absolute URL used for notification clicks; defaults to the deployed `/driver/dashboard` route |
+| `DRIVER_APP_ICON_URL` | api-server | Optional absolute URL for the driver push icon; defaults to `/app-icon-512.png` on the dashboard origin |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
 | `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
 

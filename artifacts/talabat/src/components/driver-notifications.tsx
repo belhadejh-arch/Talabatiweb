@@ -26,6 +26,7 @@ type OneSignalInstance = {
     appId: string;
     safari_web_id?: string;
     notifyButton?: { enable: boolean };
+    serviceWorkerPath?: string;
   }) => Promise<void>;
   login: (externalId: string) => Promise<void>;
   Notifications: {
@@ -74,6 +75,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const initialized = useRef(false);
   const oneSignalSetupStarted = useRef(false);
   const oneSignalRef = useRef<OneSignalInstance | null>(null);
+  const oneSignalConfiguredRef = useRef(false);
   const oneSignalAppIdRef = useRef("");
   const driverIdRef = useRef<number | null>(null);
   const registerSubscriptionRef = useRef<(() => Promise<void>) | null>(null);
@@ -132,29 +134,53 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     if (!enabled) return;
     void loadNotifications();
-    const timer = window.setInterval(() => void loadNotifications(), 30000);
-    const eventSource = new EventSource(`${base}/api/driver/events`, { withCredentials: true });
-    eventSource.onopen = () => { void loadNotifications(); };
-    eventSource.onmessage = (event) => {
-      let data: DriverOrderEvent;
-      try {
-        data = JSON.parse(event.data) as DriverOrderEvent;
-      } catch {
-        return;
-      }
-      if (data.type !== "NEW_DRIVER_ORDER" || !data.orderId) return;
-      setLatest({
-        id: data.notificationId ?? 0,
-        type: "NEW_DRIVER_ORDER",
-        message: data.message || "لديك طلب جديد",
-        orderId: data.orderId,
-        relatedId: data.orderId,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-      });
-      window.dispatchEvent(new CustomEvent("driver-order-received", { detail: { orderId: data.orderId } }));
-      void loadNotifications();
+    let stopped = false;
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+
+    const connect = () => {
+      if (stopped) return;
+      eventSource = new EventSource(`${base}/api/driver/events`, { withCredentials: true });
+      eventSource.onopen = () => { void loadNotifications(); };
+      eventSource.onmessage = (event) => {
+        let data: DriverOrderEvent;
+        try {
+          data = JSON.parse(event.data) as DriverOrderEvent;
+        } catch {
+          return;
+        }
+        if (data.type !== "NEW_DRIVER_ORDER" || !data.orderId) return;
+        setLatest({
+          id: data.notificationId ?? 0,
+          type: "NEW_DRIVER_ORDER",
+          message: data.message || "لديك طلب جديد",
+          orderId: data.orderId,
+          relatedId: data.orderId,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+        window.dispatchEvent(new CustomEvent("driver-order-received", { detail: { orderId: data.orderId } }));
+        void loadNotifications();
+      };
+      eventSource.onerror = () => {
+        eventSource?.close();
+        eventSource = null;
+        if (!stopped && reconnectTimer === null) {
+          reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+          }, 3000);
+        }
+      };
     };
+
+    const refreshWhenAvailable = () => {
+      if (document.visibilityState === "visible") void loadNotifications();
+    };
+    connect();
+    const timer = window.setInterval(() => void loadNotifications(), 15000);
+    window.addEventListener("online", refreshWhenAvailable);
+    document.addEventListener("visibilitychange", refreshWhenAvailable);
     const onPushMessage = (event: MessageEvent<{ type?: string; payload?: { title?: string; body?: string; orderId?: number } }>) => {
       if (event.data?.type !== "NEW_DRIVER_ORDER" || !event.data.payload) return;
       setLatest({
@@ -169,8 +195,12 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     };
     navigator.serviceWorker?.addEventListener("message", onPushMessage);
     return () => {
+      stopped = true;
       window.clearInterval(timer);
-      eventSource.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      eventSource?.close();
+      window.removeEventListener("online", refreshWhenAvailable);
+      document.removeEventListener("visibilitychange", refreshWhenAvailable);
       navigator.serviceWorker?.removeEventListener("message", onPushMessage);
     };
   }, [base, enabled, loadNotifications]);
@@ -196,10 +226,15 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
         deferred.push(async (OneSignal) => {
           try {
             if (cancelled) return;
+            const serviceWorkerPath = `${import.meta.env.BASE_URL}OneSignalSDKWorker.js`;
+            if ("serviceWorker" in navigator) {
+              await navigator.serviceWorker.register(serviceWorkerPath, { scope: import.meta.env.BASE_URL });
+            }
             await OneSignal.init({
               appId: oneSignalAppIdRef.current,
               safari_web_id: "web.onesignal.auto.26f438e4-4907-4b0f-9fba-4ab15d3b5c3b",
               notifyButton: { enable: false },
+              serviceWorkerPath,
             });
             if (cancelled) return;
 

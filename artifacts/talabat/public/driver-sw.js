@@ -11,8 +11,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "🚨 طلب جديد";
   const options = {
     body: payload.body || "لديك طلب جديد من مطعمك",
-    icon: `${DRIVER_SCOPE}favicon.svg`,
-    badge: `${DRIVER_SCOPE}favicon.svg`,
+    icon: `${DRIVER_SCOPE}app-icon-512.png`,
+    badge: `${DRIVER_SCOPE}app-icon-192.png`,
     tag: payload.orderId ? `driver-order-${payload.orderId}` : "driver-order",
     renotify: true,
     data: { orderId: payload.orderId, url: payload.url },

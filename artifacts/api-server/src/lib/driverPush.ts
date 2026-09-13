@@ -16,7 +16,17 @@ const oneSignalAppId = process.env.ONESIGNAL_APP_ID?.trim() || DEFAULT_ONESIGNAL
 const oneSignalApiKey = process.env.ONESIGNAL_REST_API_KEY?.trim() || "";
 const driverDashboardUrl = (
   process.env.DRIVER_DASHBOARD_URL?.trim() ||
-  "https://talabatiweb-talabat-h1pe-lime.vercel.app/driver/dashboard"
+  `${process.env.FRONTEND_URL?.trim().replace(/\/$/, "") || "https://talabatiweb-talabat-h1pe-lime.vercel.app"}/driver/dashboard`
+).replace(/\/$/, "");
+const driverAppIconUrl = (
+  process.env.DRIVER_APP_ICON_URL?.trim() ||
+  (() => {
+    try {
+      return `${new URL(driverDashboardUrl).origin}/app-icon-512.png`;
+    } catch {
+      return "https://talabatiweb-talabat-h1pe-lime.vercel.app/app-icon-512.png";
+    }
+  })()
 ).replace(/\/$/, "");
 
 export function getOneSignalAppId(): string {
@@ -63,6 +73,8 @@ async function sendOneSignalNotification(input: {
       headings: { en: input.title, ar: input.title },
       contents: { en: input.message, ar: input.message },
       url: input.url,
+      chrome_web_icon: driverAppIconUrl,
+      chrome_web_badge: driverAppIconUrl,
       data: {
         type: "NEW_DRIVER_ORDER",
         orderId: input.orderId,
