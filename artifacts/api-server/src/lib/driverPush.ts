@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   db,
   driverOneSignalSubscriptionsTable,
@@ -60,65 +60,81 @@ async function sendOneSignalNotification(input: {
   const audience = input.subscriptionIds.length > 0
     ? { include_subscription_ids: input.subscriptionIds }
     : { include_aliases: { external_id: [String(input.driverId)] } };
-  const response = await fetch("https://api.onesignal.com/notifications", {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${oneSignalApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      app_id: oneSignalAppId,
-      target_channel: "push",
-      ...audience,
-      headings: { en: input.title, ar: input.title },
-      contents: { en: input.message, ar: input.message },
-      url: input.url,
-      chrome_web_icon: driverAppIconUrl,
-      chrome_web_badge: driverAppIconUrl,
-      data: {
-        type: "NEW_DRIVER_ORDER",
-        orderId: input.orderId,
-        url: input.url,
+  const send = async (target: typeof audience) => {
+    const response = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${oneSignalApiKey}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
-
-  const responseText = await response.text().catch(() => "");
-  let responseBody: unknown = responseText;
-  try {
-    responseBody = responseText ? JSON.parse(responseText) : null;
-  } catch {
-    // Keep the raw response in the log when OneSignal does not return JSON.
-  }
-
-  const responseLog = {
-    driverId: input.driverId,
-    orderId: input.orderId,
-    appId: oneSignalAppId,
-    status: response.status,
-    response: responseBody,
+      body: JSON.stringify({
+        app_id: oneSignalAppId,
+        target_channel: "push",
+        ...target,
+        headings: { en: input.title, ar: input.title },
+        contents: { en: input.message, ar: input.message },
+        url: input.url,
+        chrome_web_icon: driverAppIconUrl,
+        chrome_web_badge: driverAppIconUrl,
+        data: {
+          type: "NEW_DRIVER_ORDER",
+          orderId: input.orderId,
+          url: input.url,
+        },
+      }),
+    });
+    const responseText = await response.text().catch(() => "");
+    let responseBody: unknown = responseText;
+    try {
+      responseBody = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      // Keep the raw response in the log when OneSignal does not return JSON.
+    }
+    return { response, responseText, responseBody };
   };
-  const oneSignalErrors = responseBody && typeof responseBody === "object" && "errors" in responseBody
-    ? responseBody.errors
-    : null;
-  const hasOneSignalErrors =
-    (Array.isArray(oneSignalErrors) && oneSignalErrors.length > 0) ||
-    (oneSignalErrors !== null &&
-      typeof oneSignalErrors === "object" &&
-      Object.keys(oneSignalErrors).length > 0) ||
-    (typeof oneSignalErrors === "string" && oneSignalErrors.length > 0);
-  const hasEmptyNotificationId =
-    responseBody &&
-    typeof responseBody === "object" &&
-    "id" in responseBody &&
-    !responseBody.id;
 
-  if (!response.ok || hasOneSignalErrors || hasEmptyNotificationId) {
-    logger.error(responseLog, "OneSignal push request failed");
-    throw new Error(`OneSignal returned ${response.status}: ${responseText.slice(0, 500)}`);
+  const validate = (result: Awaited<ReturnType<typeof send>>) => {
+    const responseLog = {
+      driverId: input.driverId,
+      orderId: input.orderId,
+      appId: oneSignalAppId,
+      status: result.response.status,
+      response: result.responseBody,
+    };
+    const oneSignalErrors = result.responseBody && typeof result.responseBody === "object" && "errors" in result.responseBody
+      ? result.responseBody.errors
+      : null;
+    const hasOneSignalErrors =
+      (Array.isArray(oneSignalErrors) && oneSignalErrors.length > 0) ||
+      (oneSignalErrors !== null &&
+        typeof oneSignalErrors === "object" &&
+        Object.keys(oneSignalErrors).length > 0) ||
+      (typeof oneSignalErrors === "string" && oneSignalErrors.length > 0);
+    const hasEmptyNotificationId =
+      result.responseBody &&
+      typeof result.responseBody === "object" &&
+      "id" in result.responseBody &&
+      !result.responseBody.id;
+
+    if (!result.response.ok || hasOneSignalErrors || hasEmptyNotificationId) {
+      logger.error(responseLog, "OneSignal push request failed");
+      throw new Error(`OneSignal returned ${result.response.status}: ${result.responseText.slice(0, 500)}`);
+    }
+    logger.info(responseLog, "OneSignal push request completed");
+  };
+
+  const firstAttempt = await send(audience);
+  try {
+    validate(firstAttempt);
+  } catch (error) {
+    if (input.subscriptionIds.length === 0) throw error;
+    logger.warn(
+      { driverId: input.driverId, orderId: input.orderId },
+      "Retrying OneSignal push with the driver's external ID after subscription delivery failed",
+    );
+    const fallbackAttempt = await send({ include_aliases: { external_id: [String(input.driverId)] } });
+    validate(fallbackAttempt);
   }
-
-  logger.info(responseLog, "OneSignal push request completed");
 }
 
 /**
@@ -172,7 +188,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
       eq(driverOneSignalSubscriptionsTable.externalId, String(driverId)),
       eq(driverOneSignalSubscriptionsTable.optedIn, true),
     ))
-    .orderBy(driverOneSignalSubscriptionsTable.updatedAt)
+    .orderBy(desc(driverOneSignalSubscriptionsTable.updatedAt))
     .limit(20);
   const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
   if (subscriptionIds.length === 0) {
