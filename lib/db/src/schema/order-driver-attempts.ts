@@ -14,6 +14,12 @@ export const orderDriverAttemptsTable = pgTable(
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
     responseAt: timestamp("response_at", { withTimezone: true }),
     timeoutAt: timestamp("timeout_at", { withTimezone: true }).notNull(),
+    notificationStatus: text("notification_status").notNull().default("PENDING"),
+    notificationAttemptedAt: timestamp("notification_attempted_at", { withTimezone: true }),
+    notificationSentAt: timestamp("notification_sent_at", { withTimezone: true }),
+    notificationResponseStatus: integer("notification_response_status"),
+    notificationResponse: text("notification_response"),
+    notificationError: text("notification_error"),
   },
   (table) => ({
     orderDriverAttemptUnique: uniqueIndex("order_driver_attempt_order_driver_idx").on(table.orderId, table.driverId),

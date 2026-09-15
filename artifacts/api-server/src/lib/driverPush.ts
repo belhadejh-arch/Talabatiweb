@@ -1,9 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db,
   driverOneSignalSubscriptionsTable,
   driversTable,
   notificationsTable,
+  orderItemsTable,
   orderDriverAttemptsTable,
   ordersTable,
   restaurantsTable,
@@ -41,20 +42,43 @@ function driverOrderUrl(orderId: number): string {
   return `${driverDashboardUrl}?order=${encodeURIComponent(orderId)}`;
 }
 
+type OneSignalPushResult = {
+  status: number;
+  responseText: string;
+  responseBody: unknown;
+};
+
+type OneSignalPushError = Error & {
+  status?: number;
+  responseText?: string;
+  responseBody?: unknown;
+};
+
 async function sendOneSignalNotification(input: {
   driverId: number;
   orderId: number;
+  restaurantId: number;
+  assignmentId: number;
   title: string;
   message: string;
   url: string;
   subscriptionIds: string[];
-}): Promise<void> {
+  customerName: string;
+  orderType: string;
+  products: Array<{
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: string;
+    subtotal: string;
+  }>;
+  total: string;
+}): Promise<OneSignalPushResult> {
   if (!isOneSignalConfigured()) {
-    logger.warn(
-      { driverId: input.driverId, orderId: input.orderId },
-      "OneSignal is not configured; set ONESIGNAL_REST_API_KEY to send driver push notifications",
-    );
-    return;
+    const error = new Error("OneSignal is not configured; ONESIGNAL_REST_API_KEY is required") as OneSignalPushError;
+    error.status = 0;
+    error.responseText = "OneSignal credentials are not configured";
+    throw error;
   }
 
   const audience = input.subscriptionIds.length > 0
@@ -79,6 +103,11 @@ async function sendOneSignalNotification(input: {
         data: {
           type: "NEW_DRIVER_ORDER",
           orderId: input.orderId,
+          restaurantId: input.restaurantId,
+          customerName: input.customerName,
+          orderType: input.orderType,
+          products: input.products,
+          total: input.total,
           url: input.url,
         },
       }),
@@ -90,15 +119,17 @@ async function sendOneSignalNotification(input: {
     } catch {
       // Keep the raw response in the log when OneSignal does not return JSON.
     }
-    return { response, responseText, responseBody };
+    return { status: response.status, responseText, responseBody };
   };
 
-  const validate = (result: Awaited<ReturnType<typeof send>>) => {
+  const validate = (result: Awaited<ReturnType<typeof send>>): OneSignalPushResult => {
     const responseLog = {
       driverId: input.driverId,
       orderId: input.orderId,
+      restaurantId: input.restaurantId,
+      assignmentId: input.assignmentId,
       appId: oneSignalAppId,
-      status: result.response.status,
+      status: result.status,
       response: result.responseBody,
     };
     const oneSignalErrors = result.responseBody && typeof result.responseBody === "object" && "errors" in result.responseBody
@@ -116,25 +147,19 @@ async function sendOneSignalNotification(input: {
       "id" in result.responseBody &&
       !result.responseBody.id;
 
-    if (!result.response.ok || hasOneSignalErrors || hasEmptyNotificationId) {
+    if (result.status < 200 || result.status >= 300 || hasOneSignalErrors || hasEmptyNotificationId) {
       logger.error(responseLog, "OneSignal push request failed");
-      throw new Error(`OneSignal returned ${result.response.status}: ${result.responseText.slice(0, 500)}`);
+      const error = new Error(`OneSignal returned ${result.status}: ${result.responseText}`) as OneSignalPushError;
+      error.status = result.status;
+      error.responseText = result.responseText;
+      error.responseBody = result.responseBody;
+      throw error;
     }
     logger.info(responseLog, "OneSignal push request completed");
+    return result;
   };
 
-  const firstAttempt = await send(audience);
-  try {
-    validate(firstAttempt);
-  } catch (error) {
-    if (input.subscriptionIds.length === 0) throw error;
-    logger.warn(
-      { driverId: input.driverId, orderId: input.orderId },
-      "Retrying OneSignal push with the driver's external ID after subscription delivery failed",
-    );
-    const fallbackAttempt = await send({ include_aliases: { external_id: [String(input.driverId)] } });
-    validate(fallbackAttempt);
-  }
+  return validate(await send(audience));
 }
 
 /**
@@ -150,6 +175,8 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
       orderType: ordersTable.orderType,
       restaurantId: ordersTable.restaurantId,
       restaurantName: restaurantsTable.name,
+      customerName: ordersTable.customerName,
+      source: ordersTable.source,
     })
     .from(ordersTable)
     .innerJoin(restaurantsTable, eq(restaurantsTable.id, ordersTable.restaurantId))
@@ -157,6 +184,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
       eq(ordersTable.id, orderId),
       eq(ordersTable.driverId, driverId),
       eq(ordersTable.status, "NEW"),
+      eq(ordersTable.source, "PUBLIC_CUSTOMER"),
     ));
 
   const [driver] = await db
@@ -176,59 +204,140 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
       eq(orderDriverAttemptsTable.driverId, driverId),
       eq(orderDriverAttemptsTable.restaurantId, order?.restaurantId ?? -1),
       eq(orderDriverAttemptsTable.status, "PENDING"),
+      eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
     ));
   if (!order || !driver || !attempt) return;
 
-  const subscriptions = await db
-    .select({ subscriptionId: driverOneSignalSubscriptionsTable.subscriptionId })
-    .from(driverOneSignalSubscriptionsTable)
+  const [claimedAttempt] = await db
+    .update(orderDriverAttemptsTable)
+    .set({
+      notificationStatus: "SENDING",
+      notificationAttemptedAt: new Date(),
+    })
     .where(and(
-      eq(driverOneSignalSubscriptionsTable.driverId, driverId),
-      eq(driverOneSignalSubscriptionsTable.appId, oneSignalAppId),
-      eq(driverOneSignalSubscriptionsTable.externalId, String(driverId)),
-      eq(driverOneSignalSubscriptionsTable.optedIn, true),
+      eq(orderDriverAttemptsTable.id, attempt.id),
+      eq(orderDriverAttemptsTable.orderId, orderId),
+      eq(orderDriverAttemptsTable.driverId, driverId),
+      eq(orderDriverAttemptsTable.status, "PENDING"),
+      eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
+      sql`EXISTS (
+        SELECT 1
+          FROM orders current_order
+          JOIN drivers current_driver ON current_driver.id = current_order.driver_id
+         WHERE current_order.id = ${orderId}
+           AND current_order.driver_id = ${driverId}
+           AND current_order.restaurant_id = ${orderDriverAttemptsTable.restaurantId}
+           AND current_order.status = 'NEW'
+           AND current_order.source = 'PUBLIC_CUSTOMER'
+           AND current_driver.is_active = true
+           AND current_driver.status = 'ACTIVE'
+      )`,
     ))
-    .orderBy(desc(driverOneSignalSubscriptionsTable.updatedAt))
-    .limit(20);
-  const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
-  if (subscriptionIds.length === 0) {
-    logger.warn(
-      { driverId, orderId },
-      "No opted-in OneSignal subscription is registered; falling back to driver external_id",
-    );
+    .returning({ id: orderDriverAttemptsTable.id });
+  if (!claimedAttempt) return;
+
+  try {
+    const products = await db
+      .select({
+        productId: orderItemsTable.productId,
+        productName: orderItemsTable.productName,
+        quantity: orderItemsTable.quantity,
+        unitPrice: orderItemsTable.unitPrice,
+        subtotal: orderItemsTable.subtotal,
+      })
+      .from(orderItemsTable)
+      .where(eq(orderItemsTable.orderId, order.id));
+
+    const subscriptions = await db
+      .select({ subscriptionId: driverOneSignalSubscriptionsTable.subscriptionId })
+      .from(driverOneSignalSubscriptionsTable)
+      .where(and(
+        eq(driverOneSignalSubscriptionsTable.driverId, driverId),
+        eq(driverOneSignalSubscriptionsTable.appId, oneSignalAppId),
+        eq(driverOneSignalSubscriptionsTable.externalId, String(driverId)),
+        eq(driverOneSignalSubscriptionsTable.optedIn, true),
+      ))
+      .orderBy(desc(driverOneSignalSubscriptionsTable.updatedAt))
+      .limit(20);
+    const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
+    if (subscriptionIds.length === 0) {
+      logger.warn(
+        { driverId, orderId },
+        "No opted-in OneSignal subscription is registered; falling back to driver external_id",
+      );
+    }
+
+    const typeLabel = order.orderType === "RESERVATION" ? "حجز" : "توصيل";
+    const message = [
+      `الطلب #${order.id}`,
+      `مطعم: ${order.restaurantName}`,
+      `العميل: ${order.customerName}`,
+      `نوع الطلب: ${typeLabel}`,
+      `المنتجات: ${products.map((product) => `${product.productName} × ${product.quantity}`).join("، ")}`,
+      `الإجمالي: ${Number(order.totalAmount).toFixed(2)} د.ل`,
+    ].join("\n");
+
+    const result = await sendOneSignalNotification({
+      driverId,
+      orderId: order.id,
+      restaurantId: order.restaurantId,
+      assignmentId: attempt.id,
+      title: "🚨 طلب جديد",
+      message,
+      url: driverOrderUrl(order.id),
+      subscriptionIds,
+      customerName: order.customerName,
+      orderType: order.orderType,
+      products,
+      total: order.totalAmount,
+    });
+
+    const [notification] = await db.insert(notificationsTable).values({
+      type: "NEW_DRIVER_ORDER",
+      message,
+      driverId,
+      restaurantId: order.restaurantId,
+      orderId: order.id,
+      relatedId: order.id,
+      relatedType: "order",
+    }).returning({ id: notificationsTable.id });
+
+    await db.update(orderDriverAttemptsTable)
+      .set({
+        notificationStatus: "SENT",
+        notificationSentAt: new Date(),
+        notificationResponseStatus: result.status,
+        notificationResponse: result.responseText,
+      })
+      .where(eq(orderDriverAttemptsTable.id, attempt.id));
+
+    publishDriverEvent(driverId, {
+      type: "NEW_DRIVER_ORDER",
+      notificationId: notification?.id ?? null,
+      orderId: order.id,
+      message,
+    });
+  } catch (error) {
+    const pushError = error as OneSignalPushError;
+    const responseText = pushError.responseText ?? pushError.message;
+    await db.update(orderDriverAttemptsTable)
+      .set({
+        notificationStatus: "FAILED",
+        notificationResponseStatus: pushError.status ?? null,
+        notificationResponse: responseText,
+        notificationError: pushError.message,
+      })
+      .where(eq(orderDriverAttemptsTable.id, attempt.id));
+    logger.error({
+      err: error,
+      orderId: order.id,
+      restaurantId: order.restaurantId,
+      driverId,
+      assignmentId: attempt.id,
+      timestamp: new Date().toISOString(),
+      oneSignalResponseStatus: pushError.status ?? null,
+      oneSignalResponse: pushError.responseBody ?? responseText,
+    }, "Driver OneSignal notification failed");
+    throw error;
   }
-
-  const typeLabel = order.orderType === "RESERVATION" ? "حجز" : "توصيل";
-  const message = [
-    `الطلب #${order.id}`,
-    `مطعم: ${order.restaurantName}`,
-    `نوع الطلب: ${typeLabel}`,
-    `الإجمالي: ${Number(order.totalAmount).toFixed(2)} د.ل`,
-  ].join("\n");
-
-  const [notification] = await db.insert(notificationsTable).values({
-    type: "NEW_DRIVER_ORDER",
-    message,
-    driverId,
-    restaurantId: order.restaurantId,
-    orderId: order.id,
-    relatedId: order.id,
-    relatedType: "order",
-  }).returning({ id: notificationsTable.id });
-
-  publishDriverEvent(driverId, {
-    type: "NEW_DRIVER_ORDER",
-    notificationId: notification?.id ?? null,
-    orderId: order.id,
-    message,
-  });
-
-  await sendOneSignalNotification({
-    driverId,
-    orderId: order.id,
-    title: "🚨 طلب جديد",
-    message,
-    url: driverOrderUrl(order.id),
-    subscriptionIds,
-  });
 }

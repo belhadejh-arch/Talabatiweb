@@ -23,6 +23,7 @@ export async function ensureRuntimeSchema(): Promise<void> {
       delivery_fee numeric(10, 2) NOT NULL DEFAULT 0,
       total_amount numeric(10, 2) NOT NULL DEFAULT 0,
       status text NOT NULL DEFAULT 'NEW',
+       source text NOT NULL DEFAULT 'UNKNOWN',
       created_at timestamptz NOT NULL DEFAULT NOW(),
       updated_at timestamptz NOT NULL DEFAULT NOW()
     )
@@ -86,7 +87,13 @@ export async function ensureRuntimeSchema(): Promise<void> {
       status text NOT NULL DEFAULT 'PENDING',
       sent_at timestamptz NOT NULL DEFAULT NOW(),
       response_at timestamptz,
-      timeout_at timestamptz NOT NULL
+       timeout_at timestamptz NOT NULL,
+       notification_status text NOT NULL DEFAULT 'PENDING',
+       notification_attempted_at timestamptz,
+       notification_sent_at timestamptz,
+       notification_response_status integer,
+       notification_response text,
+       notification_error text
     )
   `);
 
@@ -151,6 +158,7 @@ export async function ensureRuntimeSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS delivery_fee numeric(10, 2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS total_amount numeric(10, 2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS status text DEFAULT 'NEW',
+       ADD COLUMN IF NOT EXISTS source text DEFAULT 'UNKNOWN',
       ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT NOW()
   `);
@@ -182,7 +190,13 @@ export async function ensureRuntimeSchema(): Promise<void> {
     ALTER TABLE order_driver_attempts
       ADD COLUMN IF NOT EXISTS restaurant_id integer,
       ADD COLUMN IF NOT EXISTS response_at timestamptz,
-      ADD COLUMN IF NOT EXISTS timeout_at timestamptz DEFAULT NOW()
+       ADD COLUMN IF NOT EXISTS timeout_at timestamptz DEFAULT NOW(),
+       ADD COLUMN IF NOT EXISTS notification_status text DEFAULT 'PENDING',
+       ADD COLUMN IF NOT EXISTS notification_attempted_at timestamptz,
+       ADD COLUMN IF NOT EXISTS notification_sent_at timestamptz,
+       ADD COLUMN IF NOT EXISTS notification_response_status integer,
+       ADD COLUMN IF NOT EXISTS notification_response text,
+       ADD COLUMN IF NOT EXISTS notification_error text
   `);
 
   await pool.query(`
@@ -270,6 +284,7 @@ export async function ensureRuntimeSchema(): Promise<void> {
         delivery_fee = COALESCE(delivery_fee, 0),
         total_amount = COALESCE(total_amount, 0),
         status = COALESCE(status, 'NEW'),
+       source = COALESCE(source, 'UNKNOWN'),
         created_at = COALESCE(created_at, NOW()),
         updated_at = COALESCE(updated_at, NOW())
   `);
@@ -287,7 +302,8 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     UPDATE order_driver_attempts
-    SET timeout_at = COALESCE(timeout_at, NOW())
+    SET timeout_at = COALESCE(timeout_at, NOW()),
+        notification_status = COALESCE(notification_status, 'PENDING')
   `);
 
   // Reservation orders intentionally have no delivery coordinates. Older
@@ -298,6 +314,18 @@ export async function ensureRuntimeSchema(): Promise<void> {
       ALTER COLUMN latitude DROP NOT NULL,
       ALTER COLUMN longitude DROP NOT NULL,
       ALTER COLUMN maps_url DROP NOT NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE orders
+      ALTER COLUMN source SET DEFAULT 'UNKNOWN',
+      ALTER COLUMN source SET NOT NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE order_driver_attempts
+      ALTER COLUMN notification_status SET DEFAULT 'PENDING',
+      ALTER COLUMN notification_status SET NOT NULL
   `);
 
   await pool.query(`

@@ -288,71 +288,72 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
   const subtotal = totalAmount;
   const grandTotal = subtotal + deliveryFee;
 
-  // Create order
-  const [order] = await db
-    .insert(ordersTable)
-    .values({
-      restaurantId: restaurant.id,
-      orderType,
-      customerName: customerInfo.customerName,
-      customerPhone: customerInfo.customerPhone,
-      notes: customerInfo.notes ?? null,
-      latitude: isDelivery ? latitude : null,
-      longitude: isDelivery ? longitude : null,
-      mapsUrl,
-      subtotal: String(subtotal.toFixed(2)),
-      deliveryFee: String(deliveryFee.toFixed(2)),
-      totalAmount: String(grandTotal.toFixed(2)),
-      status: "NEW",
-    })
-    .returning();
-
-  // Create order items
-  for (const li of lineItems) {
-    const [item] = await db
-      .insert(orderItemsTable)
+  // Create the complete real customer order atomically. Dispatch starts only
+  // after this transaction commits, so it can never notify for a partial order.
+  const order = await db.transaction(async (tx) => {
+    const [createdOrder] = await tx
+      .insert(ordersTable)
       .values({
-        orderId: order.id,
-        productId: li.productId,
-        productName: li.productName,
-        sizeId: li.sizeId,
-        sizeName: li.sizeName,
-        quantity: li.quantity,
-        unitPrice: String(li.unitPrice.toFixed(2)),
-        subtotal: String(li.subtotal.toFixed(2)),
+        restaurantId: restaurant.id,
+        orderType,
+        customerName: customerInfo.customerName,
+        customerPhone: customerInfo.customerPhone,
+        notes: customerInfo.notes ?? null,
+        latitude: isDelivery ? latitude : null,
+        longitude: isDelivery ? longitude : null,
+        mapsUrl,
+        subtotal: String(subtotal.toFixed(2)),
+        deliveryFee: String(deliveryFee.toFixed(2)),
+        totalAmount: String(grandTotal.toFixed(2)),
+        status: "NEW",
+        source: "PUBLIC_CUSTOMER",
       })
       .returning();
 
-    // Create addons for this item
-    if (li.addonIds.length > 0) {
-      const addons = await db
-        .select()
-        .from(addonsTable)
-        .where(eq(addonsTable.productId, li.productId));
+    for (const li of lineItems) {
+      const [item] = await tx
+        .insert(orderItemsTable)
+        .values({
+          orderId: createdOrder.id,
+          productId: li.productId,
+          productName: li.productName,
+          sizeId: li.sizeId,
+          sizeName: li.sizeName,
+          quantity: li.quantity,
+          unitPrice: String(li.unitPrice.toFixed(2)),
+          subtotal: String(li.subtotal.toFixed(2)),
+        })
+        .returning();
 
-      for (const addonId of li.addonIds) {
-        const addon = addons.find((a) => a.id === addonId);
-        if (addon) {
-          await db.insert(orderItemAddonsTable).values({
-            orderItemId: item.id,
-            addonId: addon.id,
-            addonName: addon.name,
-            price: addon.price,
-          });
+      if (li.addonIds.length > 0) {
+        const addons = await tx
+          .select()
+          .from(addonsTable)
+          .where(eq(addonsTable.productId, li.productId));
+
+        for (const addonId of li.addonIds) {
+          const addon = addons.find((a) => a.id === addonId);
+          if (addon) {
+            await tx.insert(orderItemAddonsTable).values({
+              orderItemId: item.id,
+              addonId: addon.id,
+              addonName: addon.name,
+              price: addon.price,
+            });
+          }
         }
       }
     }
-  }
 
-  // Initial status history
-  await db.insert(orderStatusHistoryTable).values({ orderId: order.id, status: "NEW" });
+    await tx.insert(orderStatusHistoryTable).values({ orderId: createdOrder.id, status: "NEW" });
+    await tx.insert(notificationsTable).values({
+      type: "NEW_ORDER",
+      message: `طلب جديد #${createdOrder.id} من ${restaurant.name} — ${customerInfo.customerName}`,
+      relatedId: createdOrder.id,
+      relatedType: "order",
+    });
 
-  // Notification for admin
-  await db.insert(notificationsTable).values({
-    type: "NEW_ORDER",
-    message: `طلب جديد #${order.id} من ${restaurant.name} — ${customerInfo.customerName}`,
-    relatedId: order.id,
-    relatedType: "order",
+    return createdOrder;
   });
 
   // The order is durable before internal dashboard assignment starts.

@@ -39,12 +39,18 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
       restaurant_id: number;
       driver_id: number | null;
       status: string;
+      source: string;
     }>(
-      "SELECT id, restaurant_id, driver_id, status FROM orders WHERE id = $1 FOR UPDATE",
+      "SELECT id, restaurant_id, driver_id, status, source FROM orders WHERE id = $1 FOR UPDATE",
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || !["NEW", "WAITING_FOR_DRIVER"].includes(order.status) || order.driver_id !== null) {
+    if (
+      !order ||
+      order.source !== "PUBLIC_CUSTOMER" ||
+      !["NEW", "WAITING_FOR_DRIVER"].includes(order.status) ||
+      order.driver_id !== null
+    ) {
       await client.query("COMMIT");
       return { assigned: false, reason: "not_pending" };
     }
@@ -67,7 +73,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     const driver = driverResult.rows[0];
     if (!driver) {
       await client.query(
-        "UPDATE orders SET status = 'WAITING_FOR_DRIVER', updated_at = NOW() WHERE id = $1 AND driver_id IS NULL AND status IN ('NEW', 'WAITING_FOR_DRIVER')",
+        "UPDATE orders SET status = 'WAITING_FOR_DRIVER', updated_at = NOW() WHERE id = $1 AND driver_id IS NULL AND status IN ('NEW', 'WAITING_FOR_DRIVER') AND source = 'PUBLIC_CUSTOMER'",
         [order.id],
       );
       await client.query("COMMIT");
@@ -111,7 +117,7 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
 
 export async function dispatchPendingOrdersForRestaurant(restaurantId: number): Promise<void> {
   const result = await pool.query<{ id: number }>(
-    "SELECT id FROM orders WHERE restaurant_id = $1 AND status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC",
+    "SELECT id FROM orders WHERE restaurant_id = $1 AND source = 'PUBLIC_CUSTOMER' AND status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC",
     [restaurantId],
   );
   for (const order of result.rows) {
@@ -128,8 +134,13 @@ export async function respondToOrderAttempt(
   let shouldDispatchNext = false;
   try {
     await client.query("BEGIN");
-    const orderResult = await client.query<{ restaurant_id: number; driver_id: number | null; status: string }>(
-      "SELECT restaurant_id, driver_id, status FROM orders WHERE id = $1 FOR UPDATE",
+    const orderResult = await client.query<{
+      restaurant_id: number;
+      driver_id: number | null;
+      status: string;
+      source: string;
+    }>(
+      "SELECT restaurant_id, driver_id, status, source FROM orders WHERE id = $1 FOR UPDATE",
       [orderId],
     );
     const order = orderResult.rows[0];
@@ -197,12 +208,12 @@ export async function retryOrderDispatch(orderId: number): Promise<DispatchResul
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const orderResult = await client.query<{ driver_id: number | null; status: string }>(
-      "SELECT driver_id, status FROM orders WHERE id = $1 FOR UPDATE",
+    const orderResult = await client.query<{ driver_id: number | null; status: string; source: string }>(
+      "SELECT driver_id, status, source FROM orders WHERE id = $1 FOR UPDATE",
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || !["NEW", "WAITING_FOR_DRIVER"].includes(order.status)) {
+    if (!order || order.source !== "PUBLIC_CUSTOMER" || !["NEW", "WAITING_FOR_DRIVER"].includes(order.status)) {
       await client.query("ROLLBACK");
       return { assigned: false, reason: "not_pending" };
     }
@@ -240,12 +251,17 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const orderResult = await client.query<{ restaurant_id: number; driver_id: number | null; status: string }>(
-      "SELECT restaurant_id, driver_id, status FROM orders WHERE id = $1 FOR UPDATE",
+    const orderResult = await client.query<{
+      restaurant_id: number;
+      driver_id: number | null;
+      status: string;
+      source: string;
+    }>(
+      "SELECT restaurant_id, driver_id, status, source FROM orders WHERE id = $1 FOR UPDATE",
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || order.status !== "NEW") {
+    if (!order || order.source !== "PUBLIC_CUSTOMER" || order.status !== "NEW") {
       await client.query("ROLLBACK");
       return false;
     }
@@ -262,6 +278,15 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       return false;
     }
 
+    const previousAttempt = await client.query<{ id: number }>(
+      "SELECT id FROM order_driver_attempts WHERE order_id = $1 AND driver_id = $2 FOR UPDATE",
+      [orderId, driverId],
+    );
+    if (previousAttempt.rows[0]) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+
     if (order.driver_id && order.driver_id !== driverId) {
       await client.query(
         `UPDATE order_driver_attempts
@@ -274,15 +299,11 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     await client.query(
       `INSERT INTO order_driver_attempts
         (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
-       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
-       ON CONFLICT (order_id, driver_id) DO UPDATE
-        SET restaurant_id = EXCLUDED.restaurant_id,
-            status = 'PENDING', sent_at = NOW(), response_at = NULL,
-            timeout_at = NOW() + ($4 * INTERVAL '1 second')`,
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))`,
       [orderId, driverId, order.restaurant_id, timeoutSeconds],
     );
     await client.query(
-        "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1",
+      "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1 AND source = 'PUBLIC_CUSTOMER'",
       [orderId, driverId],
     );
     await client.query(
@@ -301,36 +322,30 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
   }
 }
 
-async function dispatchPendingOrders(): Promise<void> {
-  const result = await pool.query<{ id: number }>(
-    "SELECT id FROM orders WHERE status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC LIMIT 100",
-  );
-  for (const order of result.rows) {
-    await dispatchNextDriverForOrder(order.id);
-  }
-}
-
 async function expireTimedOutAttempts(): Promise<void> {
   const client = await pool.connect();
   const expired: Array<{ orderId: number; driverId: number }> = [];
   try {
     await client.query("BEGIN");
     const result = await client.query<{ id: number; order_id: number; driver_id: number }>(
-      `SELECT id, order_id, driver_id
-       FROM order_driver_attempts
-       WHERE status = 'PENDING' AND timeout_at <= NOW()
-       ORDER BY timeout_at ASC
+       `SELECT a.id, a.order_id, a.driver_id
+       FROM order_driver_attempts a
+       JOIN orders o ON o.id = a.order_id
+       WHERE a.status = 'PENDING'
+         AND a.timeout_at <= NOW()
+         AND o.source = 'PUBLIC_CUSTOMER'
+        ORDER BY a.timeout_at ASC
        FOR UPDATE SKIP LOCKED
        LIMIT 100`,
     );
 
     for (const attempt of result.rows) {
       await client.query(
-        "UPDATE order_driver_attempts SET status = 'TIMEOUT' WHERE id = $1 AND status = 'PENDING'",
+        "UPDATE order_driver_attempts SET status = 'TIMEOUT', response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
         [attempt.id],
       );
       const orderUpdate = await client.query(
-        "UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE id = $1 AND driver_id = $2 AND status = 'NEW'",
+        "UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE id = $1 AND driver_id = $2 AND status = 'NEW' AND source = 'PUBLIC_CUSTOMER'",
         [attempt.order_id, attempt.driver_id],
       );
       if (orderUpdate.rowCount) {
@@ -363,13 +378,11 @@ export function startDriverDispatchWorker(): void {
   const run = async () => {
     try {
       await expireTimedOutAttempts();
-      await dispatchPendingOrders();
     } catch (error) {
       logger.error({ err: error }, "Driver dispatch worker failed");
     }
   };
 
-  void run();
   const timer = setInterval(() => void run(), DISPATCH_INTERVAL_MS);
   timer.unref();
 }

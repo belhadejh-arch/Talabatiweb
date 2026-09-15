@@ -13,3 +13,4 @@
 - [Imported artifact workflows](imported-artifact-workflows.md) — imported artifact metadata may lack registered workflows; manual workflows need explicit PORT values for API and Vite
 - [OneSignal driver push](onesignal-push.md) — REST key validity must be verified separately from missing subscriptions; invalid keys return HTTP 401
 - [Driver session persistence](driver-session-persistence.md) — Render needs PostgreSQL-backed sessions; in-memory sessions disappear on restart or instance movement
+- [Real-order driver dispatch](real-order-dispatch.md) — public-menu source plus a PostgreSQL notification claim prevents stale and duplicate driver pushes
