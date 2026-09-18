@@ -258,7 +258,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
         eq(driverOneSignalSubscriptionsTable.optedIn, true),
       ))
       .orderBy(desc(driverOneSignalSubscriptionsTable.updatedAt))
-      .limit(20);
+      .limit(1);
     const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
     if (subscriptionIds.length === 0) {
       logger.warn(

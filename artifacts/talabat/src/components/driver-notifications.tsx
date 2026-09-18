@@ -47,6 +47,7 @@ type OneSignalInstance = {
       ) => void;
     };
   };
+  logout?: () => Promise<void>;
 };
 
 async function waitForOneSignalSubscription(oneSignal: OneSignalInstance): Promise<string | null> {
@@ -96,10 +97,16 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     try {
       const response = await request("/api/driver/notifications");
       const notifications: DriverNotification[] = response.data || [];
+      if (!initialized.current) {
+        // Hydrate the baseline without surfacing an old unread notification
+        // merely because the driver opened or refreshed the dashboard.
+        knownIds.current = new Set(notifications.map((notification) => notification.id));
+        initialized.current = true;
+        return;
+      }
       const incoming = notifications.find((notification) => !notification.isRead && !knownIds.current.has(notification.id));
       if (incoming) setLatest(incoming);
       knownIds.current = new Set(notifications.map((notification) => notification.id));
-      initialized.current = true;
     } catch {
       // The driver dashboard owns the auth redirect. A logged-out tab can safely stop polling.
     }
@@ -206,6 +213,13 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   }, [base, enabled, loadNotifications]);
 
   useEffect(() => {
+    if (enabled) return;
+    initialized.current = false;
+    knownIds.current.clear();
+    setLatest(null);
+  }, [enabled]);
+
+  useEffect(() => {
     if (!enabled || oneSignalSetupStarted.current) return;
     oneSignalSetupStarted.current = true;
     let cancelled = false;
@@ -293,8 +307,12 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
       if (OneSignal && listener) {
         OneSignal.User.PushSubscription.removeEventListener?.("change", listener);
       }
+      if (OneSignal?.logout) void OneSignal.logout().catch(() => undefined);
       subscriptionChangeRef.current = null;
       registerSubscriptionRef.current = null;
+      oneSignalSetupStarted.current = false;
+      oneSignalRef.current = null;
+      driverIdRef.current = null;
     };
   }, [enabled, request]);
 

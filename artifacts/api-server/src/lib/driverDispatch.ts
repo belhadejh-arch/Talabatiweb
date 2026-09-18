@@ -115,16 +115,6 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
   }
 }
 
-export async function dispatchPendingOrdersForRestaurant(restaurantId: number): Promise<void> {
-  const result = await pool.query<{ id: number }>(
-    "SELECT id FROM orders WHERE restaurant_id = $1 AND source = 'PUBLIC_CUSTOMER' AND status IN ('NEW', 'WAITING_FOR_DRIVER') AND driver_id IS NULL ORDER BY created_at ASC, id ASC",
-    [restaurantId],
-  );
-  for (const order of result.rows) {
-    await dispatchNextDriverForOrder(order.id);
-  }
-}
-
 export async function respondToOrderAttempt(
   orderId: number,
   driverId: number,

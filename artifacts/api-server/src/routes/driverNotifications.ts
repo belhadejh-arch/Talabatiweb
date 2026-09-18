@@ -123,6 +123,18 @@ router.post("/driver/push/onesignal-subscription", requireDriverAuth, async (req
     return;
   }
 
+  // A browser can create a new subscription after a reinstall, profile
+  // switch, or permission reset. Keep only the current opted-in subscription
+  // eligible for driver-order pushes so an old browser cannot receive a
+  // duplicate or stale alert.
+  await db.update(driverOneSignalSubscriptionsTable)
+    .set({ optedIn: false, updatedAt: new Date() })
+    .where(and(
+      eq(driverOneSignalSubscriptionsTable.driverId, driver.id),
+      eq(driverOneSignalSubscriptionsTable.appId, appId),
+      eq(driverOneSignalSubscriptionsTable.externalId, externalId),
+    ));
+
   await db.insert(driverOneSignalSubscriptionsTable).values({
     driverId: driver.id,
     appId,

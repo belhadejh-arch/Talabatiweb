@@ -7,7 +7,6 @@ import {
   UpdateDriverBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { dispatchPendingOrdersForRestaurant } from "../lib/driverDispatch";
 
 const router: IRouter = Router();
 
@@ -153,9 +152,6 @@ router.patch("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(driversTable.id, id))
     .returning();
 
-  if (parsed.data.isActive === true) {
-    await dispatchPendingOrdersForRestaurant(existing.restaurantId);
-  }
   res.json(driver);
 });
 
@@ -201,7 +197,6 @@ router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const client = await pool.connect();
-  let restaurantId: number | null = null;
   try {
     await client.query("BEGIN");
     const result = await client.query<{ restaurant_id: number }>(
@@ -214,8 +209,6 @@ router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    restaurantId = driver.restaurant_id;
-
     // Do not leave a deleted driver attached to an order. Orders that were
     // waiting for a response become eligible for the normal DB dispatcher.
     await client.query(
@@ -241,7 +234,6 @@ router.delete("/drivers/:id", requireAuth, async (req, res): Promise<void> => {
     client.release();
   }
 
-  if (restaurantId !== null) await dispatchPendingOrdersForRestaurant(restaurantId);
   res.status(204).send();
 });
 
