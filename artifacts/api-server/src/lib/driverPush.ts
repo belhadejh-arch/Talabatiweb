@@ -1,13 +1,13 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import {
   db,
   driverOneSignalSubscriptionsTable,
   driversTable,
-  notificationsTable,
   orderItemAddonsTable,
   orderItemsTable,
   orderDriverAttemptsTable,
   ordersTable,
+  pool,
   restaurantsTable,
 } from "@workspace/db";
 import { logger } from "./logger";
@@ -214,6 +214,7 @@ export async function notifyAssignedDriver(
       eq(orderDriverAttemptsTable.restaurantId, order?.restaurantId ?? -1),
       eq(orderDriverAttemptsTable.status, "PENDING"),
       eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
+      gt(orderDriverAttemptsTable.timeoutAt, new Date()),
     ));
   if (!order || !driver || !attempt) return;
 
@@ -238,8 +239,14 @@ export async function notifyAssignedDriver(
            AND current_order.restaurant_id = ${orderDriverAttemptsTable.restaurantId}
            AND current_order.status = 'NEW'
            AND current_order.source = 'PUBLIC_CUSTOMER'
+            AND ${orderDriverAttemptsTable.timeoutAt} > NOW()
            AND current_driver.is_active = true
            AND current_driver.status = 'ACTIVE'
+            AND EXISTS (
+              SELECT 1
+                FROM restaurants current_restaurant
+               WHERE current_restaurant.id = current_order.restaurant_id
+            )
       )`,
     ))
     .returning({ id: orderDriverAttemptsTable.id });
@@ -364,40 +371,95 @@ export async function notifyAssignedDriver(
         : {}),
     };
 
-    const result = await sendOneSignalNotification({
-      driverId,
-      orderId: order.id,
-      restaurantId: order.restaurantId,
-      assignmentId: attempt.id,
-      title: "🚨 طلب جديد",
-      message,
-      url: driverOrderUrl(order.id),
-      subscriptionIds,
-      data: notificationData,
-    });
+    // Hold PostgreSQL row locks across the final eligibility check and the
+    // external request. This prevents an accept, reject, cancellation,
+    // timeout, reassignment, or driver deactivation from committing between
+    // the last check and the OneSignal request.
+    const client = await pool.connect();
+    let notificationId: number | null = null;
+    try {
+      await client.query("BEGIN");
+      const eligible = await client.query(
+        `SELECT a.id
+           FROM order_driver_attempts a
+           JOIN orders o ON o.id = a.order_id
+           JOIN drivers d ON d.id = a.driver_id
+           JOIN restaurants r ON r.id = a.restaurant_id
+          WHERE a.id = $1
+            AND a.order_id = $2
+            AND a.driver_id = $3
+            AND a.status = 'PENDING'
+            AND a.notification_status = 'SENDING'
+            AND a.timeout_at > NOW()
+            AND o.driver_id = a.driver_id
+            AND o.restaurant_id = a.restaurant_id
+            AND o.status = 'NEW'
+            AND o.source = 'PUBLIC_CUSTOMER'
+            AND d.restaurant_id = a.restaurant_id
+            AND d.is_active = true
+            AND d.status = 'ACTIVE'
+          FOR UPDATE OF a, o, d`,
+        [attempt.id, orderId, driverId],
+      );
+      if (eligible.rowCount !== 1) {
+        await client.query(
+          `UPDATE order_driver_attempts
+              SET notification_status = 'SKIPPED',
+                  notification_error = $2
+            WHERE id = $1
+              AND notification_status = 'SENDING'`,
+          [attempt.id, "Order eligibility changed before OneSignal send"],
+        );
+        await client.query("COMMIT");
+        logger.info(
+          { driverId, orderId, assignmentId: attempt.id },
+          "Driver OneSignal notification skipped after final eligibility check",
+        );
+        return;
+      }
 
-    const [notification] = await db.insert(notificationsTable).values({
-      type: "NEW_DRIVER_ORDER",
-      message,
-      driverId,
-      restaurantId: order.restaurantId,
-      orderId: order.id,
-      relatedId: order.id,
-      relatedType: "order",
-    }).returning({ id: notificationsTable.id });
+      const result = await sendOneSignalNotification({
+        driverId,
+        orderId: order.id,
+        restaurantId: order.restaurantId,
+        assignmentId: attempt.id,
+        title: "🚨 طلب جديد",
+        message,
+        url: driverOrderUrl(order.id),
+        subscriptionIds,
+        data: notificationData,
+      });
 
-    await db.update(orderDriverAttemptsTable)
-      .set({
-        notificationStatus: "SENT",
-        notificationSentAt: new Date(),
-        notificationResponseStatus: result.status,
-        notificationResponse: result.responseText,
-      })
-      .where(eq(orderDriverAttemptsTable.id, attempt.id));
+      const notification = await client.query<{ id: number }>(
+        `INSERT INTO notifications
+          (type, message, driver_id, restaurant_id, order_id, related_id, related_type)
+         VALUES ($1, $2, $3, $4, $5, $5, $6)
+         RETURNING id`,
+        ["NEW_DRIVER_ORDER", message, driverId, order.restaurantId, order.id, "order"],
+      );
+      notificationId = notification.rows[0]?.id ?? null;
+
+      await client.query(
+        `UPDATE order_driver_attempts
+            SET notification_status = 'SENT',
+                notification_sent_at = NOW(),
+                notification_response_status = $2,
+                notification_response = $3
+          WHERE id = $1
+            AND notification_status = 'SENDING'`,
+        [attempt.id, result.status, result.responseText],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
 
     publishDriverEvent(driverId, {
       type: "NEW_DRIVER_ORDER",
-      notificationId: notification?.id ?? null,
+      notificationId,
       orderId: order.id,
       message,
     });

@@ -7,4 +7,4 @@ Only orders created by the public restaurant menu are eligible for driver push d
 
 **Why:** Process memory and broad startup scans caused stale, duplicate, and cross-restaurant driver alerts.
 
-**How to apply:** Preserve the public-order source marker, current-order/driver validation, exact assignment identity, and database notification status whenever changing assignment, retry, timeout, manual-dispatch, or driver-notification UI code. Never replace a pending notification with a single global latest value.
+**How to apply:** Preserve the public-order source marker, current-order/driver validation, exact assignment identity, and database notification status whenever changing assignment, retry, timeout, manual-dispatch, or driver-notification UI code. Never replace a pending notification with a single global latest value. Do not reset `SENDING` claims after restart; an external push may already have been accepted.
