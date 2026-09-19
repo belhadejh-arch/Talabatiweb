@@ -161,12 +161,14 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
       const permission = await OneSignal.Notifications.requestPermission();
       if (permission) {
         await OneSignal.User.PushSubscription.optIn();
+        await waitForOneSignalSubscription(OneSignal);
         await registerSubscriptionRef.current?.();
       }
       if (permission) {
         setPushPrompt(false);
         setPushWarning("");
       } else {
+        await registerSubscriptionRef.current?.().catch(() => undefined);
         setPushPrompt(false);
         setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات حتى لا تفوتك الطلبات الجديدة.");
       }
@@ -272,6 +274,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
         oneSignalAppIdRef.current = String(config.appId);
         if (!config.configured) {
           setPushWarning("⚠️ إعدادات إشعارات الطلبات غير مكتملة في الخادم.");
+          return;
         }
 
         const deferred = window.OneSignalDeferred || (window.OneSignalDeferred = []);
@@ -294,10 +297,34 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
             await OneSignal.login(String(driverIdRef.current));
 
             const registerSubscription = async () => {
-              const subscriptionId = await waitForOneSignalSubscription(OneSignal);
+              const notificationPermission =
+                typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+              const currentPushSubscription = OneSignal.User.PushSubscription;
+              const subscriptionId = currentPushSubscription.id?.trim() || "";
+              const optedIn = currentPushSubscription.optedIn === true;
               const currentDriverId = driverIdRef.current;
-              if (!subscriptionId || !currentDriverId) {
-                throw new Error("OneSignal subscription ID was not created");
+              if (!currentDriverId) {
+                throw new Error("OneSignal subscription cannot be linked without the current driver identity");
+              }
+              if (!subscriptionId || !optedIn || notificationPermission !== "granted") {
+                console.warn("OneSignal driver push is not active", {
+                  driverId: currentDriverId,
+                  appId: oneSignalAppIdRef.current,
+                  subscriptionId: subscriptionId || null,
+                  notificationPermission,
+                  optedIn,
+                });
+                await request("/api/driver/push/onesignal-subscription", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    subscriptionId: subscriptionId || undefined,
+                    appId: oneSignalAppIdRef.current,
+                    externalId: String(currentDriverId),
+                    notificationPermission,
+                    optedIn,
+                  }),
+                }).catch(() => undefined);
+                throw new Error("OneSignal driver push subscription is not active");
               }
               await request("/api/driver/push/onesignal-subscription", {
                 method: "POST",
@@ -305,7 +332,8 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
                   subscriptionId,
                   appId: oneSignalAppIdRef.current,
                   externalId: String(currentDriverId),
-                  optedIn: OneSignal.User.PushSubscription.optedIn === true,
+                  notificationPermission,
+                  optedIn,
                 }),
               });
             };
@@ -321,9 +349,15 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
 
             if (Notification.permission === "denied") {
               setPushWarning("⚠️ إشعارات الطلبات غير مفعلة — فعّل الإشعارات من إعدادات المتصفح.");
+              await registerSubscription().catch(() => undefined);
             } else if (Notification.permission === "granted") {
               await OneSignal.User.PushSubscription.optIn();
-              await registerSubscription();
+              try {
+                await waitForOneSignalSubscription(OneSignal);
+                await registerSubscription();
+              } catch {
+                setPushWarning("⚠️ لم يتم تسجيل اشتراك Push فعلي لهذا الجهاز.");
+              }
             } else {
               setPushPrompt(true);
             }

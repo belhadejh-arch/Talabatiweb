@@ -262,10 +262,12 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
       .limit(1);
     const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
     if (subscriptionIds.length === 0) {
-      logger.warn(
+      const error = new Error("No opted-in OneSignal subscription is registered for the assigned driver");
+      logger.error(
         { driverId, orderId },
-        "No opted-in OneSignal subscription is registered; falling back to driver external_id",
+        "Driver push was not sent because the assigned driver has no active OneSignal subscription",
       );
+      throw error;
     }
 
     const typeLabel = order.orderType === "RESERVATION" ? "حجز" : "توصيل";

@@ -108,18 +108,96 @@ router.post("/driver/push/onesignal-subscription", requireDriverAuth, async (req
     : "";
   const appId = typeof req.body?.appId === "string" ? req.body.appId.trim() : "";
   const externalId = typeof req.body?.externalId === "string" ? req.body.externalId.trim() : "";
+  const notificationPermission = req.body?.notificationPermission;
   const optedIn = req.body?.optedIn === true;
+  const expectedExternalId = String(driver.id);
 
-  if (!subscriptionId || subscriptionId.length > 255) {
-    res.status(400).json({ error: "معرّف OneSignal Subscription غير صالح" });
+  if (!isOneSignalConfigured()) {
+    logger.error(
+      { driverId: driver.id, appId: getOneSignalAppId() },
+      "Cannot register OneSignal driver subscription because the backend REST key is not configured",
+    );
+    res.status(503).json({ error: "إشعارات OneSignal غير مهيأة في الخادم" });
     return;
   }
   if (appId !== getOneSignalAppId()) {
+    logger.warn(
+      { driverId: driver.id, receivedAppId: appId, expectedAppId: getOneSignalAppId() },
+      "Rejected OneSignal subscription with a mismatched App ID",
+    );
     res.status(400).json({ error: "OneSignal App ID غير مطابق" });
     return;
   }
-  if (externalId !== String(driver.id)) {
+  if (externalId !== expectedExternalId) {
+    logger.warn(
+      { driverId: driver.id, receivedExternalId: externalId, expectedExternalId },
+      "Rejected OneSignal subscription with a mismatched external ID",
+    );
     res.status(400).json({ error: "هوية OneSignal لا تطابق السائق الحالي" });
+    return;
+  }
+
+  if (!optedIn || notificationPermission !== "granted") {
+    await db.update(driverOneSignalSubscriptionsTable)
+      .set({ optedIn: false, updatedAt: new Date() })
+      .where(and(
+        eq(driverOneSignalSubscriptionsTable.driverId, driver.id),
+        eq(driverOneSignalSubscriptionsTable.appId, appId),
+        eq(driverOneSignalSubscriptionsTable.externalId, expectedExternalId),
+      ));
+    logger.warn(
+      {
+        driverId: driver.id,
+        appId,
+        externalId: expectedExternalId,
+        subscriptionId: subscriptionId || null,
+        notificationPermission,
+        optedIn,
+      },
+      "OneSignal driver subscription is not active; push notifications are disabled for this driver",
+    );
+    res.status(409).json({ error: "جهاز السائق غير مشترك فعليًا في الإشعارات", subscribed: false });
+    return;
+  }
+
+  if (!subscriptionId || subscriptionId.length > 255) {
+    logger.warn(
+      { driverId: driver.id, appId, externalId: expectedExternalId },
+      "OneSignal driver subscription registration has no valid subscription ID",
+    );
+    res.status(400).json({ error: "معرّف OneSignal Subscription غير صالح" });
+    return;
+  }
+
+  const [existingSubscription] = await db
+    .select({
+      driverId: driverOneSignalSubscriptionsTable.driverId,
+      appId: driverOneSignalSubscriptionsTable.appId,
+      externalId: driverOneSignalSubscriptionsTable.externalId,
+    })
+    .from(driverOneSignalSubscriptionsTable)
+    .where(eq(driverOneSignalSubscriptionsTable.subscriptionId, subscriptionId));
+  if (
+    existingSubscription &&
+    (
+      existingSubscription.driverId !== driver.id ||
+      existingSubscription.appId !== appId ||
+      existingSubscription.externalId !== expectedExternalId
+    )
+  ) {
+    logger.error(
+      {
+        driverId: driver.id,
+        subscriptionId,
+        existingDriverId: existingSubscription.driverId,
+        existingAppId: existingSubscription.appId,
+        existingExternalId: existingSubscription.externalId,
+        appId,
+        externalId: expectedExternalId,
+      },
+      "Rejected OneSignal subscription already owned by another driver identity",
+    );
+    res.status(409).json({ error: "اشتراك OneSignal مرتبط بسائق آخر" });
     return;
   }
 
@@ -132,31 +210,45 @@ router.post("/driver/push/onesignal-subscription", requireDriverAuth, async (req
     .where(and(
       eq(driverOneSignalSubscriptionsTable.driverId, driver.id),
       eq(driverOneSignalSubscriptionsTable.appId, appId),
-      eq(driverOneSignalSubscriptionsTable.externalId, externalId),
+      eq(driverOneSignalSubscriptionsTable.externalId, expectedExternalId),
     ));
 
   await db.insert(driverOneSignalSubscriptionsTable).values({
     driverId: driver.id,
     appId,
     subscriptionId,
-    externalId,
+    externalId: expectedExternalId,
     optedIn,
   }).onConflictDoUpdate({
     target: driverOneSignalSubscriptionsTable.subscriptionId,
     set: {
       driverId: driver.id,
       appId,
-      externalId,
+      externalId: expectedExternalId,
       optedIn,
       updatedAt: new Date(),
     },
   });
 
   logger.info(
-    { driverId: driver.id, appId, subscriptionId, externalId, optedIn },
+    {
+      driverId: driver.id,
+      appId,
+      subscriptionId,
+      externalId: expectedExternalId,
+      notificationPermission,
+      optedIn,
+    },
     "OneSignal driver subscription registered",
   );
-  res.status(201).json({ ok: true, appId, externalId, subscriptionId, optedIn });
+  res.status(201).json({
+    ok: true,
+    subscribed: true,
+    appId,
+    externalId: expectedExternalId,
+    subscriptionId,
+    optedIn,
+  });
 });
 
 router.delete("/driver/push/subscription", requireDriverAuth, async (req, res): Promise<void> => {
