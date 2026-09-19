@@ -16,6 +16,8 @@ type DispatchResult =
   | { assigned: true; orderId: number; driverId: number; assignmentId: number }
   | { assigned: false; reason: "not_pending" | "no_driver" };
 
+type DispatchReason = "INITIAL" | "REJECTED" | "TIMEOUT" | "MANUAL";
+
 async function getTimeoutSeconds(): Promise<number> {
   const [settings] = await db
     .select({ timeout: settingsTable.driverResponseTimeoutSeconds })
@@ -28,7 +30,10 @@ async function getTimeoutSeconds(): Promise<number> {
  * Atomically selects the next eligible driver and creates one PENDING
  * attempt. The driver sees the assignment in the internal dashboard.
  */
-export async function dispatchNextDriverForOrder(orderId: number): Promise<DispatchResult> {
+export async function dispatchNextDriverForOrder(
+  orderId: number,
+  reason: DispatchReason = "INITIAL",
+): Promise<DispatchResult> {
   const timeoutSeconds = await getTimeoutSeconds();
   const client = await pool.connect();
 
@@ -82,14 +87,14 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
       return { assigned: false, reason: "no_driver" };
     }
 
-    const attemptResult = await client.query<{ id: number }>(
+    const attemptResult = await client.query<{ assignment_id: number }>(
       `INSERT INTO order_driver_attempts
-        (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
+        (order_id, driver_id, restaurant_id, status, created_at, expires_at)
        VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
-       RETURNING id`,
+       RETURNING assignment_id`,
       [order.id, driver.id, order.restaurant_id, timeoutSeconds],
     );
-    const assignmentId = attemptResult.rows[0]?.id;
+    const assignmentId = attemptResult.rows[0]?.assignment_id;
     if (!assignmentId) throw new Error("Failed to create driver assignment");
     await client.query(
       "UPDATE orders SET driver_id = $2, updated_at = NOW() WHERE id = $1",
@@ -106,10 +111,29 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     );
     await client.query("COMMIT");
 
+    const assignmentContext = {
+      order_id: order.id,
+      restaurant_id: order.restaurant_id,
+      driver_id: driver.id,
+      assignment_id: assignmentId,
+    };
+    logger.info(assignmentContext, "[DRIVER_SELECTED]");
+    if (reason !== "INITIAL") {
+      logger.info({ order_id: order.id, driver_id: driver.id }, "[NEXT_DRIVER]");
+    }
     try {
       await notifyAssignedDriver(driver.id, order.id, assignmentId);
     } catch (error) {
-      logger.error({ err: error, driverId: driver.id, orderId: order.id }, "Failed to notify assigned driver");
+      logger.error(
+        {
+          err: error,
+          order_id: order.id,
+          driver_id: driver.id,
+          assignment_id: assignmentId,
+          exact_error: error instanceof Error ? error.message : String(error),
+        },
+        "[ONESIGNAL_ERROR]",
+      );
     }
     return { assigned: true, orderId: order.id, driverId: driver.id, assignmentId };
   } catch (error) {
@@ -165,26 +189,26 @@ export async function respondToOrderAttempt(
       return false;
     }
 
-    const attemptResult = await client.query<{ id: number }>(
-      `SELECT id FROM order_driver_attempts
+    const attemptResult = await client.query<{ assignment_id: number }>(
+      `SELECT assignment_id FROM order_driver_attempts
        WHERE order_id = $1
          AND driver_id = $2
          AND restaurant_id = $3
          AND status = 'PENDING'
-         AND timeout_at > NOW()
+          AND expires_at > NOW()
        FOR UPDATE`,
       [orderId, driverId, order.restaurant_id],
     );
     const attempt = attemptResult.rows[0];
     if (!attempt) {
-      const expiredAttempt = await client.query<{ id: number }>(
-        `SELECT id
+      const expiredAttempt = await client.query<{ assignment_id: number }>(
+        `SELECT assignment_id
            FROM order_driver_attempts
           WHERE order_id = $1
             AND driver_id = $2
             AND restaurant_id = $3
             AND status = 'PENDING'
-            AND timeout_at <= NOW()
+            AND expires_at <= NOW()
           FOR UPDATE`,
         [orderId, driverId, order.restaurant_id],
       );
@@ -197,16 +221,16 @@ export async function respondToOrderAttempt(
         `UPDATE order_driver_attempts
             SET status = 'TIMEOUT',
                 response_at = NOW()
-          WHERE id = $1
+           WHERE assignment_id = $1
             AND status = 'PENDING'`,
-        [expiredAttempt.rows[0].id],
+        [expiredAttempt.rows[0].assignment_id],
       );
       await client.query(
         `UPDATE orders
             SET driver_id = NULL,
                 status = 'NEW',
                 updated_at = NOW()
-          WHERE id = $1
+           WHERE id = $1
             AND driver_id = $2
             AND status = 'NEW'
             AND source = 'PUBLIC_CUSTOMER'`,
@@ -225,10 +249,10 @@ export async function respondToOrderAttempt(
         `UPDATE order_driver_attempts
             SET status = $2,
                 response_at = NOW()
-          WHERE id = $1
+          WHERE assignment_id = $1
             AND status = 'PENDING'
-            AND timeout_at > NOW()`,
-        [attempt.id, response],
+            AND expires_at > NOW()`,
+        [attempt.assignment_id, response],
       );
       if (attemptUpdate.rowCount !== 1) {
         await client.query("ROLLBACK");
@@ -290,7 +314,17 @@ export async function respondToOrderAttempt(
     client.release();
   }
 
-  if (shouldDispatchNext) await dispatchNextDriverForOrder(orderId);
+  if (handled) {
+    logger.info(
+      { order_id: orderId, driver_id: driverId },
+      response === "ACCEPTED" ? "[DRIVER_ACCEPTED]" : "[DRIVER_REJECTED]",
+    );
+  } else {
+    logger.info({ order_id: orderId, driver_id: driverId }, "[DRIVER_TIMEOUT]");
+  }
+  if (shouldDispatchNext) {
+    await dispatchNextDriverForOrder(orderId, handled ? "REJECTED" : "TIMEOUT");
+  }
   return handled;
 }
 
@@ -337,7 +371,7 @@ export async function retryOrderDispatch(orderId: number): Promise<DispatchResul
     client.release();
   }
 
-  return dispatchNextDriverForOrder(orderId);
+  return dispatchNextDriverForOrder(orderId, "MANUAL");
 }
 
 export async function assignSpecificDriverForOrder(orderId: number, driverId: number): Promise<number | null> {
@@ -372,8 +406,8 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       return null;
     }
 
-    const previousAttempt = await client.query<{ id: number }>(
-      "SELECT id FROM order_driver_attempts WHERE order_id = $1 AND driver_id = $2 FOR UPDATE",
+    const previousAttempt = await client.query<{ assignment_id: number }>(
+      "SELECT assignment_id FROM order_driver_attempts WHERE order_id = $1 AND driver_id = $2 FOR UPDATE",
       [orderId, driverId],
     );
     if (previousAttempt.rows[0]) {
@@ -390,14 +424,14 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       );
     }
 
-    const attemptResult = await client.query<{ id: number }>(
+    const attemptResult = await client.query<{ assignment_id: number }>(
       `INSERT INTO order_driver_attempts
-        (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
+        (order_id, driver_id, restaurant_id, status, created_at, expires_at)
        VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
-       RETURNING id`,
+       RETURNING assignment_id`,
       [orderId, driverId, order.restaurant_id, timeoutSeconds],
     );
-    const assignmentId = attemptResult.rows[0]?.id;
+    const assignmentId = attemptResult.rows[0]?.assignment_id;
     if (!assignmentId) throw new Error("Failed to create manual driver assignment");
     await client.query(
       "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1 AND source = 'PUBLIC_CUSTOMER'",
@@ -410,6 +444,15 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     await client.query("COMMIT");
 
+    logger.info(
+      {
+        order_id: orderId,
+        restaurant_id: order.restaurant_id,
+        driver_id: driverId,
+        assignment_id: assignmentId,
+      },
+      "[DRIVER_SELECTED]",
+    );
     return assignmentId;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -424,24 +467,24 @@ async function expireTimedOutAttempts(): Promise<void> {
   const expired: Array<{ orderId: number; driverId: number }> = [];
   try {
     await client.query("BEGIN");
-    const result = await client.query<{ id: number; order_id: number; driver_id: number }>(
-       `SELECT a.id, a.order_id, a.driver_id
+    const result = await client.query<{ assignment_id: number; order_id: number; driver_id: number }>(
+       `SELECT a.assignment_id, a.order_id, a.driver_id
        FROM order_driver_attempts a
        JOIN orders o ON o.id = a.order_id
        WHERE a.status = 'PENDING'
-         AND a.timeout_at <= NOW()
+          AND a.expires_at <= NOW()
          AND o.source = 'PUBLIC_CUSTOMER'
          AND o.driver_id = a.driver_id
          AND o.restaurant_id = a.restaurant_id
-        ORDER BY a.timeout_at ASC
+         ORDER BY a.expires_at ASC
        FOR UPDATE SKIP LOCKED
        LIMIT 100`,
     );
 
     for (const attempt of result.rows) {
       await client.query(
-        "UPDATE order_driver_attempts SET status = 'TIMEOUT', response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
-        [attempt.id],
+         "UPDATE order_driver_attempts SET status = 'TIMEOUT', response_at = NOW() WHERE assignment_id = $1 AND status = 'PENDING'",
+         [attempt.assignment_id],
       );
       const orderUpdate = await client.query(
         "UPDATE orders SET driver_id = NULL, updated_at = NOW() WHERE id = $1 AND driver_id = $2 AND status = 'NEW' AND source = 'PUBLIC_CUSTOMER'",
@@ -464,9 +507,15 @@ async function expireTimedOutAttempts(): Promise<void> {
     client.release();
   }
 
+  for (const attempt of expired) {
+    logger.info(
+      { order_id: attempt.orderId, driver_id: attempt.driverId },
+      "[DRIVER_TIMEOUT]",
+    );
+  }
   await Promise.allSettled(
     expired.map((attempt) =>
-      dispatchNextDriverForOrder(attempt.orderId).catch((error) => {
+      dispatchNextDriverForOrder(attempt.orderId, "TIMEOUT").catch((error) => {
         logger.error(
           { err: error, orderId: attempt.orderId, driverId: attempt.driverId },
           "Failed to dispatch after driver timeout",
@@ -488,20 +537,20 @@ async function dispatchPendingDriverNotifications(): Promise<void> {
   try {
     const result = await client.query<{ order_id: number; driver_id: number; assignment_id: number }>(
       `SELECT a.order_id, a.driver_id
-              , a.id AS assignment_id
+               , a.assignment_id
          FROM order_driver_attempts a
          JOIN orders o ON o.id = a.order_id
          JOIN drivers d ON d.id = a.driver_id
         WHERE a.status = 'PENDING'
-          AND a.notification_status = 'PENDING'
-          AND a.timeout_at > NOW()
+           AND a.onesignal_status = 'PENDING'
+           AND a.expires_at > NOW()
           AND o.id = a.order_id
           AND o.driver_id = a.driver_id
           AND o.status = 'NEW'
           AND o.source = 'PUBLIC_CUSTOMER'
           AND d.is_active = true
           AND d.status = 'ACTIVE'
-        ORDER BY a.sent_at ASC
+         ORDER BY a.created_at ASC
         LIMIT 100`,
     );
     pending = result.rows;

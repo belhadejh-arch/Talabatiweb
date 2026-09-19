@@ -80,20 +80,18 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS order_driver_attempts (
-      id serial PRIMARY KEY,
+       assignment_id serial PRIMARY KEY,
       order_id integer NOT NULL,
       driver_id integer NOT NULL,
       restaurant_id integer NOT NULL,
       status text NOT NULL DEFAULT 'PENDING',
-      sent_at timestamptz NOT NULL DEFAULT NOW(),
+       created_at timestamptz NOT NULL DEFAULT NOW(),
+       expires_at timestamptz NOT NULL,
+       sent_at timestamptz,
       response_at timestamptz,
-       timeout_at timestamptz NOT NULL,
-       notification_status text NOT NULL DEFAULT 'PENDING',
-       notification_attempted_at timestamptz,
-       notification_sent_at timestamptz,
-       notification_response_status integer,
-       notification_response text,
-       notification_error text
+       onesignal_status text NOT NULL DEFAULT 'PENDING',
+       onesignal_response text,
+       onesignal_error text
     )
   `);
 
@@ -188,15 +186,57 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     ALTER TABLE order_driver_attempts
+       ADD COLUMN IF NOT EXISTS assignment_id integer,
       ADD COLUMN IF NOT EXISTS restaurant_id integer,
+       ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT NOW(),
+       ADD COLUMN IF NOT EXISTS expires_at timestamptz DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS response_at timestamptz,
-       ADD COLUMN IF NOT EXISTS timeout_at timestamptz DEFAULT NOW(),
-       ADD COLUMN IF NOT EXISTS notification_status text DEFAULT 'PENDING',
-       ADD COLUMN IF NOT EXISTS notification_attempted_at timestamptz,
-       ADD COLUMN IF NOT EXISTS notification_sent_at timestamptz,
-       ADD COLUMN IF NOT EXISTS notification_response_status integer,
-       ADD COLUMN IF NOT EXISTS notification_response text,
-       ADD COLUMN IF NOT EXISTS notification_error text
+       ADD COLUMN IF NOT EXISTS sent_at timestamptz,
+       ADD COLUMN IF NOT EXISTS onesignal_status text DEFAULT 'PENDING',
+       ADD COLUMN IF NOT EXISTS onesignal_response text,
+       ADD COLUMN IF NOT EXISTS onesignal_error text
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'order_driver_attempts' AND column_name = 'id'
+      ) THEN
+        EXECUTE 'UPDATE order_driver_attempts SET assignment_id = id WHERE assignment_id IS NULL';
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'order_driver_attempts' AND column_name = 'timeout_at'
+      ) THEN
+        EXECUTE 'UPDATE order_driver_attempts SET expires_at = timeout_at WHERE timeout_at IS NOT NULL';
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'order_driver_attempts' AND column_name = 'notification_status'
+      ) THEN
+        EXECUTE 'UPDATE order_driver_attempts SET onesignal_status = notification_status WHERE notification_status IS NOT NULL';
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'order_driver_attempts' AND column_name = 'notification_response'
+      ) THEN
+        EXECUTE 'UPDATE order_driver_attempts SET onesignal_response = notification_response WHERE notification_response IS NOT NULL';
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_name = 'order_driver_attempts' AND column_name = 'notification_error'
+      ) THEN
+        EXECUTE 'UPDATE order_driver_attempts SET onesignal_error = notification_error WHERE notification_error IS NOT NULL';
+      END IF;
+    END $$;
   `);
 
   await pool.query(`
@@ -209,7 +249,39 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     ALTER TABLE order_driver_attempts
-      ALTER COLUMN restaurant_id SET NOT NULL
+      ALTER COLUMN assignment_id SET NOT NULL,
+      ALTER COLUMN restaurant_id SET NOT NULL,
+      ALTER COLUMN created_at SET NOT NULL,
+      ALTER COLUMN expires_at SET NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS order_driver_attempts_assignment_id_unique
+      ON order_driver_attempts (assignment_id)
+  `);
+
+  await pool.query(`
+    CREATE SEQUENCE IF NOT EXISTS order_driver_attempts_assignment_id_seq
+  `);
+
+  await pool.query(`
+    SELECT setval(
+      'order_driver_attempts_assignment_id_seq',
+      GREATEST(COALESCE((SELECT MAX(assignment_id) FROM order_driver_attempts), 0) + 1, 1),
+      false
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE order_driver_attempts
+      ALTER COLUMN assignment_id SET DEFAULT nextval('order_driver_attempts_assignment_id_seq')
+  `);
+
+  await pool.query(`
+    UPDATE order_driver_attempts
+       SET created_at = COALESCE(created_at, sent_at, NOW()),
+           expires_at = COALESCE(expires_at, NOW()),
+           onesignal_status = COALESCE(onesignal_status, 'PENDING')
   `);
 
   await pool.query(`
@@ -302,8 +374,8 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     UPDATE order_driver_attempts
-    SET timeout_at = COALESCE(timeout_at, NOW()),
-        notification_status = COALESCE(notification_status, 'PENDING')
+    SET expires_at = COALESCE(expires_at, NOW()),
+        onesignal_status = COALESCE(onesignal_status, 'PENDING')
   `);
 
   // Reservation orders intentionally have no delivery coordinates. Older
@@ -324,8 +396,8 @@ export async function ensureRuntimeSchema(): Promise<void> {
 
   await pool.query(`
     ALTER TABLE order_driver_attempts
-      ALTER COLUMN notification_status SET DEFAULT 'PENDING',
-      ALTER COLUMN notification_status SET NOT NULL
+      ALTER COLUMN onesignal_status SET DEFAULT 'PENDING',
+      ALTER COLUMN onesignal_status SET NOT NULL
   `);
 
   await pool.query(`

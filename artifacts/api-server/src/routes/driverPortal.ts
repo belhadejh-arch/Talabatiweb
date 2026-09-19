@@ -10,13 +10,14 @@ const DRIVER_STATUS_VALUES = ["OUT_FOR_DELIVERY", "DELIVERED"] as const;
 
 async function getDriverAttempt(orderId: number, driverId: number) {
   const result = await pool.query<{
-    id: number;
+    assignment_id: number;
     status: string;
+    created_at: Date;
     sent_at: Date;
     response_at: Date | null;
-    timeout_at: Date;
+    expires_at: Date;
   }>(
-    `SELECT id, status, sent_at, response_at, timeout_at
+    `SELECT assignment_id, status, created_at, sent_at, response_at, expires_at
        FROM order_driver_attempts
       WHERE order_id = $1 AND driver_id = $2`,
     [orderId, driverId],
@@ -33,7 +34,7 @@ async function getDriverOrderDetail(orderId: number, driverId: number) {
     driverResponseStatus: attempt?.status ?? null,
     driverAttemptSentAt: attempt?.sent_at ?? null,
     driverAttemptResponseAt: attempt?.response_at ?? null,
-    driverAttemptTimeoutAt: attempt?.timeout_at ?? null,
+    driverAttemptTimeoutAt: attempt?.expires_at ?? null,
   };
 }
 
@@ -67,12 +68,12 @@ router.get("/driver/orders", requireDriverAuth, async (req, res): Promise<void> 
 
 router.get("/driver/orders/history", requireDriverAuth, async (req, res): Promise<void> => {
   const driver = (req as any).driver as typeof driversTable.$inferSelect;
-  const result = await pool.query<{ id: number; order_id: number; status: string; sent_at: Date; response_at: Date | null; timeout_at: Date }>(
-    `SELECT a.id, a.order_id, a.status, a.sent_at, a.response_at, a.timeout_at
+  const result = await pool.query<{ assignment_id: number; order_id: number; status: string; sent_at: Date | null; response_at: Date | null; expires_at: Date }>(
+    `SELECT a.assignment_id, a.order_id, a.status, a.sent_at, a.response_at, a.expires_at
        FROM order_driver_attempts a
        JOIN orders o ON o.id = a.order_id
       WHERE a.driver_id = $1 AND o.restaurant_id = $2 AND a.status <> 'PENDING'
-      ORDER BY a.sent_at DESC, a.id DESC`,
+      ORDER BY a.created_at DESC, a.assignment_id DESC`,
     [driver.id, driver.restaurantId],
   );
 
@@ -81,11 +82,11 @@ router.get("/driver/orders/history", requireDriverAuth, async (req, res): Promis
     if (!order) return null;
     return {
       ...order,
-      attemptId: attempt.id,
+      attemptId: attempt.assignment_id,
       driverResponseStatus: attempt.status,
       driverAttemptSentAt: attempt.sent_at,
       driverAttemptResponseAt: attempt.response_at,
-      driverAttemptTimeoutAt: attempt.timeout_at,
+      driverAttemptTimeoutAt: attempt.expires_at,
       canRespond: false,
     };
   }));

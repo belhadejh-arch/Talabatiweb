@@ -38,9 +38,9 @@ router.get("/drivers", requireAuth, async (_req, res): Promise<void> => {
     SELECT
       d.*,
       r.name AS restaurant_name,
-      COUNT(a.id) FILTER (WHERE a.status = 'ACCEPTED')::int AS accepted_count,
-      COUNT(a.id) FILTER (WHERE a.status = 'REJECTED')::int AS rejected_count,
-      COUNT(a.id) FILTER (WHERE a.status = 'TIMEOUT')::int AS timeout_count
+      COUNT(a.assignment_id) FILTER (WHERE a.status = 'ACCEPTED')::int AS accepted_count,
+      COUNT(a.assignment_id) FILTER (WHERE a.status = 'REJECTED')::int AS rejected_count,
+      COUNT(a.assignment_id) FILTER (WHERE a.status = 'TIMEOUT')::int AS timeout_count
     FROM drivers d
     JOIN restaurants r ON r.id = d.restaurant_id
     LEFT JOIN order_driver_attempts a ON a.driver_id = d.id
@@ -163,7 +163,7 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
 
   const result = await pool.query(
     `SELECT
-       COALESCE(a.id, -o.id) AS id,
+       COALESCE(a.assignment_id, -o.id) AS id,
        o.id AS "orderId",
        $1::int AS "driverId",
        CASE
@@ -172,7 +172,7 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
        END AS status,
        COALESCE(a.sent_at, o.created_at) AS "sentAt",
         a.response_at AS "responseAt",
-       a.timeout_at AS "timeoutAt",
+       a.expires_at AS "timeoutAt",
        o.customer_name AS "customerName",
        o.customer_phone AS "customerPhone",
        o.total_amount AS "totalAmount",
@@ -183,7 +183,7 @@ router.get("/drivers/:id/history", requireAuth, async (req, res): Promise<void> 
        ON a.order_id = o.id AND a.driver_id = $1
      WHERE o.driver_id = $1
         OR a.driver_id = $1
-     ORDER BY COALESCE(a.sent_at, o.created_at) DESC, o.id DESC`,
+      ORDER BY COALESCE(a.created_at, o.created_at) DESC, o.id DESC`,
     [id],
   );
   res.json(result.rows.map((row) => ({ ...row, totalAmount: Number(row.totalAmount) })));

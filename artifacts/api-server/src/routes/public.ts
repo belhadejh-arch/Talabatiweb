@@ -356,10 +356,15 @@ router.post("/public/restaurants/:slug/orders", async (req, res): Promise<void> 
     return createdOrder;
   });
 
+  logger.info(
+    { order_id: order.id, restaurant_id: order.restaurantId },
+    "[REAL_ORDER_CREATED]",
+  );
+
   // The order is durable before internal dashboard assignment starts.
   let dispatchMessage = "تم إنشاء الطلب بنجاح";
   try {
-    const assignment = await dispatchNextDriverForOrder(order.id);
+    const assignment = await dispatchNextDriverForOrder(order.id, "INITIAL");
     if (assignment.assigned) {
        dispatchMessage = "تم إنشاء الطلب وتعيينه للسائق داخل المنصة";
     } else {

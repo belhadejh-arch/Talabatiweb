@@ -123,14 +123,15 @@ async function sendOneSignalNotification(input: {
 
   const validate = (result: Awaited<ReturnType<typeof send>>): OneSignalPushResult => {
     const responseLog = {
-      driverId: input.driverId,
-      orderId: input.orderId,
-      restaurantId: input.restaurantId,
-      assignmentId: input.assignmentId,
+      order_id: input.orderId,
+      driver_id: input.driverId,
+      restaurant_id: input.restaurantId,
+      assignment_id: input.assignmentId,
       appId: oneSignalAppId,
-      status: result.status,
+      http_status: result.status,
       response: result.responseBody,
     };
+    logger.info(responseLog, "[ONESIGNAL_RESPONSE]");
     const oneSignalErrors = result.responseBody && typeof result.responseBody === "object" && "errors" in result.responseBody
       ? result.responseBody.errors
       : null;
@@ -147,14 +148,16 @@ async function sendOneSignalNotification(input: {
       !result.responseBody.id;
 
     if (result.status < 200 || result.status >= 300 || hasOneSignalErrors || hasEmptyNotificationId) {
-      logger.error(responseLog, "OneSignal push request failed");
+      logger.error(
+        { ...responseLog, exact_error: result.responseText },
+        "[ONESIGNAL_ERROR]",
+      );
       const error = new Error(`OneSignal returned ${result.status}: ${result.responseText}`) as OneSignalPushError;
       error.status = result.status;
       error.responseText = result.responseText;
       error.responseBody = result.responseBody;
       throw error;
     }
-    logger.info(responseLog, "OneSignal push request completed");
     return result;
   };
 
@@ -205,31 +208,31 @@ export async function notifyAssignedDriver(
       eq(driversTable.status, "ACTIVE"),
     ));
   const [attempt] = await db
-    .select({ id: orderDriverAttemptsTable.id })
+    .select({ id: orderDriverAttemptsTable.assignmentId })
     .from(orderDriverAttemptsTable)
     .where(and(
       eq(orderDriverAttemptsTable.orderId, orderId),
       eq(orderDriverAttemptsTable.driverId, driverId),
-      eq(orderDriverAttemptsTable.id, assignmentId),
+      eq(orderDriverAttemptsTable.assignmentId, assignmentId),
       eq(orderDriverAttemptsTable.restaurantId, order?.restaurantId ?? -1),
       eq(orderDriverAttemptsTable.status, "PENDING"),
-      eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
-      gt(orderDriverAttemptsTable.timeoutAt, new Date()),
+      eq(orderDriverAttemptsTable.onesignalStatus, "PENDING"),
+      gt(orderDriverAttemptsTable.expiresAt, new Date()),
     ));
   if (!order || !driver || !attempt) return;
 
   const [claimedAttempt] = await db
     .update(orderDriverAttemptsTable)
     .set({
-      notificationStatus: "SENDING",
-      notificationAttemptedAt: new Date(),
+      onesignalStatus: "SENDING",
+      sentAt: new Date(),
     })
     .where(and(
-      eq(orderDriverAttemptsTable.id, attempt.id),
+      eq(orderDriverAttemptsTable.assignmentId, attempt.id),
       eq(orderDriverAttemptsTable.orderId, orderId),
       eq(orderDriverAttemptsTable.driverId, driverId),
       eq(orderDriverAttemptsTable.status, "PENDING"),
-      eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
+      eq(orderDriverAttemptsTable.onesignalStatus, "PENDING"),
       sql`EXISTS (
         SELECT 1
           FROM orders current_order
@@ -239,7 +242,7 @@ export async function notifyAssignedDriver(
            AND current_order.restaurant_id = ${orderDriverAttemptsTable.restaurantId}
            AND current_order.status = 'NEW'
            AND current_order.source = 'PUBLIC_CUSTOMER'
-            AND ${orderDriverAttemptsTable.timeoutAt} > NOW()
+            AND ${orderDriverAttemptsTable.expiresAt} > NOW()
            AND current_driver.is_active = true
            AND current_driver.status = 'ACTIVE'
             AND EXISTS (
@@ -249,7 +252,7 @@ export async function notifyAssignedDriver(
             )
       )`,
     ))
-    .returning({ id: orderDriverAttemptsTable.id });
+    .returning({ id: orderDriverAttemptsTable.assignmentId });
   if (!claimedAttempt) return;
 
   try {
@@ -380,17 +383,17 @@ export async function notifyAssignedDriver(
     try {
       await client.query("BEGIN");
       const eligible = await client.query(
-        `SELECT a.id
+           `SELECT a.assignment_id
            FROM order_driver_attempts a
            JOIN orders o ON o.id = a.order_id
            JOIN drivers d ON d.id = a.driver_id
            JOIN restaurants r ON r.id = a.restaurant_id
-          WHERE a.id = $1
+          WHERE a.assignment_id = $1
             AND a.order_id = $2
             AND a.driver_id = $3
             AND a.status = 'PENDING'
-            AND a.notification_status = 'SENDING'
-            AND a.timeout_at > NOW()
+            AND a.onesignal_status = 'SENDING'
+            AND a.expires_at > NOW()
             AND o.driver_id = a.driver_id
             AND o.restaurant_id = a.restaurant_id
             AND o.status = 'NEW'
@@ -404,10 +407,10 @@ export async function notifyAssignedDriver(
       if (eligible.rowCount !== 1) {
         await client.query(
           `UPDATE order_driver_attempts
-              SET notification_status = 'SKIPPED',
-                  notification_error = $2
-            WHERE id = $1
-              AND notification_status = 'SENDING'`,
+              SET onesignal_status = 'SKIPPED',
+                  onesignal_error = $2
+            WHERE assignment_id = $1
+              AND onesignal_status = 'SENDING'`,
           [attempt.id, "Order eligibility changed before OneSignal send"],
         );
         await client.query("COMMIT");
@@ -418,6 +421,10 @@ export async function notifyAssignedDriver(
         return;
       }
 
+      logger.info(
+        { order_id: orderId, driver_id: driverId, assignment_id: attempt.id },
+        "[ONESIGNAL_ATTEMPT]",
+      );
       const result = await sendOneSignalNotification({
         driverId,
         orderId: order.id,
@@ -440,14 +447,13 @@ export async function notifyAssignedDriver(
       notificationId = notification.rows[0]?.id ?? null;
 
       await client.query(
-        `UPDATE order_driver_attempts
-            SET notification_status = 'SENT',
-                notification_sent_at = NOW(),
-                notification_response_status = $2,
-                notification_response = $3
-          WHERE id = $1
-            AND notification_status = 'SENDING'`,
-        [attempt.id, result.status, result.responseText],
+         `UPDATE order_driver_attempts
+             SET onesignal_status = 'SENT',
+                 onesignal_response = $2,
+                 onesignal_error = NULL
+           WHERE assignment_id = $1
+             AND onesignal_status = 'SENDING'`,
+        [attempt.id, result.responseText],
       );
       await client.query("COMMIT");
     } catch (error) {
@@ -466,24 +472,36 @@ export async function notifyAssignedDriver(
   } catch (error) {
     const pushError = error as OneSignalPushError;
     const responseText = pushError.responseText ?? pushError.message;
-    await db.update(orderDriverAttemptsTable)
-      .set({
-        notificationStatus: "FAILED",
-        notificationResponseStatus: pushError.status ?? null,
-        notificationResponse: responseText,
-        notificationError: pushError.message,
-      })
-      .where(eq(orderDriverAttemptsTable.id, attempt.id));
+    try {
+      await db.update(orderDriverAttemptsTable)
+        .set({
+          onesignalStatus: "FAILED",
+          onesignalResponse: responseText,
+          onesignalError: pushError.message,
+        })
+        .where(eq(orderDriverAttemptsTable.assignmentId, attempt.id));
+    } catch (persistenceError) {
+      logger.error(
+        {
+          err: persistenceError,
+          order_id: order.id,
+          driver_id: driverId,
+          assignment_id: attempt.id,
+          exact_error: persistenceError instanceof Error ? persistenceError.message : String(persistenceError),
+        },
+        "[ONESIGNAL_ERROR]",
+      );
+    }
     logger.error({
       err: error,
-      orderId: order.id,
-      restaurantId: order.restaurantId,
-      driverId,
-      assignmentId: attempt.id,
+      order_id: order.id,
+      restaurant_id: order.restaurantId,
+      driver_id: driverId,
+      assignment_id: attempt.id,
       timestamp: new Date().toISOString(),
-      oneSignalResponseStatus: pushError.status ?? null,
-      oneSignalResponse: pushError.responseBody ?? responseText,
-    }, "Driver OneSignal notification failed");
+      exact_error: pushError.message,
+      onesignal_response: pushError.responseBody ?? responseText,
+    }, "[ONESIGNAL_ERROR]");
     throw error;
   }
 }
