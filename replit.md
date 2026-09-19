@@ -21,6 +21,7 @@ Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants
 | `VITE_API_URL` | talabat (build-time) | Absolute API origin for split-domain deployments; leave unset for same-origin deploys |
 | `ONESIGNAL_REST_API_KEY` | api-server secret | OneSignal REST API key; never expose it to the frontend |
 | `ONESIGNAL_APP_ID` | api-server | Optional; defaults to `a076a6a2-2555-42f7-89f1-5fecc8dcf449`, and the driver page reads the same value from the API |
+| `ONESIGNAL_API_URL` | api-server | Optional server-only endpoint override for controlled integration tests; defaults to `https://api.onesignal.com` |
 | `DRIVER_DASHBOARD_URL` | api-server | Optional absolute URL used for notification clicks; defaults to the deployed `/driver/dashboard` route |
 | `DRIVER_APP_ICON_URL` | api-server | Optional absolute URL for the driver push icon; defaults to `/app-icon-512.png` on the dashboard origin |
 | `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |

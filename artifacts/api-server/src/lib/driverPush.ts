@@ -16,6 +16,7 @@ import { publishDriverEvent } from "./driverEvents";
 const DEFAULT_ONESIGNAL_APP_ID = "a076a6a2-2555-42f7-89f1-5fecc8dcf449";
 const oneSignalAppId = process.env.ONESIGNAL_APP_ID?.trim() || DEFAULT_ONESIGNAL_APP_ID;
 const oneSignalApiKey = process.env.ONESIGNAL_REST_API_KEY?.trim() || "";
+const oneSignalApiUrl = (process.env.ONESIGNAL_API_URL?.trim() || "https://api.onesignal.com").replace(/\/$/, "");
 const driverDashboardUrl = (
   process.env.DRIVER_DASHBOARD_URL?.trim() ||
   `${process.env.FRONTEND_URL?.trim().replace(/\/$/, "") || "https://talabatiweb-talabat-h1pe-lime.vercel.app"}/driver/dashboard`
@@ -53,6 +54,7 @@ type OneSignalPushError = Error & {
   status?: number;
   responseText?: string;
   responseBody?: unknown;
+  retryableBeforeSend?: boolean;
 };
 
 type DriverPushProduct = {
@@ -80,6 +82,7 @@ async function sendOneSignalNotification(input: {
     const error = new Error("OneSignal is not configured; ONESIGNAL_REST_API_KEY is required") as OneSignalPushError;
     error.status = 0;
     error.responseText = "OneSignal credentials are not configured";
+    error.retryableBeforeSend = true;
     throw error;
   }
 
@@ -87,12 +90,13 @@ async function sendOneSignalNotification(input: {
     const error = new Error("A real OneSignal subscription is required for driver push") as OneSignalPushError;
     error.status = 0;
     error.responseText = "No OneSignal subscription ID was selected";
+    error.retryableBeforeSend = true;
     throw error;
   }
 
   const audience = { include_subscription_ids: input.subscriptionIds };
   const send = async (target: typeof audience) => {
-    const response = await fetch("https://api.onesignal.com/notifications", {
+    const response = await fetch(`${oneSignalApiUrl}/notifications`, {
       method: "POST",
       headers: {
         Authorization: `Key ${oneSignalApiKey}`,
@@ -310,7 +314,8 @@ export async function notifyAssignedDriver(
       .limit(1);
     const subscriptionIds = subscriptions.map(({ subscriptionId }) => subscriptionId);
     if (subscriptionIds.length === 0) {
-      const error = new Error("No opted-in OneSignal subscription is registered for the assigned driver");
+      const error = new Error("No opted-in OneSignal subscription is registered for the assigned driver") as OneSignalPushError;
+      error.retryableBeforeSend = true;
       logger.error(
         { driverId, orderId, assignmentId },
         "Driver push was not sent because the assigned driver has no active OneSignal subscription",
@@ -472,12 +477,18 @@ export async function notifyAssignedDriver(
   } catch (error) {
     const pushError = error as OneSignalPushError;
     const responseText = pushError.responseText ?? pushError.message;
+    const retryableBeforeSend = pushError.retryableBeforeSend === true;
     try {
       await db.update(orderDriverAttemptsTable)
         .set({
-          onesignalStatus: "FAILED",
+          // No external request was made when the configuration or active
+          // subscription is missing. Keep this attempt pending so the worker
+          // can deliver it after the driver enables OneSignal. Never reset a
+          // SENDING claim after an external request has started.
+          onesignalStatus: retryableBeforeSend ? "PENDING" : "FAILED",
           onesignalResponse: responseText,
           onesignalError: pushError.message,
+          ...(retryableBeforeSend ? { sentAt: null } : {}),
         })
         .where(eq(orderDriverAttemptsTable.assignmentId, attempt.id));
     } catch (persistenceError) {
