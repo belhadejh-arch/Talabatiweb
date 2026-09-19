@@ -16,7 +16,7 @@ export default function AdminSettings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [driverTimeout, setDriverTimeout] = useState<DriverTimeoutSeconds | null>(null);
-  const timeoutSeconds = (driverTimeout ?? settings?.driverResponseTimeoutSeconds ?? 180) as DriverTimeoutSeconds;
+  const timeoutSeconds = (driverTimeout ?? settings?.driverResponseTimeoutSeconds ?? 300) as DriverTimeoutSeconds;
 
   return (
     <div className="w-full max-w-3xl space-y-4 sm:space-y-6">

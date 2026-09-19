@@ -56,7 +56,11 @@ router.get("/driver/orders", requireDriverAuth, async (req, res): Promise<void> 
   res.json({
     data: details.filter((order): order is NonNullable<typeof order> => order !== null).map((order) => ({
       ...order,
-      canRespond: order.status === "NEW" && order.driverResponseStatus === "PENDING",
+      canRespond:
+        order.status === "NEW" &&
+        order.driverResponseStatus === "PENDING" &&
+        !!order.driverAttemptTimeoutAt &&
+        new Date(order.driverAttemptTimeoutAt).getTime() > Date.now(),
     })),
   });
 });

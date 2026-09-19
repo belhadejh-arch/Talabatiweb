@@ -127,6 +127,7 @@ export async function respondToOrderAttempt(
 ): Promise<boolean> {
   const client = await pool.connect();
   let shouldDispatchNext = false;
+  let handled = true;
   try {
     await client.query("BEGIN");
     const orderResult = await client.query<{
@@ -149,44 +150,137 @@ export async function respondToOrderAttempt(
       return false;
     }
 
-    const attemptResult = await client.query<{ id: number }>(
-      `SELECT id FROM order_driver_attempts
-       WHERE order_id = $1 AND driver_id = $2 AND status = 'PENDING'
-       FOR UPDATE`,
-      [orderId, driverId],
+    const driverResult = await client.query<{ id: number }>(
+      `SELECT id
+         FROM drivers
+        WHERE id = $1
+          AND restaurant_id = $2
+          AND is_active = true
+          AND status = 'ACTIVE'
+        FOR UPDATE`,
+      [driverId, order.restaurant_id],
     );
-    const attempt = attemptResult.rows[0];
-    if (!attempt) {
+    if (!driverResult.rows[0]) {
       await client.query("ROLLBACK");
       return false;
     }
 
-    await client.query(
-      "UPDATE order_driver_attempts SET status = $2, response_at = NOW() WHERE id = $1 AND status = 'PENDING'",
-      [attempt.id, response],
+    const attemptResult = await client.query<{ id: number }>(
+      `SELECT id FROM order_driver_attempts
+       WHERE order_id = $1
+         AND driver_id = $2
+         AND restaurant_id = $3
+         AND status = 'PENDING'
+         AND timeout_at > NOW()
+       FOR UPDATE`,
+      [orderId, driverId, order.restaurant_id],
     );
+    const attempt = attemptResult.rows[0];
+    if (!attempt) {
+      const expiredAttempt = await client.query<{ id: number }>(
+        `SELECT id
+           FROM order_driver_attempts
+          WHERE order_id = $1
+            AND driver_id = $2
+            AND restaurant_id = $3
+            AND status = 'PENDING'
+            AND timeout_at <= NOW()
+          FOR UPDATE`,
+        [orderId, driverId, order.restaurant_id],
+      );
+      if (!expiredAttempt.rows[0]) {
+        await client.query("ROLLBACK");
+        return false;
+      }
 
-    if (response === "ACCEPTED") {
       await client.query(
-        "UPDATE orders SET status = 'ACCEPTED', updated_at = NOW() WHERE id = $1 AND driver_id = $2 AND status = 'NEW'",
-        [orderId, driverId],
+        `UPDATE order_driver_attempts
+            SET status = 'TIMEOUT',
+                response_at = NOW()
+          WHERE id = $1
+            AND status = 'PENDING'`,
+        [expiredAttempt.rows[0].id],
       );
       await client.query(
-        `INSERT INTO order_status_history (order_id, status, note)
-          VALUES ($1, 'ACCEPTED', $2)`,
-          [orderId, `تم قبول الطلب من السائق رقم ${driverId}`],
-      );
-    } else {
-      await client.query(
-        "UPDATE orders SET driver_id = NULL, status = 'NEW', updated_at = NOW() WHERE id = $1 AND driver_id = $2 AND status = 'NEW'",
+        `UPDATE orders
+            SET driver_id = NULL,
+                status = 'NEW',
+                updated_at = NOW()
+          WHERE id = $1
+            AND driver_id = $2
+            AND status = 'NEW'
+            AND source = 'PUBLIC_CUSTOMER'`,
         [orderId, driverId],
       );
       await client.query(
         `INSERT INTO order_status_history (order_id, status, note)
          VALUES ($1, 'NEW', $2)`,
-        [orderId, `رفض السائق رقم ${driverId} الطلب وانتقل إلى المحاولة التالية`],
+        [orderId, `انتهت مهلة رد السائق رقم ${driverId} وانتقل الطلب للمحاولة التالية`],
       );
       shouldDispatchNext = true;
+      handled = false;
+    } else {
+
+      const attemptUpdate = await client.query(
+        `UPDATE order_driver_attempts
+            SET status = $2,
+                response_at = NOW()
+          WHERE id = $1
+            AND status = 'PENDING'
+            AND timeout_at > NOW()`,
+        [attempt.id, response],
+      );
+      if (attemptUpdate.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+
+      if (response === "ACCEPTED") {
+        const orderUpdate = await client.query(
+          `UPDATE orders
+              SET driver_id = $2,
+                  status = 'ACCEPTED',
+                  updated_at = NOW()
+            WHERE id = $1
+              AND restaurant_id = $3
+              AND driver_id = $2
+              AND status = 'NEW'
+              AND source = 'PUBLIC_CUSTOMER'`,
+          [orderId, driverId, order.restaurant_id],
+        );
+        if (orderUpdate.rowCount !== 1) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+        await client.query(
+          `INSERT INTO order_status_history (order_id, status, note)
+            VALUES ($1, 'ACCEPTED', $2)`,
+            [orderId, `تم قبول الطلب من السائق رقم ${driverId}`],
+        );
+      } else {
+        const orderUpdate = await client.query(
+          `UPDATE orders
+              SET driver_id = NULL,
+                  status = 'NEW',
+                  updated_at = NOW()
+            WHERE id = $1
+              AND restaurant_id = $3
+              AND driver_id = $2
+              AND status = 'NEW'
+              AND source = 'PUBLIC_CUSTOMER'`,
+          [orderId, driverId, order.restaurant_id],
+        );
+        if (orderUpdate.rowCount !== 1) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+        await client.query(
+          `INSERT INTO order_status_history (order_id, status, note)
+           VALUES ($1, 'NEW', $2)`,
+          [orderId, `رفض السائق رقم ${driverId} الطلب وانتقل إلى المحاولة التالية`],
+        );
+        shouldDispatchNext = true;
+      }
     }
     await client.query("COMMIT");
   } catch (error) {
@@ -197,7 +291,7 @@ export async function respondToOrderAttempt(
   }
 
   if (shouldDispatchNext) await dispatchNextDriverForOrder(orderId);
-  return true;
+  return handled;
 }
 
 /**
