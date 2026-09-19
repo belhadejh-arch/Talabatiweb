@@ -1,9 +1,10 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   driverOneSignalSubscriptionsTable,
   driversTable,
   notificationsTable,
+  orderItemAddonsTable,
   orderItemsTable,
   orderDriverAttemptsTable,
   ordersTable,
@@ -54,6 +55,16 @@ type OneSignalPushError = Error & {
   responseBody?: unknown;
 };
 
+type DriverPushProduct = {
+  productId: number;
+  productName: string;
+  sizeName: string | null;
+  quantity: number;
+  unitPrice: string;
+  subtotal: string;
+  selectedAddons: Array<{ addonName: string; price: string }>;
+};
+
 async function sendOneSignalNotification(input: {
   driverId: number;
   orderId: number;
@@ -63,16 +74,7 @@ async function sendOneSignalNotification(input: {
   message: string;
   url: string;
   subscriptionIds: string[];
-  customerName: string;
-  orderType: string;
-  products: Array<{
-    productId: number;
-    productName: string;
-    quantity: number;
-    unitPrice: string;
-    subtotal: string;
-  }>;
-  total: string;
+  data: Record<string, unknown>;
 }): Promise<OneSignalPushResult> {
   if (!isOneSignalConfigured()) {
     const error = new Error("OneSignal is not configured; ONESIGNAL_REST_API_KEY is required") as OneSignalPushError;
@@ -81,9 +83,14 @@ async function sendOneSignalNotification(input: {
     throw error;
   }
 
-  const audience = input.subscriptionIds.length > 0
-    ? { include_subscription_ids: input.subscriptionIds }
-    : { include_aliases: { external_id: [String(input.driverId)] } };
+  if (input.subscriptionIds.length === 0) {
+    const error = new Error("A real OneSignal subscription is required for driver push") as OneSignalPushError;
+    error.status = 0;
+    error.responseText = "No OneSignal subscription ID was selected";
+    throw error;
+  }
+
+  const audience = { include_subscription_ids: input.subscriptionIds };
   const send = async (target: typeof audience) => {
     const response = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",
@@ -100,16 +107,7 @@ async function sendOneSignalNotification(input: {
         url: input.url,
         chrome_web_icon: driverAppIconUrl,
         chrome_web_badge: driverAppIconUrl,
-        data: {
-          type: "NEW_DRIVER_ORDER",
-          orderId: input.orderId,
-          restaurantId: input.restaurantId,
-          customerName: input.customerName,
-          orderType: input.orderType,
-          products: input.products,
-          total: input.total,
-          url: input.url,
-        },
+        data: input.data,
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -181,6 +179,11 @@ export async function notifyAssignedDriver(
       restaurantId: ordersTable.restaurantId,
       restaurantName: restaurantsTable.name,
       customerName: ordersTable.customerName,
+      customerPhone: ordersTable.customerPhone,
+      notes: ordersTable.notes,
+      latitude: ordersTable.latitude,
+      longitude: ordersTable.longitude,
+      mapsUrl: ordersTable.mapsUrl,
       source: ordersTable.source,
     })
     .from(ordersTable)
@@ -243,16 +246,46 @@ export async function notifyAssignedDriver(
   if (!claimedAttempt) return;
 
   try {
-    const products = await db
+    const productRows = await db
       .select({
+        itemId: orderItemsTable.id,
         productId: orderItemsTable.productId,
         productName: orderItemsTable.productName,
+        sizeName: orderItemsTable.sizeName,
         quantity: orderItemsTable.quantity,
         unitPrice: orderItemsTable.unitPrice,
         subtotal: orderItemsTable.subtotal,
       })
       .from(orderItemsTable)
       .where(eq(orderItemsTable.orderId, order.id));
+    const itemIds = productRows.map((product) => product.itemId);
+    const itemRows = await db
+      .select({
+        orderItemId: orderItemAddonsTable.orderItemId,
+        addonName: orderItemAddonsTable.addonName,
+        price: orderItemAddonsTable.price,
+      })
+      .from(orderItemAddonsTable)
+      .where(
+        productRows.length > 0
+          ? inArray(orderItemAddonsTable.orderItemId, itemIds)
+          : sql`false`,
+      );
+    const addonsByItem = new Map<number, Array<{ addonName: string; price: string }>>();
+    for (const addon of itemRows) {
+      const current = addonsByItem.get(addon.orderItemId) ?? [];
+      current.push({ addonName: addon.addonName, price: addon.price });
+      addonsByItem.set(addon.orderItemId, current);
+    }
+    const products: DriverPushProduct[] = productRows.map((product) => ({
+      productId: product.productId,
+      productName: product.productName,
+      sizeName: product.sizeName,
+      quantity: product.quantity,
+      unitPrice: product.unitPrice,
+      subtotal: product.subtotal,
+      selectedAddons: addonsByItem.get(product.itemId) ?? [],
+    }));
 
     const subscriptions = await db
       .select({ subscriptionId: driverOneSignalSubscriptionsTable.subscriptionId })
@@ -276,14 +309,60 @@ export async function notifyAssignedDriver(
     }
 
     const typeLabel = order.orderType === "RESERVATION" ? "حجز" : "توصيل";
-    const message = [
+    const productLabel = products.map((product) => [
+      product.productName,
+      product.sizeName ? `الحجم: ${product.sizeName}` : null,
+      `× ${product.quantity}`,
+      product.selectedAddons.length > 0
+        ? `الإضافات: ${product.selectedAddons.map((addon) => addon.addonName).join("، ")}`
+        : null,
+    ].filter(Boolean).join(" — ")).join("، ");
+    const messageLines = [
       `الطلب #${order.id}`,
       `مطعم: ${order.restaurantName}`,
-      `العميل: ${order.customerName}`,
       `نوع الطلب: ${typeLabel}`,
-      `المنتجات: ${products.map((product) => `${product.productName} × ${product.quantity}`).join("، ")}`,
+      `العميل: ${order.customerName}`,
+      `الهاتف: ${order.customerPhone}`,
+      `المنتجات: ${productLabel}`,
       `الإجمالي: ${Number(order.totalAmount).toFixed(2)} د.ل`,
-    ].join("\n");
+    ];
+    if (order.orderType === "DELIVERY") {
+      if (order.latitude != null && order.longitude != null) {
+        messageLines.push(`موقع العميل: ${order.latitude}, ${order.longitude}`);
+      }
+      if (order.mapsUrl) {
+        messageLines.push(`الخريطة: ${order.mapsUrl}`);
+      }
+    } else if (order.notes) {
+      messageLines.push(`بيانات الحجز: ${order.notes}`);
+    }
+    const message = messageLines.join("\n");
+    const deliveryData =
+      order.orderType === "DELIVERY" && order.latitude != null && order.longitude != null
+        ? {
+            latitude: order.latitude,
+            longitude: order.longitude,
+            ...(order.mapsUrl ? { mapsUrl: order.mapsUrl } : {}),
+          }
+        : {};
+    const notificationData = {
+      type: "NEW_DRIVER_ORDER",
+      orderId: order.id,
+      restaurantId: order.restaurantId,
+      assignmentId: attempt.id,
+      driverId,
+      restaurantName: order.restaurantName,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      orderType: order.orderType,
+      products,
+      total: order.totalAmount,
+      url: driverOrderUrl(order.id),
+      ...deliveryData,
+      ...(order.orderType === "RESERVATION" && order.notes
+        ? { reservationDetails: order.notes }
+        : {}),
+    };
 
     const result = await sendOneSignalNotification({
       driverId,
@@ -294,10 +373,7 @@ export async function notifyAssignedDriver(
       message,
       url: driverOrderUrl(order.id),
       subscriptionIds,
-      customerName: order.customerName,
-      orderType: order.orderType,
-      products,
-      total: order.totalAmount,
+      data: notificationData,
     });
 
     const [notification] = await db.insert(notificationsTable).values({
