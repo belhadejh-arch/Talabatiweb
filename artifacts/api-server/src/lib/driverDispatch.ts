@@ -11,6 +11,7 @@ import { notifyAssignedDriver } from "./driverPush";
 
 const DEFAULT_TIMEOUT_SECONDS = 300;
 const DISPATCH_INTERVAL_MS = 10_000;
+const NOTIFICATION_CLAIM_LEASE_SECONDS = 120;
 
 type DispatchResult =
   | { assigned: true; orderId: number; driverId: number }
@@ -360,6 +361,70 @@ async function expireTimedOutAttempts(): Promise<void> {
   }
 }
 
+/**
+ * Recover only notification claims that belong to a still-active order attempt.
+ * A process can die after claiming SENDING and before recording the OneSignal
+ * result; without a lease those attempts would remain permanently invisible.
+ * The atomic claim inside notifyAssignedDriver still prevents two workers from
+ * sending the same attempt at the same time.
+ */
+async function resumePendingDriverNotifications(): Promise<void> {
+  const client = await pool.connect();
+  let pending: Array<{ order_id: number; driver_id: number }> = [];
+  try {
+    await client.query(
+      `UPDATE order_driver_attempts
+          SET notification_status = 'PENDING'
+        WHERE status = 'PENDING'
+          AND notification_status = 'SENDING'
+          AND notification_attempted_at IS NOT NULL
+          AND notification_attempted_at <= NOW() - ($1 * INTERVAL '1 second')
+          AND timeout_at > NOW()
+          AND EXISTS (
+            SELECT 1
+              FROM orders o
+              JOIN drivers d ON d.id = o.driver_id
+             WHERE o.id = order_driver_attempts.order_id
+               AND o.driver_id = order_driver_attempts.driver_id
+               AND o.restaurant_id = order_driver_attempts.restaurant_id
+               AND o.status = 'NEW'
+               AND o.source = 'PUBLIC_CUSTOMER'
+               AND d.is_active = true
+               AND d.status = 'ACTIVE'
+          )`,
+      [NOTIFICATION_CLAIM_LEASE_SECONDS],
+    );
+    const result = await client.query<{ order_id: number; driver_id: number }>(
+      `SELECT a.order_id, a.driver_id
+         FROM order_driver_attempts a
+         JOIN orders o ON o.id = a.order_id
+         JOIN drivers d ON d.id = a.driver_id
+        WHERE a.status = 'PENDING'
+          AND a.notification_status = 'PENDING'
+          AND a.timeout_at > NOW()
+          AND o.id = a.order_id
+          AND o.driver_id = a.driver_id
+          AND o.status = 'NEW'
+          AND o.source = 'PUBLIC_CUSTOMER'
+          AND d.is_active = true
+          AND d.status = 'ACTIVE'
+        ORDER BY a.sent_at ASC
+        LIMIT 100`,
+    );
+    pending = result.rows;
+  } finally {
+    client.release();
+  }
+
+  await Promise.allSettled(
+    pending.map(({ order_id: orderId, driver_id: driverId }) =>
+      notifyAssignedDriver(driverId, orderId).catch((error) => {
+        logger.error({ err: error, orderId, driverId }, "Failed to resume driver notification");
+      }),
+    ),
+  );
+}
+
 let workerStarted = false;
 export function startDriverDispatchWorker(): void {
   if (workerStarted) return;
@@ -367,12 +432,14 @@ export function startDriverDispatchWorker(): void {
 
   const run = async () => {
     try {
+      await resumePendingDriverNotifications();
       await expireTimedOutAttempts();
     } catch (error) {
       logger.error({ err: error }, "Driver dispatch worker failed");
     }
   };
 
+  void run();
   const timer = setInterval(() => void run(), DISPATCH_INTERVAL_MS);
   timer.unref();
 }

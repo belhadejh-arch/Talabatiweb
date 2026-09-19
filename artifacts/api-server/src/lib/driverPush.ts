@@ -111,6 +111,7 @@ async function sendOneSignalNotification(input: {
           url: input.url,
         },
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     const responseText = await response.text().catch(() => "");
     let responseBody: unknown = responseText;

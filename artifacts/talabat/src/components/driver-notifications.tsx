@@ -14,6 +14,13 @@ type DriverNotification = {
   createdAt: string;
 };
 
+function notificationKey(notification: Pick<DriverNotification, "id" | "orderId" | "relatedId" | "createdAt">): string {
+  const orderId = notification.orderId ?? notification.relatedId;
+  if (orderId) return `order:${orderId}`;
+  if (notification.id > 0) return `notification:${notification.id}`;
+  return `event:${notification.createdAt}`;
+}
+
 type DriverOrderEvent = {
   type?: string;
   notificationId?: number | null;
@@ -69,11 +76,12 @@ declare global {
 export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   const [, setLocation] = useLocation();
   const base = getBaseUrl() ?? "";
-  const [latest, setLatest] = useState<DriverNotification | null>(null);
+  const [notificationQueue, setNotificationQueue] = useState<DriverNotification[]>([]);
   const [pushPrompt, setPushPrompt] = useState(false);
   const [pushWarning, setPushWarning] = useState("");
   const knownIds = useRef<Set<number>>(new Set());
   const initialized = useRef(false);
+  const notificationsLoadInFlight = useRef<Promise<void> | null>(null);
   const oneSignalSetupStarted = useRef(false);
   const oneSignalRef = useRef<OneSignalInstance | null>(null);
   const oneSignalConfiguredRef = useRef(false);
@@ -94,23 +102,53 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
   }, [base]);
 
   const loadNotifications = useCallback(async () => {
-    try {
-      const response = await request("/api/driver/notifications");
-      const notifications: DriverNotification[] = response.data || [];
-      if (!initialized.current) {
-        // Hydrate the baseline without surfacing an old unread notification
-        // merely because the driver opened or refreshed the dashboard.
+    if (notificationsLoadInFlight.current) return notificationsLoadInFlight.current;
+
+    const load = (async () => {
+      try {
+        const response = await request("/api/driver/notifications");
+        const notifications: DriverNotification[] = response.data || [];
+        if (!initialized.current) {
+          // Hydrate the baseline without surfacing an old unread notification
+          // merely because the driver opened or refreshed the dashboard.
+          knownIds.current = new Set(notifications.map((notification) => notification.id));
+          initialized.current = true;
+          return;
+        }
+        const incoming = notifications.filter(
+          (notification) => !notification.isRead && !knownIds.current.has(notification.id),
+        );
+        if (incoming.length > 0) {
+          setNotificationQueue((current) => {
+            const existing = new Set(current.map(notificationKey));
+            const additions = incoming.filter((notification) => {
+              const key = notificationKey(notification);
+              if (existing.has(key)) return false;
+              existing.add(key);
+              return true;
+            });
+            return additions.length > 0 ? [...current, ...additions] : current;
+          });
+        }
         knownIds.current = new Set(notifications.map((notification) => notification.id));
-        initialized.current = true;
-        return;
+      } catch {
+        // The driver dashboard owns the auth redirect. A logged-out tab can safely stop polling.
       }
-      const incoming = notifications.find((notification) => !notification.isRead && !knownIds.current.has(notification.id));
-      if (incoming) setLatest(incoming);
-      knownIds.current = new Set(notifications.map((notification) => notification.id));
-    } catch {
-      // The driver dashboard owns the auth redirect. A logged-out tab can safely stop polling.
+    })();
+    notificationsLoadInFlight.current = load;
+    try {
+      await load;
+    } finally {
+      if (notificationsLoadInFlight.current === load) notificationsLoadInFlight.current = null;
     }
   }, [request]);
+
+  const enqueueNotification = useCallback((notification: DriverNotification) => {
+    setNotificationQueue((current) => {
+      const key = notificationKey(notification);
+      return current.some((item) => notificationKey(item) === key) ? current : [...current, notification];
+    });
+  }, []);
 
   const enablePush = useCallback(async () => {
     if (!("Notification" in window)) {
@@ -157,7 +195,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
           return;
         }
         if (data.type !== "NEW_DRIVER_ORDER" || !data.orderId) return;
-        setLatest({
+        enqueueNotification({
           id: data.notificationId ?? 0,
           type: "NEW_DRIVER_ORDER",
           message: data.message || "لديك طلب جديد",
@@ -190,7 +228,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     document.addEventListener("visibilitychange", refreshWhenAvailable);
     const onPushMessage = (event: MessageEvent<{ type?: string; payload?: { title?: string; body?: string; orderId?: number } }>) => {
       if (event.data?.type !== "NEW_DRIVER_ORDER" || !event.data.payload) return;
-      setLatest({
+      enqueueNotification({
         id: 0,
         type: "NEW_DRIVER_ORDER",
         message: event.data.payload.body || "لديك طلب جديد",
@@ -216,7 +254,7 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
     if (enabled) return;
     initialized.current = false;
     knownIds.current.clear();
-    setLatest(null);
+    setNotificationQueue([]);
   }, [enabled]);
 
   useEffect(() => {
@@ -318,13 +356,19 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
 
   if (!enabled) return null;
 
+  const currentNotification = notificationQueue[0] ?? null;
+
+  const dismissCurrentNotification = () => {
+    setNotificationQueue((current) => current.slice(1));
+  };
+
   const openNotification = async () => {
-    if (!latest) return;
-    if (latest.id > 0) {
-      await request(`/api/driver/notifications/${latest.id}/read`, { method: "PATCH" }).catch(() => undefined);
+    if (!currentNotification) return;
+    if (currentNotification.id > 0) {
+      await request(`/api/driver/notifications/${currentNotification.id}/read`, { method: "PATCH" }).catch(() => undefined);
     }
-    const orderId = latest.orderId ?? latest.relatedId;
-    setLatest(null);
+    const orderId = currentNotification.orderId ?? currentNotification.relatedId;
+    dismissCurrentNotification();
     if (orderId) setLocation(`/driver/dashboard?order=${orderId}`);
   };
 
@@ -334,10 +378,10 @@ export default function DriverNotifications({ enabled }: { enabled: boolean }) {
       <Button className="shrink-0" onClick={() => void enablePush()}>السماح بالإشعارات</Button>
     </div>}
     {pushWarning && !pushPrompt && <div className="mx-auto mt-4 flex max-w-6xl items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" dir="rtl"><BellOff className="h-4 w-4 shrink-0" />{pushWarning}<button className="ms-auto" aria-label="إغلاق التنبيه" onClick={() => setPushWarning("")}><X className="h-4 w-4" /></button></div>}
-    {latest && <div className="fixed inset-x-3 top-4 z-[60] mx-auto max-w-md rounded-2xl border-2 border-red-400 bg-white p-4 text-right shadow-2xl" dir="rtl" role="alert">
-      <button className="absolute left-3 top-3 text-muted-foreground" aria-label="إغلاق الإشعار" onClick={() => setLatest(null)}><X className="h-4 w-4" /></button>
+    {currentNotification && <div className="fixed inset-x-3 top-4 z-[60] mx-auto max-w-md rounded-2xl border-2 border-red-400 bg-white p-4 text-right shadow-2xl" dir="rtl" role="alert">
+      <button className="absolute left-3 top-3 text-muted-foreground" aria-label="إغلاق الإشعار" onClick={dismissCurrentNotification}><X className="h-4 w-4" /></button>
       <p className="font-black text-red-700">🔔 طلب جديد من مطعم</p>
-      <p className="mt-1 font-bold">{latest.message}</p>
+      <p className="mt-1 font-bold">{currentNotification.message}</p>
       <Button className="mt-3 w-full" onClick={() => void openNotification()}>اضغط لعرض الطلب</Button>
     </div>}
   </>;
