@@ -168,7 +168,11 @@ async function sendOneSignalNotification(input: {
  * The database check is deliberately repeated immediately before sending so
  * a late notification cannot be sent after a rejection or timeout.
  */
-export async function notifyAssignedDriver(driverId: number, orderId: number): Promise<void> {
+export async function notifyAssignedDriver(
+  driverId: number,
+  orderId: number,
+  assignmentId: number,
+): Promise<void> {
   const [order] = await db
     .select({
       id: ordersTable.id,
@@ -203,6 +207,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     .where(and(
       eq(orderDriverAttemptsTable.orderId, orderId),
       eq(orderDriverAttemptsTable.driverId, driverId),
+      eq(orderDriverAttemptsTable.id, assignmentId),
       eq(orderDriverAttemptsTable.restaurantId, order?.restaurantId ?? -1),
       eq(orderDriverAttemptsTable.status, "PENDING"),
       eq(orderDriverAttemptsTable.notificationStatus, "PENDING"),
@@ -264,7 +269,7 @@ export async function notifyAssignedDriver(driverId: number, orderId: number): P
     if (subscriptionIds.length === 0) {
       const error = new Error("No opted-in OneSignal subscription is registered for the assigned driver");
       logger.error(
-        { driverId, orderId },
+        { driverId, orderId, assignmentId },
         "Driver push was not sent because the assigned driver has no active OneSignal subscription",
       );
       throw error;

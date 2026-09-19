@@ -206,16 +206,19 @@ router.post("/orders/:id/assign-driver", requireAuth, async (req, res): Promise<
     return;
   }
 
-  const assigned = await assignSpecificDriverForOrder(id, parsed.data.driverId);
-  if (!assigned) {
+  const assignmentId = await assignSpecificDriverForOrder(id, parsed.data.driverId);
+  if (!assignmentId) {
     res.status(409).json({ error: "تعذر إسناد الطلب، ربما تم تحديثه أو انتهت صلاحيته" });
     return;
   }
 
   try {
-    await notifyAssignedDriver(parsed.data.driverId, id);
+    await notifyAssignedDriver(parsed.data.driverId, id, assignmentId);
   } catch (error) {
-    logger.error({ err: error, driverId: parsed.data.driverId, orderId: id }, "Failed to notify manually assigned driver");
+    logger.error(
+      { err: error, driverId: parsed.data.driverId, orderId: id, assignmentId },
+      "Failed to notify manually assigned driver",
+    );
   }
 
   // Create notification

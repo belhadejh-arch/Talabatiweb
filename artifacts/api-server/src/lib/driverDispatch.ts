@@ -14,7 +14,7 @@ const DISPATCH_INTERVAL_MS = 10_000;
 const NOTIFICATION_CLAIM_LEASE_SECONDS = 120;
 
 type DispatchResult =
-  | { assigned: true; orderId: number; driverId: number }
+  | { assigned: true; orderId: number; driverId: number; assignmentId: number }
   | { assigned: false; reason: "not_pending" | "no_driver" };
 
 async function getTimeoutSeconds(): Promise<number> {
@@ -83,12 +83,15 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
       return { assigned: false, reason: "no_driver" };
     }
 
-    await client.query(
+    const attemptResult = await client.query<{ id: number }>(
       `INSERT INTO order_driver_attempts
         (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
-       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))`,
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
+       RETURNING id`,
       [order.id, driver.id, order.restaurant_id, timeoutSeconds],
     );
+    const assignmentId = attemptResult.rows[0]?.id;
+    if (!assignmentId) throw new Error("Failed to create driver assignment");
     await client.query(
       "UPDATE orders SET driver_id = $2, updated_at = NOW() WHERE id = $1",
       [order.id, driver.id],
@@ -105,11 +108,11 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
     await client.query("COMMIT");
 
     try {
-      await notifyAssignedDriver(driver.id, order.id);
+      await notifyAssignedDriver(driver.id, order.id, assignmentId);
     } catch (error) {
       logger.error({ err: error, driverId: driver.id, orderId: order.id }, "Failed to notify assigned driver");
     }
-    return { assigned: true, orderId: order.id, driverId: driver.id };
+    return { assigned: true, orderId: order.id, driverId: driver.id, assignmentId };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -244,7 +247,7 @@ export async function retryOrderDispatch(orderId: number): Promise<DispatchResul
   return dispatchNextDriverForOrder(orderId);
 }
 
-export async function assignSpecificDriverForOrder(orderId: number, driverId: number): Promise<boolean> {
+export async function assignSpecificDriverForOrder(orderId: number, driverId: number): Promise<number | null> {
   const timeoutSeconds = await getTimeoutSeconds();
   const client = await pool.connect();
   try {
@@ -261,7 +264,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     const order = orderResult.rows[0];
     if (!order || order.source !== "PUBLIC_CUSTOMER" || order.status !== "NEW") {
       await client.query("ROLLBACK");
-      return false;
+      return null;
     }
 
     const driverResult = await client.query<{ id: number }>(
@@ -273,7 +276,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     if (!driverResult.rows[0]) {
       await client.query("ROLLBACK");
-      return false;
+      return null;
     }
 
     const previousAttempt = await client.query<{ id: number }>(
@@ -282,7 +285,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     if (previousAttempt.rows[0]) {
       await client.query("ROLLBACK");
-      return false;
+      return null;
     }
 
     if (order.driver_id && order.driver_id !== driverId) {
@@ -294,12 +297,15 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
       );
     }
 
-    await client.query(
+    const attemptResult = await client.query<{ id: number }>(
       `INSERT INTO order_driver_attempts
         (order_id, driver_id, restaurant_id, status, sent_at, timeout_at)
-       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))`,
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW() + ($4 * INTERVAL '1 second'))
+       RETURNING id`,
       [orderId, driverId, order.restaurant_id, timeoutSeconds],
     );
+    const assignmentId = attemptResult.rows[0]?.id;
+    if (!assignmentId) throw new Error("Failed to create manual driver assignment");
     await client.query(
       "UPDATE orders SET driver_id = $2, status = 'NEW', updated_at = NOW() WHERE id = $1 AND source = 'PUBLIC_CUSTOMER'",
       [orderId, driverId],
@@ -311,7 +317,7 @@ export async function assignSpecificDriverForOrder(orderId: number, driverId: nu
     );
     await client.query("COMMIT");
 
-    return true;
+    return assignmentId;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -386,7 +392,7 @@ async function expireTimedOutAttempts(): Promise<void> {
  */
 async function resumePendingDriverNotifications(): Promise<void> {
   const client = await pool.connect();
-  let pending: Array<{ order_id: number; driver_id: number }> = [];
+  let pending: Array<{ order_id: number; driver_id: number; assignment_id: number }> = [];
   try {
     await client.query(
       `UPDATE order_driver_attempts
@@ -410,8 +416,9 @@ async function resumePendingDriverNotifications(): Promise<void> {
           )`,
       [NOTIFICATION_CLAIM_LEASE_SECONDS],
     );
-    const result = await client.query<{ order_id: number; driver_id: number }>(
+    const result = await client.query<{ order_id: number; driver_id: number; assignment_id: number }>(
       `SELECT a.order_id, a.driver_id
+              , a.id AS assignment_id
          FROM order_driver_attempts a
          JOIN orders o ON o.id = a.order_id
          JOIN drivers d ON d.id = a.driver_id
@@ -433,9 +440,9 @@ async function resumePendingDriverNotifications(): Promise<void> {
   }
 
   await Promise.allSettled(
-    pending.map(({ order_id: orderId, driver_id: driverId }) =>
-      notifyAssignedDriver(driverId, orderId).catch((error) => {
-        logger.error({ err: error, orderId, driverId }, "Failed to resume driver notification");
+    pending.map(({ order_id: orderId, driver_id: driverId, assignment_id: assignmentId }) =>
+      notifyAssignedDriver(driverId, orderId, assignmentId).catch((error) => {
+        logger.error({ err: error, orderId, driverId, assignmentId }, "Failed to resume driver notification");
       }),
     ),
   );
