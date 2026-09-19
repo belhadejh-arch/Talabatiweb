@@ -64,7 +64,9 @@ export async function dispatchNextDriverForOrder(orderId: number): Promise<Dispa
            AND d.status = 'ACTIVE'
          AND NOT EXISTS (
            SELECT 1 FROM order_driver_attempts a
-           WHERE a.order_id = $2 AND a.driver_id = d.id
+            WHERE a.order_id = $2
+              AND a.restaurant_id = $1
+              AND a.driver_id = d.id
          )
        ORDER BY d.id ASC
        FOR UPDATE SKIP LOCKED
@@ -135,7 +137,12 @@ export async function respondToOrderAttempt(
       [orderId],
     );
     const order = orderResult.rows[0];
-    if (!order || order.driver_id !== driverId || order.status !== "NEW") {
+    if (
+      !order ||
+      order.source !== "PUBLIC_CUSTOMER" ||
+      order.driver_id !== driverId ||
+      order.status !== "NEW"
+    ) {
       await client.query("ROLLBACK");
       return false;
     }
@@ -325,6 +332,8 @@ async function expireTimedOutAttempts(): Promise<void> {
        WHERE a.status = 'PENDING'
          AND a.timeout_at <= NOW()
          AND o.source = 'PUBLIC_CUSTOMER'
+         AND o.driver_id = a.driver_id
+         AND o.restaurant_id = a.restaurant_id
         ORDER BY a.timeout_at ASC
        FOR UPDATE SKIP LOCKED
        LIMIT 100`,
@@ -356,9 +365,16 @@ async function expireTimedOutAttempts(): Promise<void> {
     client.release();
   }
 
-  for (const attempt of expired) {
-    await dispatchNextDriverForOrder(attempt.orderId);
-  }
+  await Promise.allSettled(
+    expired.map((attempt) =>
+      dispatchNextDriverForOrder(attempt.orderId).catch((error) => {
+        logger.error(
+          { err: error, orderId: attempt.orderId, driverId: attempt.driverId },
+          "Failed to dispatch after driver timeout",
+        );
+      }),
+    ),
+  );
 }
 
 /**
