@@ -1,9 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @workspace/talabat run build",
-  "outputDirectory": "dist/public",
-  "framework": null,
-  "rewrites": [
-    { "source": "/((?!assets/).*)", "destination": "/index.html" }
-  ]
-}
