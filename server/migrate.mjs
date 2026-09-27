@@ -4,7 +4,8 @@ import { pool } from "./db.mjs";
 const migrations = [
   ["001_driver_email_dispatch.sql", new URL("./migrations/001_driver_email_dispatch.sql", import.meta.url)],
   ["002_admin_settings.sql", new URL("./migrations/002_admin_settings.sql", import.meta.url)],
-  ["003_gmail_oauth.sql", new URL("./migrations/003_gmail_oauth.sql", import.meta.url)]
+  ["003_gmail_oauth.sql", new URL("./migrations/003_gmail_oauth.sql", import.meta.url)],
+  ["004_driver_gmail_verification.sql", new URL("./migrations/004_driver_gmail_verification.sql", import.meta.url)]
 ];
 const selected = process.argv[2];
 if (selected && !migrations.some(([name]) => name === selected)) {

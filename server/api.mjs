@@ -3,6 +3,7 @@ import { pool, withTransaction } from "./db.mjs";
 import { kickDispatch, reconcileEmailDelivery } from "./dispatch.mjs";
 import { handleAdminManagement } from "./admin-management.mjs";
 import { handleGmailOAuthRoutes } from "./gmail-oauth.mjs";
+import { handleDriverGmailRoutes } from "./driver-gmail.mjs";
 import {
   AuthError,
   loginAdmin,
@@ -1077,6 +1078,7 @@ async function routeApi(req, res, url) {
   const method = req.method || "GET";
 
   if (await handleGmailOAuthRoutes(req, res, url, { sendJson })) return true;
+  if (await handleDriverGmailRoutes(req, res, url, { sendJson })) return true;
   if (await handleAdminManagement(req, res, url, { readJson, sendJson })) return true;
 
   if (path.startsWith("/api/storage/db-images/")) {

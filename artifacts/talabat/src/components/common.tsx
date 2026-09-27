@@ -8,6 +8,7 @@ export function Header() {
   return <header className="site-header"><div className="shell header-inner">
     <Link href="/" className="brand" data-testid="link-home"><span className="brand-mark"><UtensilsCrossed size={19} strokeWidth={2.6} /></span><span>طلبات<span style={{ color: 'hsl(var(--primary))' }}>.</span></span></Link>
     <nav className="nav-actions" aria-label="التنقل الرئيسي">
+      <Link href="/driver" className="btn btn-plain" data-testid="link-driver">دخول السائقين</Link>
       <Link href="/admin" className="btn btn-plain admin-link" data-testid="link-admin">لوحة الإدارة</Link>
       <Link href="/#cart" className="btn btn-dark" data-testid="link-cart"><ShoppingBag size={17}/><span>السلة</span><span aria-label={`${count} عناصر`}>({count})</span></Link>
     </nav>

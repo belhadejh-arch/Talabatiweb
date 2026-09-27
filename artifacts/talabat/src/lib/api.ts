@@ -6,6 +6,10 @@ export type Order = { id: number; restaurantId: number; restaurantName?: string;
 export type OrderInput = { restaurantId: number; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: { productId: number; quantity: number }[]; notes?: string; latitude?: number; longitude?: number; reservationDate?: string; reservationTime?: string; partySize?: number };
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
+export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number };
+export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'itemsSummary' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
+export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
+export type DriverGmailStatus = { configured: boolean; connected: boolean; email: string | null; registeredEmail: string | null };
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public requestId?: string) { super(message); this.name = 'ApiError'; }
@@ -44,6 +48,11 @@ export const api = {
   adminOverview: (token: string) => request<AdminOverview>('/api/admin/overview', { headers: { Authorization: `Bearer ${token}` } }),
   adminStats: (token: string, filters?: { from?: string; to?: string; period?: string }) => request<StatsData>(`/api/admin/stats${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value) as [string, string][]).toString()}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }),
   adminRequest: <T>(token: string, path: string, method = 'GET', body?: unknown) => request<T>(path, { method, headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : jsonHeaders) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
+  driverLogin: (serialNumber: string) => request<{ token: string; driver: DriverIdentity }>('/api/driver/login', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ serialNumber }) }),
+  driverOrders: (token: string) => request<{ orders: DriverOrder[] }>('/api/driver/orders', { headers: { Authorization: `Bearer ${token}` } }),
+  driverStats: (token: string) => request<DriverStats>('/api/driver/stats', { headers: { Authorization: `Bearer ${token}` } }),
+  driverGmailStatus: (token: string) => request<DriverGmailStatus>('/api/driver/gmail/status', { headers: { Authorization: `Bearer ${token}` } }),
+  driverGmailConnect: (token: string) => request<{ authorizationUrl: string }>('/api/driver/gmail/connect', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
 };
 
 export const money = (value: number | string | null | undefined) => new Intl.NumberFormat('ar', { maximumFractionDigits: 2 }).format(Number(value) || 0);

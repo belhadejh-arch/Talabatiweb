@@ -9,6 +9,7 @@ import Browse from './pages/browse';
 import Checkout from './pages/checkout';
 import Confirmation from './pages/confirmation';
 import Admin from './pages/admin';
+import Driver from './pages/driver';
 import NotFoundAr from './pages/not-found-ar';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: true, retry: 1 } } });
@@ -17,6 +18,7 @@ const meta: Record<string, { title: string; description: string }> = {
   '/checkout': { title: 'تأكيد الطلب | طلبات', description: 'راجع تفاصيل الطلب واختر التوصيل أو الحجز قبل الإرسال.' },
   '/order-confirmation': { title: 'تم استلام طلبك | طلبات', description: 'تفاصيل الطلب الذي تم استلامه بنجاح.' },
   '/admin': { title: 'لوحة الإدارة | طلبات', description: 'إدارة الطلبات ومتابعة بيانات التشغيل.' },
+  '/driver': { title: 'مساحة السائق | طلبات', description: 'تابع محاولات إسناد طلباتك وحالاتها في مساحة السائق.' },
 };
 function PageMetadata() {
   const [location] = useLocation();
@@ -46,6 +48,7 @@ function App() {
     <Route path="/checkout" component={Checkout}/>
     <Route path="/order-confirmation" component={Confirmation}/>
     <Route path="/admin" component={Admin}/>
+    <Route path="/driver" component={Driver}/>
     <Route component={NotFoundAr}/>
   </Switch></RoutedErrorBoundary></WouterRouter></CartProvider><Toaster/></TooltipProvider></QueryClientProvider>;
 }
