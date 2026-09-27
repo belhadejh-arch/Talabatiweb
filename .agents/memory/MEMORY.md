@@ -4,3 +4,4 @@
 - [Legacy API preview routing](legacy-api-preview-routing.md) — a running legacy server may still be unreachable at the root API path of an artifact preview.
 - [Vercel project roots](vercel-project-root-output.md) — successful Vite builds can fail upload if Vercel reads config and output relative to a different monorepo root.
 - [Shallow Git history](shallow-git-history.md) — older frontend revisions may still exist upstream even when absent from every local ref.
+- [Chromium CDP preview checks](chromium-cdp-preview.md) — browser-only visual checks may need a CDP client without Node WebSocket; match the HTTP 101 code, not its reason phrase.
