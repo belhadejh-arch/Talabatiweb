@@ -7,3 +7,4 @@
 - [Chromium CDP preview checks](chromium-cdp-preview.md) — browser-only visual checks may need a CDP client without Node WebSocket; match the HTTP 101 code, not its reason phrase.
 - [Shared database test isolation](shared-db-test-isolation.md) — fixture cleanup count assertions are unreliable when independent test files run concurrently against one database.
 - [External production verification](external-production-verification.md) — GitHub deployment URLs can be Vercel-login protected even while the production alias is public; verify the alias separately.
+- [Render SMTP egress](render-smtp-egress.md) — Render Free blocks Gmail SMTP on port 465; a healthy API and correct recipient do not imply email delivery.
