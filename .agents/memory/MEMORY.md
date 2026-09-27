@@ -1,6 +1,6 @@
 - [Raw SQL parameter discipline](raw-sql-parameters.md) — every PostgreSQL placeholder must have a matching parameter; unused placeholders fail at runtime even when TypeScript passes
 - [PostgreSQL fixture cleanup](http-fixture-cleanup.md) — recover test-owned rows by a unique parent even if the HTTP request commits before a response assertion fails.
-- [Console workflow startup](workflow-start-state.md) — verify workflow state and port; a successful restart response may leave a stopped console workflow unstarted.
+- [Console workflow lifecycle](workflow-start-state.md) — verify process and port after restart or post-merge reconciliation; success alone may not refresh the server.
 - [Legacy API preview routing](legacy-api-preview-routing.md) — a running legacy server may still be unreachable at the root API path of an artifact preview.
 - [Vercel project roots](vercel-project-root-output.md) — successful Vite builds can fail upload if Vercel reads config and output relative to a different monorepo root.
 - [Shallow Git history](shallow-git-history.md) — older frontend revisions may still exist upstream even when absent from every local ref.
