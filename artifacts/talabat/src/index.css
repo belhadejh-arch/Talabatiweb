@@ -228,3 +228,122 @@
   .checkout-page .choice { padding:.8rem; }
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important;scroll-behavior:auto!important;transition-duration:.01ms!important; } }
+
+/* Historical compact restaurant canvas: the surrounding dark field deliberately
+   remains visible on large screens instead of stretching the menu to a dashboard. */
+.storefront { background:#101010; }
+.storefront .site-header { max-width:480px;margin-inline:auto;background:#111112;border-inline:1px solid #1b1b1d; }
+.storefront .header-inner { min-height:60px;padding-inline:16px; }
+.storefront .brand { font-size:1.25rem; }
+.storefront .brand-mark { width:32px;height:32px;border-radius:10px; }
+.storefront .nav-actions { gap:2px; }
+.storefront .nav-actions .btn { font-size:.74rem;padding:.6rem .65rem; }
+.storefront .hero,.storefront .layout,.storefront footer { max-width:480px;margin-inline:auto; }
+.storefront .hero { min-height:260px;background-color:#24201e;border-inline:1px solid #1b1b1d; }
+.storefront .hero::before { background:linear-gradient(0deg,#101010 0%,rgba(16,16,16,.48) 48%,rgba(16,16,16,.08) 100%); }
+.storefront .hero-inner { min-height:260px;padding:18px 16px 22px;align-items:flex-end; }
+.storefront .hero-title { font-size:clamp(1.8rem,6vw,2.35rem);margin:.15rem 0 .3rem; }
+.restaurant-identity { display:flex;align-items:flex-end;gap:13px;width:100%; }
+.restaurant-avatar { display:grid;place-items:center;width:72px;height:72px;border-radius:17px;flex:none;background:#202124;border:2px solid #343436;color:#ddd;font-weight:900;font-size:2rem;overflow:hidden;box-shadow:0 12px 25px rgba(0,0,0,.25); }
+.restaurant-avatar img { width:100%;height:100%;object-fit:cover; }
+.restaurant-location { display:flex;gap:5px;align-items:center;color:#d0ccca;font-size:.77rem;line-height:1.5; }
+.restaurant-location svg { flex:none;color:#fa5421; }
+.storefront .layout { display:flex;flex-direction:column;gap:0;padding:0 13px 7rem;background:#101010;min-height:60vh;border-inline:1px solid #1b1b1d; }
+.storefront .layout>div { width:100%;min-width:0; }
+.storefront .section-head { margin:0;padding:15px 0 10px;display:block; }
+.storefront .section-title { font-size:1.45rem;letter-spacing:0; }
+.restaurant-about { display:flex;gap:10px;align-items:flex-start;padding:13px 12px;border-radius:13px;background:#181819;color:#aaa;margin:4px 0 18px;font-size:.77rem;line-height:1.7; }
+.restaurant-about svg { color:#fa5421;flex:none;margin-top:2px; }
+.restaurant-picker { padding-bottom:14px;border-bottom:1px solid #242426; }
+.restaurant-picker-title { display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:.85rem;font-weight:700; }
+.storefront .searchbox { padding:.65rem .85rem;border-radius:11px;margin-bottom:11px; }
+.storefront .restaurant-grid { display:flex;overflow-x:auto;gap:8px;padding:2px 1px 8px;scrollbar-width:thin; }
+.storefront .restaurant-card { flex:0 0 138px;min-height:106px;padding:9px;border-radius:12px;border-color:#282829; }
+.storefront .restaurant-card.active::before { width:0; }
+.storefront .restaurant-card.active { background:#241b17;border-color:#fa5421;box-shadow:none;transform:none; }
+.storefront .restaurant-card .restaurant-cover { width:100%;height:65px;border-radius:7px;margin:0 0 6px; }
+.storefront .restaurant-card h3 { font-size:.83rem;margin:0;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%; }
+.storefront .restaurant-card .restaurant-number { display:none; }
+.storefront .restaurant-card .arrow { left:9px;bottom:9px;width:15px; }
+.storefront .restaurant-card .subtle { display:none; }
+.storefront .menu-heading { padding:19px 0 12px;margin:0;border:0; }
+.storefront .menu-heading .section-title { font-size:1.25rem; }
+.storefront .category-nav { display:flex;gap:8px;overflow-x:auto;padding:3px 0 12px;scrollbar-width:none;position:sticky;top:59px;z-index:22;background:#101010; }
+.storefront .category-nav::-webkit-scrollbar { display:none; }
+.storefront .category-nav a { flex:none;border-radius:999px;padding:9px 15px;background:#242426;color:#eee;font-size:.77rem;font-weight:700;transition:transform .18s ease,background .18s ease; }
+.storefront .category-nav a:first-child,.storefront .category-nav a:hover { background:#fa5421;color:#fff;transform:translateY(-1px); }
+.storefront .category-block { padding-top:16px;scroll-margin-top:112px; }
+.storefront .category-title { display:flex;align-items:center;justify-content:space-between;font-size:1.16rem;font-weight:800;margin-bottom:13px; }
+.storefront .category-count { background:#252526;color:#aaa;border-radius:99px;padding:3px 9px;font-size:.7rem; }
+.storefront .product-list { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+.storefront .product-row { background:#1b1b1d;border:1px solid #232325;border-radius:17px;min-width:0; }
+.storefront .product-row .product-image { aspect-ratio:1.35;height:auto; }
+.product-placeholder { aspect-ratio:1.35;width:100%;display:grid;place-items:center;background:linear-gradient(#292929,#202022);color:#555;font-size:2.4rem;font-weight:900; }
+.storefront .product-row>.min-w-0 { padding:9px 10px 0; }
+.storefront .product-row h4 { line-height:1.3;font-size:.84rem; }
+.storefront .product-row p { font-size:.7rem;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+.storefront .product-row .product-actions { padding:8px 10px 10px;flex-direction:row-reverse; }
+.storefront .price { color:#fa5421;font-size:.8rem; }
+.storefront .icon-button { width:31px;height:31px; }
+.storefront .cart-panel { margin-top:22px;padding:15px;background:#19191b;border-radius:16px;position:static; }
+.storefront .cart-panel .cart-head { padding-bottom:9px; }
+.storefront footer { border-inline:1px solid #1b1b1d; }
+.storefront footer .shell { padding-inline:16px; }
+.checkout-page { background:#101010; }
+.checkout-page .site-header,.checkout-page .page-wrap { max-width:480px;margin-inline:auto;border-inline:1px solid #1b1b1d; }
+.checkout-page .page-wrap { padding:18px 16px 8rem;background:#101010;min-height:calc(100dvh - 60px); }
+.checkout-page .site-header .header-inner { min-height:60px;padding-inline:16px; }
+.checkout-page .checkout-grid { display:flex;flex-direction:column;gap:16px;margin-top:22px; }
+.checkout-page .checkout-grid>* { width:100%; }
+.checkout-page .surface { padding:18px;border-radius:17px; }
+.checkout-page .field-grid { grid-template-columns:1fr;gap:12px; }
+.checkout-page .choice { min-height:95px;padding:13px; }
+.checkout-page .checkout-summary { position:static; }
+.checkout-page .section-title { font-size:1.7rem; }
+.checkout-page .form-stack { gap:13px; }
+.checkout-page .form-stack>button[data-testid=button-submit-order] { min-height:54px; }
+.confirmation-page { background:#101010;color:#f6f5f4;--foreground:0 0% 96%;--card:0 0% 10%;--border:0 0% 16%;--muted-foreground:0 0% 65%;--secondary:0 0% 15%;--primary:15 95% 55%;--primary-foreground:0 0% 100%; }
+.confirmation-page .site-header { max-width:480px;margin-inline:auto;background:#111112;border-color:#242426; }
+.confirmation-page .page-wrap { max-width:480px;margin-inline:auto;padding:35px 16px 80px; }
+.confirmation-page .page-wrap>.w-16 { color:#fa5421;background:#30201a!important;border:2px solid #5e3022; }
+.confirmation-page .surface { background:#1b1b1d;border-color:#2a2a2c; }
+.confirmation-page .btn-dark { background:#29292b;color:#fff; }
+.confirmation-page .status-pill { background:#30201a;color:#fb724d; }
+.admin-sidebar { background:#1e3444;min-height:100dvh;border-left:1px solid #28465a; }
+.admin-sidebar nav button { display:flex;align-items:center;gap:11px;min-height:43px; }
+.admin-sidebar nav button[aria-current=page] { background:#6465e9!important;color:#fff!important;opacity:1;box-shadow:0 5px 16px rgba(37,38,105,.25); }
+.admin-content { padding-top:0; }
+.admin-topbar { min-height:73px;display:flex;align-items:center;justify-content:space-between;gap:15px;border-bottom:1px solid #e3e9f0;margin:0 calc(clamp(1.5rem,4vw,3.5rem) * -1) 28px;padding:0 clamp(1.5rem,4vw,3.5rem);background:#f8fbff; }
+.metric { position:relative;overflow:hidden; }
+.metric-icon { width:38px;height:38px;border-radius:12px;background:#eeefff;display:grid;place-items:center;color:#6263e9; }
+.metric:nth-child(2) .metric-icon { background:#e8f7fc;color:#149bbd; }
+.metric:nth-child(3) .metric-icon { background:#f0eaff;color:#8654cc; }
+.metric:nth-child(4) .metric-icon { background:#e9f7f0;color:#38976b; }
+.metric strong { font-size:1.8rem; }
+.login-wrap { background:linear-gradient(128deg,#2fd2e2 0%,#148ffa 40%,#5f61fa 71%,#a54bf2 100%); }
+.login-form { margin-top:0; }
+.login-form-inner { padding-bottom:30px; }
+.login-form-inner .section-title { text-align:center;font-size:1.55rem; }
+.login-form-inner .login-subtitle { text-align:center;margin:6px 0 20px;font-size:.8rem; }
+.login-form-inner .field { color:#344457; }
+.login-form-inner .field input { min-height:47px; }
+.login-form-inner .btn-primary { min-height:47px; }
+.login-form { max-width:410px; }
+.admin-sidebar .brand-mark { color:#fff; }
+@media(max-width:767px) {
+  .storefront .layout { padding:0 13px 7rem; }
+  .storefront .product-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .storefront .cart-panel:has(.cart-item) { max-width:480px;margin-inline:auto;max-height:38dvh;padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .storefront .cart-panel:has(.cart-item) .cart-head,.storefront .cart-panel:has(.cart-item)>.subtle,.storefront .cart-panel:has(.cart-item)>.text-xs { display:none; }
+  .storefront .cart-panel:has(.cart-item) .cart-item { padding:5px 0; }
+  .checkout-page .page-wrap { padding:18px 16px 10rem; }
+  .checkout-page .checkout-summary { position:fixed;bottom:76px;left:0;right:0;max-width:480px;margin-inline:auto;border-radius:16px 16px 0 0;padding:10px 16px; }
+  .checkout-page .form-stack>button[data-testid=button-submit-order] { max-width:448px;margin-inline:auto; }
+  .admin-sidebar { min-height:0; }
+  .admin-sidebar nav { flex:1;width:auto; }
+  .admin-sidebar nav button { justify-content:center;min-height:46px; }
+  .admin-sidebar>button:last-child { display:flex!important;min-width:42px;min-height:42px;align-items:center;justify-content:center;opacity:.8; }
+  .admin-topbar { min-height:60px;margin:0 -1rem 20px;padding:0 1rem; }
+  .login-form { margin-top:0; }
+}
+@media(max-width:360px) { .storefront .product-list { gap:7px; } .storefront .product-row h4 { font-size:.78rem; } }
