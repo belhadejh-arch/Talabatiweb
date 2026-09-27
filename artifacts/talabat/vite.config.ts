@@ -61,6 +61,10 @@ export default defineConfig({
     // Match the prefixed preview API and forward it to the same Render upstream
     // used by vercel.json, without exposing a cross-origin URL to the browser.
     proxy: {
+      [`${basePath.replace(/\/$/, '')}/api/storage/db-images`]: {
+        target: 'http://localhost:8080',
+        rewrite: (url) => url.replace(new RegExp(`^${basePath.replace(/\/$/, '')}/api`), '/api'),
+      },
       [`${basePath.replace(/\/$/, '')}/api`]: {
         target: 'https://talabatiweb-wo8o.onrender.com',
         changeOrigin: true,

@@ -11,6 +11,13 @@ export class ApiError extends Error {
   constructor(message: string, public status: number, public requestId?: string) { super(message); this.name = 'ApiError'; }
 }
 
+// The preview proxy mounts the API below /talabat; Vercel mounts it at /.
+export function catalogImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  const previewPrefix = import.meta.env.DEV ? import.meta.env.BASE_URL.replace(/\/$/, '') : '';
+  return url.startsWith('/api/storage/db-images/') ? `${previewPrefix}${url}` : url;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
   try {

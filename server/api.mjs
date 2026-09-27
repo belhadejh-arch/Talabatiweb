@@ -1051,6 +1051,44 @@ async function routeApi(req, res, url) {
   const path = url.pathname;
   const method = req.method || "GET";
 
+  if (path.startsWith("/api/storage/db-images/")) {
+    if (method !== "GET" && method !== "HEAD") return methodNotAllowed(res);
+    const id = path.slice("/api/storage/db-images/".length);
+    if (!UUID_PATTERN.test(id)) {
+      sendJson(res, 404, { error: "IMAGE_NOT_FOUND" });
+      return true;
+    }
+    // Only expose images belonging to public catalog items, not private driver uploads.
+    const result = await pool.query(
+      `SELECT b.data, b.content_type
+         FROM talabat_image_blobs b
+        WHERE b.id = $1
+          AND b.content_type = 'image/webp'
+          AND (
+            (b.folder = 'restaurants' AND EXISTS (
+              SELECT 1 FROM restaurants r WHERE r.logo_url = $2 OR r.cover_url = $2
+            ))
+            OR (b.folder = 'products' AND EXISTS (
+              SELECT 1 FROM products p WHERE p.image_url = $2
+            ))
+          )
+        LIMIT 1`,
+      [id.toLowerCase(), `/api/storage/db-images/${id.toLowerCase()}`]
+    );
+    const image = result.rows[0];
+    if (!image) {
+      sendJson(res, 404, { error: "IMAGE_NOT_FOUND" });
+      return true;
+    }
+    res.writeHead(200, {
+      "content-type": image.content_type,
+      "content-length": image.data.length,
+      "cache-control": "public, max-age=86400",
+      "x-content-type-options": "nosniff"
+    });
+    res.end(method === "HEAD" ? undefined : image.data);
+    return true;
+  }
   if (path === "/api/catalog") {
     if (method !== "GET") return methodNotAllowed(res);
     sendJson(res, 200, await getCatalog());
