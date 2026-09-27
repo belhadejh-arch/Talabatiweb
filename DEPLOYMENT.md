@@ -1,51 +1,50 @@
-# نشر TALABAT: Backend على Replit + Frontend على Vercel
+# نشر TALABAT (Android + PostgreSQL + Gmail SMTP)
 
-هذا التوثيق يشرح كيفية نشر الواجهة الأمامية (`artifacts/talabat`) على Vercel بينما يبقى الـ Backend (`artifacts/api-server`) وقاعدة البيانات ونظام تخزين الصور على استضافة Replit.
+المستودع الحالي تطبيق Android أصلي في `app/` وخادم Node.js في `server/`. لا توجد واجهة Vercel أو حزم React القديمة في هذا الـ checkout. احتفظ بقاعدة البيانات الحالية؛ لا تنفّذ seed أو `db push` أو أي أمر حذف على الإنتاج.
 
-> **لماذا هذا التقسيم؟** رفع الصور (ضغط + تحويل WebP + تخزين) يعتمد على Replit Object Storage، والذي يتطلب الاتصال بخدمة داخلية خاصة بـ Replit (sidecar auth) — لا يعمل خارج بيئة Replit. لذلك يبقى الـ Backend على Replit، بينما الواجهة (React/Vite) يمكن نشرها في أي مكان لأنها تتحدث مع الـ API عبر HTTP فقط.
+## نشر Backend على Render
 
-## الخطوة 1 — نشر الـ Backend على Replit
+1. اربط هذا المستودع بخدمة **Web Service** في Render (Node.js)، من جذر المستودع. أمر البناء: `pnpm install --frozen-lockfile`؛ أمر التشغيل: `pnpm run server:dev`. يوفر Render أمر `pnpm` مسبقاً؛ لا تستخدم `corepack enable` لأنه يحاول تعديل `/usr/bin/pnpm` في نظام ملفات للقراءة فقط. يجب أن يكون للخدمة مثيل يعمل باستمرار لأن انتهاء مهلة السائق وإعادة محاولات البريد يعتمدان على عامل الخادم. يستمع الخادم على `PORT` الذي يقدمه Render.
+2. استخدم قاعدة PostgreSQL المقصودة نفسها، ثم طبّق `pnpm run server:migrate` **مرة واحدة** في بيئة الخادم قبل بدء النسخة الجديدة. الترحيل `server/migrations/001_driver_email_dispatch.sql` إضافي ويحافظ على جميع الطلبات السابقة. لا تعِد تشغيله تلقائياً مع كل نشر.
+3. أضف المتغيرات في Render للخادم فقط:
 
-1. من لوحة Replit اضغط **Publish** لنشر المشروع (ينشر كل الـ artifacts، بما فيها `api-server`، تحت نفس النطاق).
-2. بعد نجاح النشر، احصل على رابط الإنتاج (مثال: `https://your-app.replit.app`). الـ API يكون متاحاً على `https://your-app.replit.app/api/...` وفحص الصحة على `https://your-app.replit.app/health`.
-3. تأكد أن قاعدة البيانات (`DATABASE_URL`) ومتغيرات تخزين الكائنات (`DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`) مُهيأة بالفعل — هي كذلك في هذا المشروع.
-
-## الخطوة 2 — إنشاء مشروع Vercel للواجهة فقط
-
-1. في Vercel، أنشئ مشروعاً جديداً واربطه بنفس مستودع الكود (GitHub/GitLab وغيره — إن لم يكن المشروع مرتبطاً بمستودع Git بعد، فعّل ذلك من إعدادات Replit أولاً).
-2. في **Project Settings → General → Root Directory** اختر: `artifacts/talabat`
-3. ملف `artifacts/talabat/vercel.json` (موجود بالفعل في المشروع) يضبط أوامر البناء تلقائياً:
-   - Build Command: `pnpm --filter @workspace/talabat run build`
-   - Output Directory: `dist/public`
-   - إعادة توجيه كل المسارات إلى `index.html` (SPA routing عبر Wouter)
-4. Vercel يكتشف `pnpm-workspace.yaml` في جذر المستودع تلقائياً وينفّذ `pnpm install` من الجذر — لا حاجة لتعديل يدوي.
-
-## الخطوة 3 — متغيرات البيئة على Vercel
-
-في **Project Settings → Environment Variables** أضف:
-
-| Variable | Value |
+| المتغير | المطلوب |
 |---|---|
-| `VITE_API_URL` | رابط الإنتاج من الخطوة 1، بدون `/api` في النهاية (مثال: `https://your-app.replit.app`) |
-| `PORT` | `3000` (قيمة وهمية فقط — يتطلبها ملف `vite.config.ts` عند البناء، غير مستخدمة فعلياً لأن Vercel يخدم ملفات ثابتة) |
-| `BASE_PATH` | `/` |
+| `DATABASE_URL` | رابط PostgreSQL الحالي؛ احتفظ به سراً |
+| `SESSION_SECRET` | سر عشوائي لا يقل عن 32 حرفاً، ثابت عبر إعادة التشغيل |
+| `PUBLIC_API_URL` | أصل رابط Render العام بصيغة `https://...` بلا مسار فرعي؛ يستعمل لأزرار البريد |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SECURE` | `true` |
+| `SMTP_USER` | حساب Gmail المركزي للإرسال |
+| `SMTP_PASS` | Gmail App Password، **ليس** كلمة مرور Gmail العادية |
 
-أعد النشر (Redeploy) بعد إضافة المتغيرات.
+لا تعرض `DATABASE_URL` أو `SESSION_SECRET` أو `SMTP_PASS` في السجلات أو Git أو التطبيق. بريد السائق نفسه يُضاف من شاشة الإدارة، وليس حساب SMTP منفصلاً.
 
-## الخطوة 4 — ربط CORS وجلسة تسجيل الدخول (نطاقان مختلفان)
+4. تحقّق من `https://<render-host>/health` ثم من `/api/catalog`. ابنِ نسخة Android الإنتاجية بعنوان الخدمة العامة: `-PAPI_BASE_URL=https://<render-host>`. اتصالات HTTP المحلية مسموحة فقط لنسخة debug في المحاكي.
+5. اختبر مع بريد سائق حقيقي مُدخل في الإدارة وطلب جديد حقيقي؛ لا تحاول إرسال الطلبات التاريخية. اختبر رفض/قبول رابط البريد عبر صفحة التأكيد، الانتقال للسائق التالي، المهلة، السجل والإحصائيات. اختبر SMTP في Render ذاته؛ نجاح الاختبارات المحلية بحقن ناقل بريد لا يثبت وصول Gmail.
 
-بما أن الواجهة (Vercel) والـ Backend (Replit) على نطاقين مختلفين، يجب ضبط:
+## نشر واجهة الويب على Vercel
 
-1. على الـ Backend (Replit)، أضف السر/المتغير `FRONTEND_URL` بقيمة نطاق Vercel الكامل (مثال: `https://talabat.vercel.app`) — هذا يفعّل CORS الصحيح وإعدادات كوكيز الجلسة (`SameSite=None; Secure`) اللازمة لتسجيل دخول الأدمن عبر النطاقين. أعد تشغيل/نشر الـ Backend بعد إضافته.
-2. تحقق أن `NODE_ENV=production` مضبوط على نشر Replit (مضبوط تلقائياً عبر إعدادات النشر الحالية).
+خادم الطلبات والبريد والمهلة يبقى على Render؛ Vercel ينشر واجهة Vite الثابتة فقط. من إعدادات مشروع Vercel المرتبط بجذر هذا المستودع:
 
-## الخطوة 5 — التحقق النهائي
+| الإعداد | القيمة |
+|---|---|
+| Framework Preset | `Vite` |
+| Root Directory | جذر المستودع (فارغ)، أو `artifacts/talabat` |
+| Install Command | `pnpm install --frozen-lockfile` |
+| Build Command | `pnpm --filter @workspace/talabat run build` |
+| Output Directory | `dist/public` |
+| Development Command، إن احتجته | `pnpm --filter @workspace/talabat run dev`، وليس `vite` من الجذر |
 
-- افتح `https://your-app.replit.app/health` — يجب أن يعيد `{"status":"ok"}`
-- افتح موقع Vercel، سجّل دخول كأدمن (`admin` / `admin123` أو الحساب الفعلي)، وتأكد من نجاح تسجيل الدخول (الكوكيز تُحفظ عبر النطاقين)
-- ارفع صورة منتج من لوحة التحكم وتأكد من ظهورها
-- افتح متجر مطعم عبر الرابط العام (`/{slug}`) على نطاق Vercel وأتمم طلباً تجريبياً كاملاً (سلة → GPS → تأكيد)
+يوجد `vercel.json` في جذر المستودع وداخل حزمة الويب لتُقرأ الإعدادات سواء اختار المشروع أيّاً من قيمتَي Root Directory أعلاه. يُنشئ أمر البناء `dist/public` نسبةً إلى كلا الجذرين. يضبط ملف الإعداد المناسب أمر البناء ومسار الملفات وتحويل `/api/*` إلى عنوان Render، فلا توضع أسرار قاعدة البيانات أو Gmail في واجهة Vercel. عنوان Render هو الخادم الذي ينفذ الطلبات ويُرسل البريد؛ أبقِ `PUBLIC_API_URL` فيه على عنوان Render لتذهب روابط قبول السائق إليه مباشرة. تحديث هذا المستودع في Replit وحده لا يغيّر نسخة GitHub: تأكد من وصول الملفات الجديدة إلى فرع `main` قبل إعادة نشر Vercel.
 
-## ملاحظة حول قاعدة بيانات منفصلة
+## تعطل البريد أو نتيجة SMTP غير مؤكدة
 
-إذا أردت لاحقاً فصل قاعدة البيانات عن Replit (مثلاً Postgres على Render/Neon/Supabase)، يكفي تحديث `DATABASE_URL` على نشر Replit، ثم تشغيل `pnpm --filter @workspace/db run push` لدفع المخطط، و`pnpm --filter @workspace/db run seed` لإنشاء حساب الأدمن التجريبي — لا حاجة لأي تعديل في الكود.
+- الإخفاق المؤكد يسجل `FAILED` وتعيد الخدمة إرسال **المحاولة نفسها** بعد تأخير متزايد، من دون طلب أو Assignment جديد.
+- إذا انقطع الاتصال أثناء عملية SMTP وقد تكون Gmail قبلت الرسالة، تبقى حالة الإرسال `SENDING` لتجنب بريد مكرر. بعد مرور دقيقتين على الأقل، يفحص مسؤول النظام صندوق **Sent** في Gmail. استعمل مسار الإدارة المحمي `GET /api/admin/email-deliveries?status=SENDING` للاطلاع على السجل، ثم `POST /api/admin/email-deliveries/{id}/reconcile` مع `{"result":"SENT"}` إن ثبت التسليم، أو `{"result":"NOT_SENT"}` إن ثبت عدم الإرسال. لا تستخدم `NOT_SENT` بلا تحقق، لأنه يعيد المحاولة وقد يرسل نسخة ثانية.
+- المهلة البالغة خمس دقائق تبدأ من نجاح SMTP/تأكيد التسليم؛ إرسال لم يبدأ بعد لا ينبغي أن يحسب ردّ السائق من وقت إنشاء الطلب.
+
+## مستحقات السائق
+
+لا يحتوي هذا الـ checkout أو قاعدة البيانات الحالية على قاعدة معتمدة لحساب أرباح السائق. لذلك يعرض API المستحقات غير المسجلة كقيمة غير معروفة (`null`) ولا يفترض أن رسوم التوصيل هي ربح السائق. يلزم تحديد قاعدة الأرباح قبل اعتماد أرقام مستحقات في الإنتاج.

@@ -5,12 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.talabat.data.*
 import com.example.talabat.ui.screens.*
 import com.example.talabat.ui.theme.TalabatTheme
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,7 +23,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             TalabatTheme {
                 val navController = rememberNavController()
-                var checkoutRestaurant by remember { mutableStateOf<Restaurant?>(null) }
+                var checkoutRestaurantJson by rememberSaveable { mutableStateOf<String?>(null) }
+                val checkoutRestaurant = remember(checkoutRestaurantJson) {
+                    checkoutRestaurantJson?.let { Json.decodeFromString<Restaurant>(it) }
+                }
 
                 NavHost(navController = navController, startDestination = "home") {
                     composable("home") {
@@ -33,7 +40,7 @@ class MainActivity : ComponentActivity() {
                         CustomerStorefrontScreen(
                             onBack = { navController.popBackStack() },
                             onCheckout = { rest ->
-                                checkoutRestaurant = rest
+                                checkoutRestaurantJson = Json.encodeToString(rest)
                                 navController.navigate("checkout")
                             }
                         )
@@ -42,8 +49,12 @@ class MainActivity : ComponentActivity() {
                         if (checkoutRestaurant != null) {
                             CheckoutScreen(
                                 restaurant = checkoutRestaurant!!,
-                                onBack = { navController.popBackStack() },
+                                onBack = {
+                                    checkoutRestaurantJson = null
+                                    navController.popBackStack()
+                                },
                                 onOrderPlaced = {
+                                    checkoutRestaurantJson = null
                                     navController.popBackStack("home", inclusive = false)
                                 }
                             )
