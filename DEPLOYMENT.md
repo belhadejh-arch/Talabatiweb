@@ -24,6 +24,21 @@
 4. تحقّق من `https://<render-host>/health` ثم من `/api/catalog`. ابنِ نسخة Android الإنتاجية بعنوان الخدمة العامة: `-PAPI_BASE_URL=https://<render-host>`. اتصالات HTTP المحلية مسموحة فقط لنسخة debug في المحاكي.
 5. اختبر مع بريد سائق حقيقي مُدخل في الإدارة وطلب جديد حقيقي؛ لا تحاول إرسال الطلبات التاريخية. اختبر رفض/قبول رابط البريد عبر صفحة التأكيد، الانتقال للسائق التالي، المهلة، السجل والإحصائيات. اختبر SMTP في Render ذاته؛ نجاح الاختبارات المحلية بحقن ناقل بريد لا يثبت وصول Gmail.
 
+## نشر واجهة الويب على Vercel
+
+خادم الطلبات والبريد والمهلة يبقى على Render؛ Vercel ينشر واجهة Vite الثابتة فقط. من إعدادات مشروع Vercel المرتبط بجذر هذا المستودع:
+
+| الإعداد | القيمة |
+|---|---|
+| Framework Preset | `Vite` |
+| Root Directory | جذر المستودع (فارغ) |
+| Install Command | `pnpm install --frozen-lockfile` |
+| Build Command | `pnpm --filter @workspace/talabat run build` |
+| Output Directory | `dist/public` |
+| Development Command، إن احتجته | `pnpm --filter @workspace/talabat run dev`، وليس `vite` من الجذر |
+
+يضبط `vercel.json` أمر البناء ومسار الملفات وتحويل `/api/*` إلى عنوان Render، فلا توضع أسرار قاعدة البيانات أو Gmail في واجهة Vercel. عنوان Render هو الخادم الذي ينفذ الطلبات ويُرسل البريد؛ أبقِ `PUBLIC_API_URL` فيه على عنوان Render لتذهب روابط قبول السائق إليه مباشرة. تحديث هذا المستودع في Replit وحده لا يغيّر نسخة GitHub: تأكد من وصول الملفات الجديدة إلى فرع `main` قبل إعادة نشر Vercel.
+
 ## تعطل البريد أو نتيجة SMTP غير مؤكدة
 
 - الإخفاق المؤكد يسجل `FAILED` وتعيد الخدمة إرسال **المحاولة نفسها** بعد تأخير متزايد، من دون طلب أو Assignment جديد.

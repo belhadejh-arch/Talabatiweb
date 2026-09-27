@@ -1,3 +1,4 @@
 - [Raw SQL parameter discipline](raw-sql-parameters.md) — every PostgreSQL placeholder must have a matching parameter; unused placeholders fail at runtime even when TypeScript passes
 - [PostgreSQL fixture cleanup](http-fixture-cleanup.md) — recover test-owned rows by a unique parent even if the HTTP request commits before a response assertion fails.
 - [Console workflow startup](workflow-start-state.md) — verify workflow state and port; a successful restart response may leave a stopped console workflow unstarted.
+- [Legacy API preview routing](legacy-api-preview-routing.md) — a running legacy server may still be unreachable at the root API path of an artifact preview.
