@@ -5,6 +5,14 @@ let running = false;
 let timer;
 const ACTIVE_DRIVER = "d.is_active = true AND d.status = 'ACTIVE'";
 
+// The Replit preview can share the production database with Render. It must
+// not claim live email jobs unless deliberately enabled against an isolated DB.
+export function automaticDispatchEnabled(env = process.env) {
+  if (env.DISPATCH_WORKER_ENABLED === "true") return true;
+  if (env.DISPATCH_WORKER_ENABLED === "false") return false;
+  return !env.REPL_ID || env.NODE_ENV === "production";
+}
+
 function safeError(error) {
   let text = String(error?.message ?? error);
   for (const key of ["SMTP_PASS", "DATABASE_URL", "SESSION_SECRET"]) {
@@ -484,10 +492,15 @@ async function runTick() {
 }
 
 export function kickDispatch() {
+  if (!automaticDispatchEnabled()) return;
   queueMicrotask(() => void runTick());
 }
 
 export function startDispatchWorker() {
+  if (!automaticDispatchEnabled()) {
+    console.log("Automatic email dispatch disabled in the Replit development preview.");
+    return;
+  }
   if (timer) return;
   timer = setInterval(kickDispatch, 1_000);
   timer.unref();
