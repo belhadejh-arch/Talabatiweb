@@ -5,3 +5,4 @@
 - [Vercel project roots](vercel-project-root-output.md) — successful Vite builds can fail upload if Vercel reads config and output relative to a different monorepo root.
 - [Shallow Git history](shallow-git-history.md) — older frontend revisions may still exist upstream even when absent from every local ref.
 - [Chromium CDP preview checks](chromium-cdp-preview.md) — browser-only visual checks may need a CDP client without Node WebSocket; match the HTTP 101 code, not its reason phrase.
+- [Shared database test isolation](shared-db-test-isolation.md) — fixture cleanup count assertions are unreliable when independent test files run concurrently against one database.

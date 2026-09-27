@@ -334,7 +334,7 @@ async function saveSubscription(subscriptionId, input) {
     only(input, ["restaurantId", "plan", "days"], "الاشتراك");
     const inserted = await pool.query(
       `INSERT INTO subscriptions (restaurant_id,plan,status,start_date,expiry_date)
-       SELECT id,$2,'ACTIVE',CURRENT_DATE,CURRENT_DATE+$3 FROM restaurants WHERE id=$1
+        SELECT id,$2,'ACTIVE',CURRENT_DATE,CURRENT_DATE+$3::integer FROM restaurants WHERE id=$1
        RETURNING id,restaurant_id,plan,status,start_date,expiry_date`,
       [id(input.restaurantId, "المطعم"), plan(input.plan), days(input.days)]
     );
@@ -377,7 +377,7 @@ async function renewSubscription(subscriptionId, input) {
   const planValue = input.plan == null ? null : plan(input.plan);
   const result = await pool.query(
     `UPDATE subscriptions SET plan=COALESCE($2,plan),
-       expiry_date=GREATEST(expiry_date,CURRENT_DATE)+$3,status='ACTIVE'
+        expiry_date=GREATEST(expiry_date,CURRENT_DATE)+$3::integer,status='ACTIVE'
      WHERE id=$1 RETURNING id,restaurant_id,plan,status,start_date,expiry_date`,
     [subscriptionId, planValue, days(input.days)]
   );

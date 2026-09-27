@@ -54,6 +54,7 @@ test("mail includes saved delivery and reservation details; tokens bind all IDs"
 test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no replay", async () => {
   const ids = { restaurants: [], categories: [], products: [], drivers: [], orders: [] };
   const mails = [];
+  let originalTimeout;
   async function createRestaurant() {
     const slug = `email-test-${randomUUID()}`;
     const restaurant = (await pool.query(
@@ -141,6 +142,12 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
     )).rows;
   }
   try {
+    originalTimeout = (await pool.query(
+      "SELECT dispatch_timeout_minutes FROM admin_settings WHERE id=1"
+    )).rows[0].dispatch_timeout_minutes;
+    await pool.query(
+      "UPDATE admin_settings SET dispatch_timeout_minutes=12 WHERE id=1"
+    );
     const rest = await createRestaurant();
     const otherRest = await createRestaurant();
     await createDriver(rest.restaurantId, false, "inactive@example.test");
@@ -153,6 +160,15 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
     assert.equal(rows.length, 1);
     assert.equal(rows[0].driver_id, first);
     assert.equal(rows[0].email_status, "SENT");
+    const sentAt = (await pool.query(
+      "SELECT sent_at FROM order_email_deliveries WHERE assignment_id=$1",
+      [rows[0].assignment_id],
+    )).rows[0].sent_at;
+    assert.equal(
+      new Date(rows[0].timeout_at).getTime() - new Date(sentAt).getTime(),
+      12 * 60_000,
+      "Dispatch must use the configured timeout after email confirmation.",
+    );
     assert.deepEqual(mails.map((mail) => mail.assignment.driver_email), ["first@example.test"]);
     const input = {
       orderId, assignmentId: rows[0].assignment_id, driverId: first,
@@ -310,6 +326,12 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
       driverId: first, token: actionToken(expiryAttempt), decision: "ACCEPTED",
     })).ok, false);
   } finally {
+    if (originalTimeout != null) {
+      await pool.query(
+        "UPDATE admin_settings SET dispatch_timeout_minutes=$1 WHERE id=1",
+        [originalTimeout],
+      );
+    }
     // Only remove records created by this test. Pre-existing user data is untouched.
     await pool.query("DELETE FROM order_email_deliveries WHERE order_id=ANY($1::integer[])", [ids.orders]);
     await pool.query("DELETE FROM order_driver_attempts WHERE order_id=ANY($1::integer[])", [ids.orders]);
