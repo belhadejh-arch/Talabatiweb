@@ -15,7 +15,7 @@ export function automaticDispatchEnabled(env = process.env) {
 
 function safeError(error) {
   let text = String(error?.message ?? error);
-  for (const key of ["SMTP_PASS", "DATABASE_URL", "SESSION_SECRET"]) {
+  for (const key of ["SMTP_PASS", "DATABASE_URL", "SESSION_SECRET", "GOOGLE_OAUTH_CLIENT_SECRET"]) {
     const secret = process.env[key];
     if (secret) text = text.replaceAll(secret, "[REDACTED]");
   }
@@ -245,6 +245,16 @@ async function processJob(orderId) {
 }
 
 async function claimEmail(orderId = null) {
+  // Linking Gmail API must not suddenly replay an old FAILED order. Deliveries
+  // created before the most recent connection require deliberate human review.
+  let connectedAt = null;
+  try {
+    connectedAt = (await pool.query(
+      "SELECT connected_at FROM gmail_oauth_accounts WHERE id=1",
+    )).rows[0]?.connected_at ?? null;
+  } catch (error) {
+    if (error.code !== "42P01") throw error; // Before migration 003, SMTP remains available.
+  }
   return withTransaction(async (client) => {
     const delivery = (await client.query(
       `SELECT e.id
@@ -258,11 +268,13 @@ async function claimEmail(orderId = null) {
          AND s.start_date<=CURRENT_DATE AND s.expiry_date>=CURRENT_DATE
        WHERE e.status IN ('PENDING','FAILED')
          AND ($1::integer IS NULL OR e.order_id=$1)
+         AND ($2::timestamptz IS NULL OR
+              (e.created_at >= $2 AND o.created_at >= $2))
          AND (e.next_retry_at IS NULL OR e.next_retry_at<=now())
          AND a.status='PENDING' AND ${ACTIVE_DRIVER}
        ORDER BY e.created_at,e.id LIMIT 1
        FOR UPDATE OF e SKIP LOCKED`,
-      [orderId],
+      [orderId, connectedAt],
     )).rows[0];
     if (!delivery) return null;
     return (await client.query(
@@ -330,10 +342,10 @@ async function sendNextEmail(sendMail, orderId = null) {
     await sendMail(payload);
   } catch (error) {
     const details = safeError(error);
-    console.error(`SMTP assignment ${delivery.assignment_id} failed: ${details}`);
+    console.error(`Email assignment ${delivery.assignment_id} failed: ${details}`);
     const command = String(error?.command || "").toUpperCase();
     const definitelyBeforeData =
-      !sendInvoked || error?.smtpNotStarted === true ||
+      !sendInvoked || error?.smtpNotStarted === true || error?.deliveryNotAccepted === true ||
       (error?.code === "EAUTH" && command.startsWith("AUTH")) ||
       (["ECONNECTION", "ETIMEDOUT", "ESOCKET"].includes(error?.code) && command === "CONN") ||
       (["EENVELOPE", "ESMTP"].includes(error?.code) &&
@@ -344,7 +356,7 @@ async function sendNextEmail(sendMail, orderId = null) {
       // Never automatically resend such a message.
       await pool.query(
         "UPDATE order_email_deliveries SET error=$2,updated_at=now() WHERE id=$1 AND status='SENDING'",
-        [delivery.id, `Unconfirmed SMTP result: ${details}`],
+        [delivery.id, `Unconfirmed email result: ${details}`],
       );
       return true;
     }
@@ -363,7 +375,7 @@ async function sendNextEmail(sendMail, orderId = null) {
     });
     return true;
   }
-  // SMTP has already accepted the message. If PostgreSQL now fails, leave the
+  // The provider has already accepted the message. If PostgreSQL now fails, leave the
   // delivery in SENDING for reconciliation; automatically retrying could duplicate it.
   try {
     await withTransaction(async (client) => {
@@ -389,7 +401,7 @@ async function sendNextEmail(sendMail, orderId = null) {
       }
     });
   } catch (error) {
-    console.error(`SMTP accepted assignment ${delivery.assignment_id}, database confirmation failed: ${safeError(error)}`);
+    console.error(`Email accepted for assignment ${delivery.assignment_id}, database confirmation failed: ${safeError(error)}`);
   }
   return true;
 }

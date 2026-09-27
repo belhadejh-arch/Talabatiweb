@@ -2,6 +2,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { pool, withTransaction } from "./db.mjs";
 import { kickDispatch, reconcileEmailDelivery } from "./dispatch.mjs";
 import { handleAdminManagement } from "./admin-management.mjs";
+import { handleGmailOAuthRoutes } from "./gmail-oauth.mjs";
 import {
   AuthError,
   loginAdmin,
@@ -1075,6 +1076,7 @@ async function routeApi(req, res, url) {
   const path = url.pathname;
   const method = req.method || "GET";
 
+  if (await handleGmailOAuthRoutes(req, res, url, { sendJson })) return true;
   if (await handleAdminManagement(req, res, url, { readJson, sendJson })) return true;
 
   if (path.startsWith("/api/storage/db-images/")) {

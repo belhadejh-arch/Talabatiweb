@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import nodemailer from "nodemailer";
+import { sendGmailIfConnected } from "./gmail-api.mjs";
 
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -129,12 +130,22 @@ export function buildAssignmentEmail({ order, restaurant, items, assignment, bas
 
 let transport;
 export async function sendAssignmentEmail(payload) {
+  let message;
+  try {
+    message = buildAssignmentEmail(payload);
+  } catch (error) {
+    error.deliveryNotAccepted = true;
+    throw error;
+  }
+  // Gmail API uses HTTPS and works on hosts that block SMTP egress. A linked
+  // Gmail account always takes precedence; never fall back to SMTP on an
+  // unconfirmed API result, which could send the same order twice.
+  if (await sendGmailIfConnected(payload, message)) return;
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || "465");
   const secure = process.env.SMTP_SECURE || "true";
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  let message;
   try {
     if (host !== "smtp.gmail.com" || port !== 465 || secure !== "true") {
       throw new Error("Gmail SMTP must use smtp.gmail.com:465 with SMTP_SECURE=true");
@@ -142,7 +153,6 @@ export async function sendAssignmentEmail(payload) {
     if (!user || !pass || !/^[^@\s]+@gmail\.com$/i.test(user)) {
       throw new Error("SMTP_USER must be a Gmail address and SMTP_PASS must be a Gmail App Password");
     }
-    message = buildAssignmentEmail(payload);
     if (!transport) {
       transport = nodemailer.createTransport({
         host,
