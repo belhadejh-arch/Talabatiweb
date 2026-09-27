@@ -1,20 +1,81 @@
-# TALABAT — Android + Gmail order dispatch
+# TALABAT — منصة إدارة المطاعم
 
-This checkout contains a Kotlin/Jetpack Compose Android customer, admin, and driver app (`app/`) and a Node.js/PostgreSQL API (`server/`). It does **not** contain the old React/Vite or Express artifact packages. Do not reintroduce Telegram, OneSignal, or other notifications.
+Multi-restaurant delivery SaaS: a Super Admin dashboard for managing restaurants, menus, drivers, orders, and analytics, plus slug-based public storefronts (`/{slug}`) where customers browse a menu, build a cart, and place delivery or reservation orders.
 
-## Development
+## Run & Operate
 
-- Apply additive schema changes once to the intended database: `pnpm run server:migrate`.
-- Run the API: `PORT=8080 pnpm run server:dev`. Check `GET /health`.
-- Run server tests: `pnpm run server:test`. The HTTP integration test needs `TEST_DATABASE_URL`, or an explicit development-database fixture opt-in.
-- Android emulator defaults to `http://10.0.2.2:8080` in debug only. For a release build, supply the HTTPS backend URL via `-PAPI_BASE_URL=https://your-backend.example`.
-- Required server secrets: `DATABASE_URL`, `SESSION_SECRET` (at least 32 characters), `SMTP_USER` (central Gmail account), and `SMTP_PASS` (Gmail App Password). Required server environment: `PUBLIC_API_URL` (public HTTPS origin for action links); Gmail settings are `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`. `PORT` is provided by the host.
-- Production setup, Render instructions, and operational recovery are in `DEPLOYMENT.md`.
+- `pnpm --filter @workspace/api-server run dev` — API server (reads `PORT`, defaults to 8080 locally)
+- `pnpm --filter @workspace/talabat run dev` — customer/admin/driver web app (Vite)
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- Seed admin login: `admin` / `admin123`
 
-## Data and behavior
+### Required environment variables
 
-- Keep existing restaurants, subscriptions, products, historical orders/attempts, and legacy notification records intact. Migration `server/migrations/001_driver_email_dispatch.sql` adds only necessary columns and tables; it is not a destructive schema push.
-- Only orders newly committed through `POST /api/orders` get an `order_email_dispatch_jobs` row. Historical orders have no job and are never dispatched on login, page refresh, or restart. The Android client sends a stable UUID `Idempotency-Key` per checkout attempt.
-- The worker selects one eligible active driver of the same active subscribed restaurant. Rejection or five minutes after a confirmed send advances to the next eligible driver. Acceptance/response and worker updates use PostgreSQL transactions.
-- Email GET links only show confirmation; POST performs the response. SMTP results that may have been accepted but could not be confirmed remain `SENDING` until an admin checks Gmail Sent and reconciles explicitly. Do not retry an ambiguous send blindly.
-- Driver and admin data is read from PostgreSQL. Earnings are read from recorded `driver_payout_amount` only; this checkout has no existing payout formula, so unknown payouts stay `null` rather than being invented.
+| Var | Used by | Notes |
+|---|---|---|
+| `DATABASE_URL` | api-server | Postgres connection string |
+| `SESSION_SECRET` (or `AUTH_SECRET`) | api-server | Express session signing secret |
+| `FRONTEND_URL` | api-server | Restricts CORS + enables cross-site cookies (`SameSite=None`) when frontend/backend are on different domains |
+| `VITE_API_URL` | talabat (build-time) | Absolute API origin for split-domain deployments; leave unset for same-origin deploys |
+| `ONESIGNAL_REST_API_KEY` | api-server secret | OneSignal REST API key; never expose it to the frontend |
+| `ONESIGNAL_APP_ID` | api-server | Optional; defaults to `a076a6a2-2555-42f7-89f1-5fecc8dcf449`, and the driver page reads the same value from the API |
+| `ONESIGNAL_API_URL` | api-server | Optional server-only endpoint override for controlled integration tests; defaults to `https://api.onesignal.com` |
+| `DRIVER_DASHBOARD_URL` | api-server | Optional absolute URL used for notification clicks; defaults to the deployed `/driver/dashboard` route |
+| `DRIVER_APP_ICON_URL` | api-server | Optional absolute URL for the driver push icon; defaults to `/app-icon-512.png` on the dashboard origin |
+| `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` | api-server | Provisioned by Replit Object Storage; back the uploaded-image pipeline |
+| `NODE_ENV=production` | api-server | Enables secure/cross-site session cookies and `trust proxy` |
+
+`GET /health` (unprefixed) and `GET /api/healthz` both report liveness for platform health checks.
+
+## Stack
+
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5, secure session-based admin and driver authentication
+- DB: PostgreSQL + Drizzle ORM
+- Validation: Zod (`zod/v4`), `drizzle-zod`
+- API codegen: Orval (from OpenAPI spec)
+- Object storage: Replit Object Storage with a PostgreSQL-backed portable fallback
+- Image processing: `sharp` (resize + WebP re-encode server-side before storage)
+- Build: esbuild (api-server), Vite (talabat)
+
+## Where things live
+
+- `artifacts/api-server` — Express API (routes per resource under `src/routes`, `src/lib` for cross-cutting logic)
+- `artifacts/talabat` — customer storefront, admin dashboard, and driver portal (React + Vite), routed by Wouter
+- `lib/db` — Drizzle schema (source of truth for tables) + `push` script
+- `lib/api-zod` / `lib/api-client-react` — generated from the OpenAPI spec; do not hand-edit `generated/`
+- Image uploads: `POST /api/uploads/image` (multipart, `requireAuth`) → server-side processing/storage → public storage endpoint
+- Order placement + driver assignment: `artifacts/api-server/src/routes/public.ts` computes the Google Maps link and creates an internal assignment for an active driver scoped to the order's restaurant
+- Internal dispatch worker: `artifacts/api-server/src/lib/driverDispatch.ts` manages pending attempts, responses, and timeouts entirely in PostgreSQL
+- Driver push: OneSignal Web SDK v16 registers each driver's subscription after permission, links it to the authenticated driver ID, and the API targets only the active pending attempt for that driver
+- Driver authentication: `/api/driver-auth/login` accepts only the six-digit serial number generated by the admin; `/driver/login` and `/driver/dashboard` are the driver UI
+
+## Architecture decisions
+
+- Driver accounts are created by admins only. Each account receives a unique six-digit serial number stored in PostgreSQL.
+- Driver sessions use the same Express session system as admin sessions, regenerate on login, store the driver and restaurant IDs, and are invalidated on logout or if the account is no longer active.
+- Every driver API query is constrained by the authenticated `driverId` and `restaurantId`. The driver portal cannot access admin routes or another driver's orders.
+- Orders are assigned and acted on inside the platform. There are no WhatsApp, Telegram, WP Sender, webhook, external-message, or delivery-message-log features.
+- A driver's WhatsApp number, when provided, is retained only as personal profile information and is never used for delivery dispatch.
+- Uploaded images are processed server-side and use Replit Object Storage when available, with a PostgreSQL fallback for external API hosts.
+- The frontend never hardcodes an API origin. `VITE_API_URL`/`setBaseUrl` is only needed for split-domain deployments; relative asset URLs use the same base URL.
+
+## Product
+
+- **Admin dashboard**: manage restaurants, menus (categories/products/sizes/addons with image upload), drivers, orders, analytics, and general platform settings.
+- **Driver portal** (`/driver/login`, `/driver/dashboard`): sign in with the serial number, view the assigned restaurant and personal profile, accept or reject new orders, start delivery, confirm delivery, view locations, and sign out.
+- **Public storefront** (`/{slug}`): mobile-first menu browsing, cart, and checkout with explicit delivery/reservation selection. Delivery requires GPS location capture; reservations do not collect location data.
+
+## Gotchas
+
+- After editing `lib/*` package source, run the edited package's TypeScript build before typechecking consumers because project references resolve types through built declarations.
+- Driver schema initialization is additive and backfills serial numbers for older rows before creating the unique PostgreSQL index. It also removes legacy external-dispatch columns/tables when the API starts.
+- Deleting/replacing a product, category, restaurant, or driver image is best-effort and non-blocking.
+
+## Pointers
+
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- See the `object-storage` skill for the Replit Object Storage API surface and portable image fallback
+- See `DEPLOYMENT.md` for split-deployment setup

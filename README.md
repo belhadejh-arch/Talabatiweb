@@ -1,7 +1,15 @@
 # Talabat Android App
 
-Native Kotlin/Jetpack Compose customer, admin, and driver application backed by PostgreSQL and the Node.js API in `server/`.
+Talabat is a comprehensive restaurant management and food delivery platform, rewritten as a native Android application using Kotlin and Jetpack Compose.
 
-Customers browse the real restaurant catalog and submit delivery or reservation orders. The server saves each order, emails only the eligible restaurant driver through Gmail SMTP, and advances to the next eligible driver after rejection or a five-minute response timeout. Drivers accept or reject from secure email confirmation links; the app displays their persisted orders, history, and statistics without push notifications.
+## Features
 
-Apply the additive migration with `pnpm run server:migrate`, then run the API with `PORT=8080 pnpm run server:dev`. Server tests: `pnpm run server:test` (the HTTP integration test additionally requires a test database, or an explicit opt-in for temporary fixtures on the development database). See [DEPLOYMENT.md](DEPLOYMENT.md) for Render, Android release configuration, SMTP variables, and production verification.
+- **Customer Storefront**: Browse partner restaurants (Burger King, Pizza Hut, Damascus Shawarma), view menus, select items, manage cart, and place delivery orders.
+- **Driver Portal**: Secure driver login, view assigned deliveries, and update order statuses (Accept, Out for Delivery, Delivered).
+- **Admin Dashboard**: Overview statistics (total orders, active restaurants, available drivers, subscriptions), restaurant management, and driver tracking.
+
+## Architecture
+
+- Built with **Jetpack Compose** and **Material Design 3**.
+- State management using Kotlin Coroutines and StateFlow.
+- Type-safe navigation with Jetpack Navigation Compose.
