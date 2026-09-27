@@ -75,7 +75,7 @@ export default function Checkout() {
     }
     await sendAttempt(attempt);
   });
-  return <div dir="rtl" className="min-h-[100dvh]"><Header/><main className="shell page-wrap">
+  return <div dir="rtl" className="checkout-page min-h-[100dvh]"><Header/><main className="shell page-wrap">
     <Link href="/" className="inline-flex gap-2 items-center text-sm subtle hover:underline mb-7" data-testid="link-back-browse"><ArrowRight size={16}/> العودة للقائمة</Link>
     <span className="eyebrow block" style={{ color: 'hsl(var(--primary))' }}>الخطوة الأخيرة</span><h1 className="section-title mt-2">تأكيد طلبك</h1><p className="subtle mt-3">تفاصيل صغيرة تفصل بينك وبين وجبتك.</p>
     {isLoading && !pending ? <div className="mt-8"><LoadingState/></div> : catalogError && !pending ? <div className="mt-8"><ErrorState message={(catalogError as Error).message} onRetry={() => { void refetch(); }}/></div> : !cart.items.length && !pending ? <div className="surface text-center max-w-xl mx-auto mt-10 py-14"><div className="empty-illustration"><ShoppingBag size={30}/></div><h2 className="display text-3xl">سلتك فارغة</h2><p className="subtle mt-3 mb-6">ابدأ بإضافة شيء يعجبك من القائمة.</p><Link href="/" className="btn btn-primary" data-testid="link-start-shopping">تصفّح المطاعم</Link></div> : <div className="checkout-grid">
@@ -93,7 +93,7 @@ export default function Checkout() {
         {error && <div className="error-box" role="alert" data-testid="status-submit-error">{error}</div>}
         {pending ? <button type="button" onClick={() => { void sendAttempt(pending); }} className="btn btn-primary w-full py-4" disabled={submitting} data-testid="button-submit-order">{submitting ? 'جارٍ إرسال الطلب...' : 'إعادة محاولة إرسال الطلب'}</button> : <button type="submit" className="btn btn-primary w-full py-4" disabled={submitting} data-testid="button-submit-order">{submitting ? 'جارٍ إرسال الطلب...' : 'تأكيد وإرسال الطلب'}</button>}
       </form></Form>
-      <aside className="surface md:sticky md:top-24"><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>ملخص الطلب</span><h2 className="display text-2xl mt-2 mb-5">{restaurant?.name || 'طلبك'}</h2>{rows.map(row => <div className="total-line text-sm border-b border-border" key={row.productId}><span>{row.quantity} × {row.product?.name || `منتج #${row.productId}`}</span><span>{row.product ? `${money(Number(row.product.price) * row.quantity)} ر.س` : 'غير متاح'}</span></div>)}<div className="total-line font-bold mt-4"><span>تقدير المنتجات</span><span data-testid="text-checkout-estimate">{money(estimate)} ر.س</span></div><p className="subtle text-xs leading-6 mt-3">السعر النهائي ورسوم التوصيل يُحتسبان على الخادم بعد إرسال الطلب.</p></aside>
+       <aside className="surface checkout-summary md:sticky md:top-24"><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>ملخص الطلب</span><h2 className="display text-2xl mt-2 mb-5">{restaurant?.name || 'طلبك'}</h2>{rows.map(row => <div className="total-line text-sm border-b border-border" key={row.productId}><span>{row.quantity} × {row.product?.name || `منتج #${row.productId}`}</span><span>{row.product ? `${money(Number(row.product.price) * row.quantity)} ر.س` : 'غير متاح'}</span></div>)}<div className="total-line font-bold mt-4"><span>تقدير المنتجات</span><span data-testid="text-checkout-estimate">{money(estimate)} ر.س</span></div><p className="subtle text-xs leading-6 mt-3">السعر النهائي ورسوم التوصيل يُحتسبان على الخادم بعد إرسال الطلب.</p></aside>
     </div>}
   </main></div>;
 }
