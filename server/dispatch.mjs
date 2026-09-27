@@ -44,6 +44,25 @@ async function recordStatus(client, orderId, status, note) {
   );
 }
 
+async function dispatchTimeoutMinutes(client) {
+  let result;
+  try {
+    result = await client.query(
+      "SELECT dispatch_timeout_minutes FROM admin_settings WHERE id=1"
+    );
+  } catch (error) {
+    if (error?.code === "42P01" || error?.code === "42703") {
+      throw new Error("Missing admin settings migration: apply server/migrations/002_admin_settings.sql");
+    }
+    throw error;
+  }
+  const minutes = Number(result.rows[0]?.dispatch_timeout_minutes);
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) {
+    throw new Error("Admin dispatch timeout setting is missing or invalid.");
+  }
+  return minutes;
+}
+
 async function markAttempt(client, attempt, status) {
   const timestampColumn = {
     TIMEOUT: "timed_out_at",
@@ -74,6 +93,7 @@ async function processJob(orderId) {
       [orderId],
     )).rows[0];
     if (!job) return;
+    const timeoutMinutes = await dispatchTimeoutMinutes(client);
     const order = (await client.query(
       "SELECT * FROM orders WHERE id=$1 FOR UPDATE",
       [orderId],
@@ -196,9 +216,9 @@ async function processJob(orderId) {
       const created = (await client.query(
         `INSERT INTO order_driver_attempts
            (order_id,driver_id,restaurant_id,driver_email,status,sent_at,timeout_at,expires_at)
-         VALUES ($1,$2,$3,$4,'PENDING',now(),now()+interval '5 minutes',now()+interval '5 minutes')
+         VALUES ($1,$2,$3,$4,'PENDING',now(),now()+($5 * interval '1 minute'),now()+($5 * interval '1 minute'))
          RETURNING assignment_id`,
-        [orderId, driver.id, order.restaurant_id, driver.email],
+        [orderId, driver.id, order.restaurant_id, driver.email, timeoutMinutes],
       )).rows[0];
       await client.query(
         `INSERT INTO order_email_deliveries (order_id,driver_id,assignment_id,driver_email)
@@ -340,6 +360,7 @@ async function sendNextEmail(sendMail, orderId = null) {
   try {
     await withTransaction(async (client) => {
       await lockDeliveryChain(client, delivery);
+      const timeoutMinutes = await dispatchTimeoutMinutes(client);
       const sent = (await client.query(
         `UPDATE order_email_deliveries
          SET status='SENT',sent_at=now(),error=NULL,next_retry_at=NULL,updated_at=now()
@@ -349,14 +370,14 @@ async function sendNextEmail(sendMail, orderId = null) {
       if (!sent) return;
       const activeAttempt = await client.query(
         `UPDATE order_driver_attempts
-         SET timeout_at=$2::timestamptz+interval '5 minutes',
-             expires_at=$2::timestamptz+interval '5 minutes'
+          SET timeout_at=$2::timestamptz+($3 * interval '1 minute'),
+              expires_at=$2::timestamptz+($3 * interval '1 minute')
          WHERE assignment_id=$1 AND status='PENDING'`,
-        [delivery.assignment_id, sent.sent_at],
+        [delivery.assignment_id, sent.sent_at, timeoutMinutes],
       );
       if (activeAttempt.rowCount) {
         await updateJob(client, delivery.order_id, "ACTIVE",
-          new Date(new Date(sent.sent_at).getTime() + 300_000));
+          new Date(new Date(sent.sent_at).getTime() + timeoutMinutes * 60_000));
       }
     });
   } catch (error) {
@@ -412,6 +433,7 @@ export async function reconcileEmailDelivery({ id, result }, schedule = kickDisp
         row.job_state !== "ACTIVE" || row.order_status !== "ASSIGNED") {
       return { ok: false, reason: "Assignment is no longer awaiting email reconciliation" };
     }
+    const timeoutMinutes = result === "SENT" ? await dispatchTimeoutMinutes(client) : null;
     // Allow any in-flight SMTP socket to finish before a human decides whether
     // it did or did not send. This is not a substitute for checking Gmail Sent.
     if (new Date(row.last_attempt_at).getTime() > Date.now() - 120_000) {
@@ -436,13 +458,13 @@ export async function reconcileEmailDelivery({ id, result }, schedule = kickDisp
     )).rows[0].sent_at;
     await client.query(
       `UPDATE order_driver_attempts
-       SET timeout_at=$2::timestamptz+interval '5 minutes',
-           expires_at=$2::timestamptz+interval '5 minutes'
+       SET timeout_at=$2::timestamptz+($3 * interval '1 minute'),
+           expires_at=$2::timestamptz+($3 * interval '1 minute')
        WHERE assignment_id=$1 AND status='PENDING'`,
-      [row.assignment_id, sentAt],
+      [row.assignment_id, sentAt, timeoutMinutes],
     );
     await updateJob(client, row.order_id, "ACTIVE",
-      new Date(new Date(sentAt).getTime() + 300_000));
+      new Date(new Date(sentAt).getTime() + timeoutMinutes * 60_000));
     return { ok: true, result, advance: false };
   });
   if (outcome.advance) schedule();

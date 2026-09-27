@@ -43,12 +43,13 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
   let server;
   let baseline;
   let beforeOrders;
+  let originalDispatchTimeout;
   const cleanupErrors = [];
 
   const requiredColumns = {
     restaurants: ["id", "name", "slug", "phone", "address", "description", "status",
       "logo_url", "cover_url", "delivery_fee"],
-    categories: ["id", "restaurant_id", "name", "name_ar"],
+    categories: ["id", "restaurant_id", "name", "name_ar", "is_available"],
     products: ["id", "restaurant_id", "category_id", "name", "name_ar",
       "description", "description_ar", "image_url", "price", "is_available",
       "stock_quantity", "sort_order"],
@@ -56,6 +57,7 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     drivers: ["id", "restaurant_id", "name", "phone", "email", "is_active",
       "status", "serial_number", "created_at"],
     admins: ["id", "username", "password_hash"],
+    admin_settings: ["id", "dispatch_timeout_minutes", "updated_at"],
     api_sessions: ["token_hash", "role", "owner_id", "expires_at"],
     auth_rate_limits: ["key_hash", "attempts", "reset_at"],
     orders: ["id", "restaurant_id", "customer_name", "customer_phone", "notes",
@@ -73,7 +75,8 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
   const countedTables = [
     "restaurants", "categories", "products", "subscriptions", "drivers", "admins",
     "api_sessions", "auth_rate_limits", "orders", "order_items", "order_status_history",
-    "order_email_dispatch_jobs", "order_email_deliveries", "order_driver_attempts"
+    "order_email_dispatch_jobs", "order_email_deliveries", "order_driver_attempts",
+    "admin_settings"
   ];
 
   async function inspectAndValidateSchema() {
@@ -328,7 +331,8 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     fixtures.subscriptions.push(Number(subscription.id));
 
     const adminUsername = `http-test-${suffix}`;
-    const passwordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
+    const adminPassword = randomBytes(32).toString("hex");
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     const admin = (await pool.query(
       `INSERT INTO admins (username, password_hash)
        VALUES ($1, $2) RETURNING id`,
@@ -337,6 +341,33 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     fixtures.admins.push(Number(admin.id));
 
     const adminToken = await createSession("ADMIN", Number(admin.id));
+    const otherAdminToken = await createSession("ADMIN", Number(admin.id));
+    originalDispatchTimeout = Number((await pool.query(
+      "SELECT dispatch_timeout_minutes FROM admin_settings WHERE id=1"
+    )).rows[0]?.dispatch_timeout_minutes);
+    assert.ok(Number.isInteger(originalDispatchTimeout), "admin_settings singleton row is required.");
+
+    const initialSettings = await request(baseUrl, "/api/admin/settings", { token: adminToken });
+    assert.equal(initialSettings.status, 200);
+    assert.equal(initialSettings.payload.settings.adminUsername, adminUsername);
+    const changedSettings = await request(baseUrl, "/api/admin/settings", {
+      method: "PATCH", token: adminToken, body: { dispatchTimeoutMinutes: 12 }
+    });
+    assert.equal(changedSettings.status, 200);
+    assert.equal(changedSettings.payload.settings.dispatchTimeoutMinutes, 12);
+    const renamedUsername = `http-renamed-${suffix}`;
+    const changedCredentials = await request(baseUrl, "/api/admin/settings/credentials", {
+      method: "POST", token: adminToken,
+      body: {
+        currentPassword: adminPassword,
+        newUsername: renamedUsername,
+        newPassword: `${randomBytes(20).toString("hex")}aA1!`
+      }
+    });
+    assert.deepEqual(changedCredentials.payload, { ok: true });
+    assert.equal(changedCredentials.status, 200);
+    assert.equal((await request(baseUrl, "/api/admin/settings", { token: adminToken })).payload.settings.adminUsername, renamedUsername);
+    assert.equal((await request(baseUrl, "/api/admin/settings", { token: otherAdminToken })).status, 401);
 
     const catalog = await request(baseUrl, "/api/catalog");
     assert.equal(catalog.status, 200);
@@ -479,6 +510,121 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     );
     assert.equal(filteredStats.status, 200);
     assert.equal(filteredStats.payload.summary.totalOrders, 2);
+    assert.equal(typeof filteredStats.payload.periods[0].orderValue, "number");
+    assert.equal(typeof filteredStats.payload.byRestaurant[0].orderValue, "number");
+
+    const editedRestaurant = await request(baseUrl, `/api/admin/restaurants/${restaurantId}`, {
+      method: "PATCH", token: adminToken,
+      body: { description: "Edited by admin", deliveryFee: 4.125 }
+    });
+    assert.equal(editedRestaurant.status, 200);
+    assert.equal(editedRestaurant.payload.restaurant.description, "Edited by admin");
+    assert.equal(editedRestaurant.payload.restaurant.deliveryFee, 4.125);
+
+    const createdCategory = await request(baseUrl, "/api/admin/categories", {
+      method: "POST", token: adminToken, body: { restaurantId, name: `Managed category ${suffix}` }
+    });
+    assert.equal(createdCategory.status, 201);
+    const managedCategoryId = createdCategory.payload.category.id;
+    fixtures.categories.push(managedCategoryId);
+    const editedCategory = await request(baseUrl, `/api/admin/categories/${managedCategoryId}`, {
+      method: "PATCH", token: adminToken, body: { name: `Managed category edited ${suffix}` }
+    });
+    assert.equal(editedCategory.status, 200);
+    const categoryRequired = await request(baseUrl, "/api/admin/products", {
+      method: "POST", token: adminToken,
+      body: { restaurantId, name: "Missing category", price: 1 }
+    });
+    assert.equal(categoryRequired.status, 400);
+    const createdProduct = await request(baseUrl, "/api/admin/products", {
+      method: "POST", token: adminToken,
+      body: {
+        restaurantId, categoryId: managedCategoryId, name: `Managed product ${suffix}`,
+        description: "Temporary product", price: 8.250, isAvailable: true, stockQuantity: 7
+      }
+    });
+    assert.equal(createdProduct.status, 201);
+    const managedProductId = createdProduct.payload.product.id;
+    fixtures.products.push(managedProductId);
+    const editedProduct = await request(baseUrl, `/api/admin/products/${managedProductId}`, {
+      method: "PATCH", token: adminToken, body: { price: 9.125, stockQuantity: 5 }
+    });
+    assert.equal(editedProduct.status, 200);
+    assert.equal(editedProduct.payload.product.price, 9.125);
+    const archivedCategory = await request(baseUrl, `/api/admin/categories/${managedCategoryId}`, {
+      method: "DELETE", token: adminToken
+    });
+    assert.equal(archivedCategory.status, 200);
+    assert.equal(archivedCategory.payload.category.isAvailable, false);
+    assert.equal((await request(baseUrl, `/api/admin/categories/${managedCategoryId}`, {
+      method: "PATCH", body: { isAvailable: true }
+    })).status, 401);
+    assert.equal((await request(baseUrl, `/api/admin/categories/${managedCategoryId}`, {
+      method: "PATCH", token: adminToken, body: { isAvailable: "true" }
+    })).status, 400);
+    const archivedCategoryMenu = await request(baseUrl, `/api/admin/menu?restaurantId=${restaurantId}`, { token: adminToken });
+    assert.ok(archivedCategoryMenu.payload.categories.some((row) => row.id === managedCategoryId && !row.isAvailable));
+    assert.ok(archivedCategoryMenu.payload.products.some((row) => row.id === managedProductId && row.isAvailable));
+    const createInArchivedCategory = await request(baseUrl, "/api/admin/products", {
+      method: "POST", token: adminToken,
+      body: { restaurantId, categoryId: managedCategoryId, name: "Archived category product", price: 2 }
+    });
+    assert.equal(createInArchivedCategory.status, 400);
+    const updateInArchivedCategory = await request(baseUrl, `/api/admin/products/${managedProductId}`, {
+      method: "PATCH", token: adminToken, body: { price: 10 }
+    });
+    assert.equal(updateInArchivedCategory.status, 400);
+    const restoredCategory = await request(baseUrl, `/api/admin/categories/${managedCategoryId}`, {
+      method: "PATCH", token: adminToken, body: { isAvailable: true }
+    });
+    assert.equal(restoredCategory.status, 200);
+    assert.equal(restoredCategory.payload.category.isAvailable, true);
+    const restoredCatalog = await request(baseUrl, "/api/catalog");
+    assert.ok(restoredCatalog.payload.products.some((row) => row.id === managedProductId));
+    const deletedManagedProduct = await request(baseUrl, `/api/admin/products/${managedProductId}`, {
+      method: "DELETE", token: adminToken
+    });
+    assert.equal(deletedManagedProduct.status, 200);
+    assert.equal(deletedManagedProduct.payload.product.isAvailable, false);
+    const menu = await request(baseUrl, `/api/admin/menu?restaurantId=${restaurantId}`, { token: adminToken });
+    assert.equal(menu.status, 200);
+    assert.ok(menu.payload.products.some((row) => row.id === managedProductId && !row.isAvailable));
+    assert.equal((await request(baseUrl, `/api/admin/products/${productId}`, {
+      method: "DELETE", token: adminToken
+    })).payload.product.isAvailable, false);
+    const historicItems = await pool.query(
+      "SELECT count(*)::integer AS count FROM order_items WHERE product_id=$1",
+      [productId]
+    );
+    assert.equal(historicItems.rows[0].count, 2);
+    const emptyCategory = await request(baseUrl, "/api/admin/categories", {
+      method: "POST", token: adminToken, body: { restaurantId, name: `Empty category ${suffix}` }
+    });
+    assert.equal(emptyCategory.status, 201);
+    fixtures.categories.push(emptyCategory.payload.category.id);
+    assert.equal((await request(baseUrl, `/api/admin/categories/${emptyCategory.payload.category.id}`, {
+      method: "DELETE", token: adminToken
+    })).status, 200);
+
+    const createdSubscription = await request(baseUrl, "/api/admin/subscriptions", {
+      method: "POST", token: adminToken, body: { restaurantId, plan: "BASIC", days: 20 }
+    });
+    assert.equal(createdSubscription.status, 201);
+    const managedSubscriptionId = createdSubscription.payload.subscription.id;
+    fixtures.subscriptions.push(managedSubscriptionId);
+    const renewedSubscription = await request(baseUrl, `/api/admin/subscriptions/${managedSubscriptionId}/renew`, {
+      method: "POST", token: adminToken, body: { plan: "PREMIUM", days: 10 }
+    });
+    assert.equal(renewedSubscription.status, 200);
+    assert.equal(renewedSubscription.payload.subscription.plan, "PREMIUM");
+    assert.equal((await request(baseUrl, `/api/admin/subscriptions/${managedSubscriptionId}`, {
+      method: "PATCH", token: adminToken, body: { status: "ACTIVE", expiryDate: new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10) }
+    })).status, 200);
+    const cancelledSubscription = await request(baseUrl, `/api/admin/subscriptions/${managedSubscriptionId}`, {
+      method: "DELETE", token: adminToken
+    });
+    assert.equal(cancelledSubscription.status, 200);
+    assert.equal(cancelledSubscription.payload.subscription.status, "CANCELLED");
 
     const disabled = await request(baseUrl, `/api/admin/drivers/${driverId}`, {
       method: "PATCH",
@@ -490,9 +636,32 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
 
     const deniedDriverStats = await request(baseUrl, "/api/driver/stats", { token: driverToken });
     assert.equal(deniedDriverStats.status, 401);
+    const removedDriver = await request(baseUrl, `/api/admin/drivers/${driverId}`, {
+      method: "DELETE", token: adminToken
+    });
+    assert.equal(removedDriver.status, 200);
+    assert.equal(removedDriver.payload.driver.isActive, false);
+    assert.equal(removedDriver.payload.driver.status, "ARCHIVED");
+    const archivedRestaurant = await request(baseUrl, `/api/admin/restaurants/${restaurantId}`, {
+      method: "DELETE", token: adminToken
+    });
+    assert.equal(archivedRestaurant.status, 200);
+    assert.equal(archivedRestaurant.payload.restaurant.status, "ARCHIVED");
+    const retainedOrders = await pool.query("SELECT count(*)::integer AS count FROM orders WHERE restaurant_id=$1", [restaurantId]);
+    assert.equal(retainedOrders.rows[0].count, 2);
   } finally {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
+    }
+    if (originalDispatchTimeout != null) {
+      try {
+        await pool.query(
+          "UPDATE admin_settings SET dispatch_timeout_minutes=$1,updated_at=now() WHERE id=1",
+          [originalDispatchTimeout]
+        );
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
     }
     try {
       await cleanup();

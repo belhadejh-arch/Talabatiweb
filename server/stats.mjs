@@ -229,9 +229,11 @@ export function buildStats(
     const periodGroup = groupedPeriods.get(bucket) || {
       period: bucket,
       orders: 0,
+      orderValue: 0,
       earnings: 0
     };
     periodGroup.orders += 1;
+    periodGroup.orderValue += amount;
     if (payout != null) periodGroup.earnings += payout;
     groupedPeriods.set(bucket, periodGroup);
 
@@ -239,9 +241,11 @@ export function buildStats(
     const restaurantGroup = groupedRestaurants.get(restaurantName) || {
       name: restaurantName,
       orders: 0,
+      orderValue: 0,
       earnings: 0
     };
     restaurantGroup.orders += 1;
+    restaurantGroup.orderValue += amount;
     if (payout != null) restaurantGroup.earnings += payout;
     groupedRestaurants.set(restaurantName, restaurantGroup);
   }
@@ -268,10 +272,18 @@ export function buildStats(
         : 0
     },
     periods: [...groupedPeriods.values()]
-      .map((group) => ({ ...group, earnings: roundMoney(group.earnings) }))
+      .map((group) => ({
+        ...group,
+        orderValue: roundMoney(group.orderValue),
+        earnings: roundMoney(group.earnings)
+      }))
       .sort((a, b) => a.period.localeCompare(b.period)),
     byRestaurant: [...groupedRestaurants.values()]
-      .map((group) => ({ ...group, earnings: roundMoney(group.earnings) }))
+      .map((group) => ({
+        ...group,
+        orderValue: roundMoney(group.orderValue),
+        earnings: roundMoney(group.earnings)
+      }))
       .sort((a, b) => b.orders - a.orders || a.name.localeCompare(b.name)),
     byDriver: []
   };

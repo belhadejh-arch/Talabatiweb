@@ -1,0 +1,28 @@
+import { useState } from 'react';
+import { CalendarClock, Plus, Pencil, RotateCcw, Ban } from 'lucide-react';
+import { dateLabel, money, type Restaurant } from '../lib/api';
+import { ConfirmDialog, EmptyBlock, EntityDialog, SectionHeading, type Field, type Write, number, text } from './admin-ui';
+
+type Row = Record<string, unknown>;
+const planNames: Record<string,string> = { TRIAL:'تجريبي', MONTHLY:'شهري', YEARLY:'سنوي' };
+const planOptions = Object.entries(planNames).map(([value,label]) => ({ value,label }));
+const createFields: Field[] = [
+  { key:'restaurantId', label:'المطعم', type:'select', required:true },
+  { key:'plan', label:'الخطة', type:'select', required:true, options:planOptions },
+  { key:'days', label:'المدة بالأيام (اختياري)', type:'number', min:1, step:'1' },
+];
+export default function AdminSubscriptions({ subscriptions, restaurants, write }: { subscriptions: Row[]; restaurants: Restaurant[]; write: Write }) {
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [renewing, setRenewing] = useState<Row | null>(null);
+  const [renewConfirmation, setRenewConfirmation] = useState<{ row: Row; plan: string; days?: number } | null>(null);
+  const [cancel, setCancel] = useState<Row | null>(null);
+  const restaurantName = (row:Row) => text(row.restaurantName) || restaurants.find(r => r.id === number(row.restaurantId))?.name || `مطعم #${row.restaurantId}`;
+  return <div className="admin-workspace"><SectionHeading title="الاشتراكات" subtitle="الخطط وفترات الصلاحية الفعلية لكل مطعم"><button className="admin-action primary" onClick={() => setCreating(true)} disabled={!restaurants.length} data-testid="button-add-subscription"><Plus size={16}/>اشتراك جديد</button></SectionHeading><div className="admin-card">{subscriptions.length ? <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>المطعم</th><th>الخطة</th><th>الحالة</th><th>تاريخ الانتهاء</th><th>الإجراءات</th></tr></thead><tbody>{subscriptions.map((s,i) => <tr key={text(s.id) || i} data-testid={`row-subscription-${s.id}`}><td><strong>{restaurantName(s)}</strong></td><td>{planNames[text(s.plan)] || text(s.plan) || '—'}</td><td><span className="status-pill">{text(s.status) || '—'}</span></td><td>{s.expiryDate ? dateLabel(text(s.expiryDate)) : '—'}</td><td><div className="admin-actions"><button className="admin-action" onClick={() => setEditing(s)} data-testid={`button-edit-subscription-${s.id}`}><Pencil size={14}/>تغيير</button><button className="admin-action" onClick={() => setRenewing(s)} data-testid={`button-renew-subscription-${s.id}`}><RotateCcw size={14}/>تجديد</button><button className="admin-action danger" onClick={() => setCancel(s)} data-testid={`button-cancel-subscription-${s.id}`}><Ban size={14}/>إلغاء</button></div></td></tr>)}</tbody></table></div> : <EmptyBlock title="لا اشتراكات بعد" text="أضف اشتراكاً لتحديد صلاحية مطعم."/ >}</div>
+  <EntityDialog open={creating} onClose={() => setCreating(false)} title="اشتراك جديد" description="يبدأ الاشتراك بناءً على الخطة والمدة المحددتين." fields={[{ ...createFields[0], options:restaurants.map(r => ({value:String(r.id),label:r.name})) },...createFields.slice(1)]} testId="subscription-create" onSave={async v => { await write('/api/admin/subscriptions','POST',{ restaurantId:number(v.restaurantId),plan:text(v.plan),...(v.days ? { days:number(v.days) } : {}) }); }}/>
+  <EntityDialog open={!!editing} onClose={() => setEditing(null)} title="تغيير الاشتراك" fields={[{ key:'plan',label:'الخطة',type:'select',required:true,options:planOptions },{ key:'status',label:'الحالة',type:'select',options:[{value:'ACTIVE',label:'نشط'},{value:'INACTIVE',label:'غير نشط'},{value:'CANCELLED',label:'ملغي'}] },{ key:'expiryDate',label:'تاريخ الانتهاء',type:'date' }]} initial={{ plan:editing?.plan, status:editing?.status === 'EXPIRED' ? 'INACTIVE' : editing?.status, expiryDate:editing?.expiryDate ? text(editing.expiryDate).slice(0,10) : '' }} testId="subscription-edit" onSave={async v => { await write(`/api/admin/subscriptions/${editing?.id}`,'PATCH',{ plan:v.plan, ...(v.status ? { status:v.status } : {}), ...(v.expiryDate ? { expiryDate:v.expiryDate } : {}) }); }}/>
+  <EntityDialog open={!!renewing} onClose={() => setRenewing(null)} title={`تجديد اشتراك ${renewing ? restaurantName(renewing) : ''}`} description="راجع الخطة والمدة قبل التأكيد النهائي." fields={[{ key:'plan',label:'الخطة',type:'select',required:true,options:planOptions },{ key:'days',label:'المدة بالأيام (اختياري)',type:'number',min:1,step:'1' }]} initial={{plan:renewing?.plan}} testId="subscription-renew" onSave={async v => { if (renewing) setRenewConfirmation({row:renewing,plan:text(v.plan),...(v.days ? {days:number(v.days)} : {})}); }}/>
+  <ConfirmDialog open={!!renewConfirmation} onClose={() => setRenewConfirmation(null)} title="تأكيد التجديد" description={`تجديد اشتراك ${renewConfirmation ? restaurantName(renewConfirmation.row) : 'المطعم'} بخطة ${planNames[renewConfirmation?.plan || ''] || ''}${renewConfirmation?.days ? ` لمدة ${renewConfirmation.days} يوماً` : ''}؟`} action="تأكيد التجديد" testId="subscription-renew" onConfirm={async () => { if (renewConfirmation) await write(`/api/admin/subscriptions/${renewConfirmation.row.id}/renew`,'POST',{plan:renewConfirmation.plan,...(renewConfirmation.days ? {days:renewConfirmation.days} : {})}); }}/>
+  <ConfirmDialog open={!!cancel} onClose={() => setCancel(null)} title="إلغاء الاشتراك؟" description={`سيُلغى اشتراك ${cancel ? restaurantName(cancel) : 'المطعم'} مع الاحتفاظ بالسجل السابق.`} action="تأكيد الإلغاء" testId="subscription" onConfirm={async () => { if (cancel) await write(`/api/admin/subscriptions/${cancel.id}`,'DELETE'); }}/>
+  </div>;
+}

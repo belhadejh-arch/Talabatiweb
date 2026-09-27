@@ -98,10 +98,13 @@ if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
   throw new Error("SESSION_SECRET must be at least 32 characters");
 }
 const initialized = (await pool.query(
-  "SELECT to_regclass('public.order_email_dispatch_jobs') AS jobs, to_regclass('public.order_email_deliveries') AS deliveries",
+  "SELECT to_regclass('public.order_email_dispatch_jobs') AS jobs, to_regclass('public.order_email_deliveries') AS deliveries, to_regclass('public.admin_settings') AS admin_settings",
 )).rows[0];
 if (!initialized.jobs || !initialized.deliveries) {
   throw new Error("Apply server/migrations/001_driver_email_dispatch.sql before starting the API");
+}
+if (!initialized.admin_settings) {
+  throw new Error("Apply server/migrations/002_admin_settings.sql before starting the API");
 }
 
 const server = http.createServer(async (req, res) => {

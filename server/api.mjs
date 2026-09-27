@@ -1,6 +1,7 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { pool, withTransaction } from "./db.mjs";
 import { kickDispatch, reconcileEmailDelivery } from "./dispatch.mjs";
+import { handleAdminManagement } from "./admin-management.mjs";
 import {
   AuthError,
   loginAdmin,
@@ -187,7 +188,8 @@ function mapRestaurant(row) {
     rating: null,
     deliveryTime: null,
     deliveryFee: Number(row.delivery_fee || 0),
-    imageUrl: row.logo_url || row.cover_url || ""
+    imageUrl: row.logo_url || row.cover_url || "",
+    status: row.status || "ACTIVE"
   };
 }
 
@@ -199,20 +201,33 @@ function mapProduct(row) {
     description: row.description_ar || row.description || "",
     price: Number(row.price),
     category: row.category_ar || row.category || "",
-    imageUrl: row.image_url || ""
+    imageUrl: row.image_url || "",
+    categoryId: row.category_id == null ? null : Number(row.category_id),
+    isAvailable: Boolean(row.is_available),
+    stockQuantity: row.stock_quantity == null ? null : Number(row.stock_quantity)
   };
 }
 
 function mapSubscription(row) {
   return {
     id: Number(row.id),
+    restaurantId: Number(row.restaurant_id),
     restaurantName: row.restaurant_name || "",
     planName: row.plan || "",
+    plan: row.plan || "",
     status: row.status,
+    startDate: dateOnly(row.start_date),
+    expiryDate: dateOnly(row.expiry_date),
     renewalDate: row.expiry_date instanceof Date
       ? row.expiry_date.toISOString().slice(0, 10)
       : String(row.expiry_date || "").slice(0, 10)
   };
+}
+
+function dateOnly(value) {
+  return value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value || "").slice(0, 10);
 }
 
 function mapDriver(row) {
@@ -336,7 +351,7 @@ async function loadOrder(client, id) {
 
 async function getCatalog() {
   const restaurantsResult = await pool.query(
-    `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description,
+    `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
             r.logo_url, r.cover_url, r.delivery_fee
        FROM restaurants r
       WHERE r.status = 'ACTIVE'
@@ -357,18 +372,20 @@ async function getCatalog() {
 
   const [productsResult, subscriptionsResult] = await Promise.all([
     pool.query(
-      `SELECT p.id, p.restaurant_id, p.name, p.name_ar,
+      `SELECT p.id, p.restaurant_id, p.category_id, p.name, p.name_ar,
               p.description, p.description_ar, p.image_url, p.price,
-              c.name AS category, c.name_ar AS category_ar
+              p.is_available, p.stock_quantity,
+              c.name AS category, c.name_ar AS category_ar, c.is_available AS category_is_available
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
         WHERE p.restaurant_id = ANY($1::int[])
           AND p.is_available = TRUE
+          AND COALESCE(c.is_available, TRUE) = TRUE
         ORDER BY p.sort_order, p.id`,
       [restaurantIds]
     ),
     pool.query(
-      `SELECT s.id, s.plan, s.status, s.expiry_date,
+      `SELECT s.id, s.restaurant_id, s.plan, s.status, s.start_date, s.expiry_date,
               r.name AS restaurant_name
          FROM subscriptions s
          JOIN restaurants r ON r.id = s.restaurant_id
@@ -533,6 +550,7 @@ async function createOrder(input, idempotencyKey) {
       `SELECT p.id, p.restaurant_id, p.name, p.name_ar, p.price,
               p.is_available, p.stock_quantity
          FROM products p
+         JOIN categories c ON c.id=p.category_id AND COALESCE(c.is_available,TRUE)=TRUE
         WHERE p.id = ANY($1::int[])
           AND p.restaurant_id = $2
           AND p.is_available = TRUE
@@ -711,6 +729,12 @@ function routeFailureMessage(error, status) {
   if (error instanceof ApiError || error instanceof AuthError || error instanceof StatsError) {
     return error.message;
   }
+  if (Number.isInteger(error?.status) && status < 500 && typeof error.message === "string") {
+    return error.message;
+  }
+  if (error?.code === "42P01" || error?.code === "42703") {
+    return "تحديث قاعدة البيانات المطلوب غير مطبق بعد. تحقّق من ترحيلات server/migrations.";
+  }
   if (status === 409) return "توجد بيانات متعارضة. تحقق من الطلب وأعد المحاولة.";
   if (status === 400) return "البيانات المرسلة غير صالحة.";
   if (status === 503) return "تحديث قاعدة البيانات المطلوب غير مطبق بعد.";
@@ -782,7 +806,7 @@ async function listAdminDrivers() {
 
 async function listRestaurants({ activeOnly = false } = {}) {
   const result = await pool.query(
-    `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description,
+    `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
             r.logo_url, r.cover_url, r.delivery_fee
        FROM restaurants r
       ${activeOnly ? "WHERE r.status = 'ACTIVE'" : ""}
@@ -793,7 +817,7 @@ async function listRestaurants({ activeOnly = false } = {}) {
 
 async function listAdminSubscriptions() {
   const result = await pool.query(
-    `SELECT s.id, s.plan, s.status, s.expiry_date,
+    `SELECT s.id, s.restaurant_id, s.plan, s.status, s.start_date, s.expiry_date,
             r.name AS restaurant_name
        FROM subscriptions s
        JOIN restaurants r ON r.id = s.restaurant_id
@@ -1050,6 +1074,8 @@ function methodNotAllowed(res) {
 async function routeApi(req, res, url) {
   const path = url.pathname;
   const method = req.method || "GET";
+
+  if (await handleAdminManagement(req, res, url, { readJson, sendJson })) return true;
 
   if (path.startsWith("/api/storage/db-images/")) {
     if (method !== "GET" && method !== "HEAD") return methodNotAllowed(res);

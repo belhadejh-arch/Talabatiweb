@@ -201,8 +201,10 @@ test("admin statistics count each distinct assignment but total order value once
   assert.equal(stats.summary.totalOrderValue, 80);
   assert.equal(stats.summary.totalEarnings, 7.25);
   assert.equal(stats.periods[0].orders, 1);
+  assert.equal(stats.periods[0].orderValue, 80);
   assert.equal(stats.periods[0].earnings, 7.25);
   assert.equal(stats.byRestaurant[0].orders, 1);
+  assert.equal(stats.byRestaurant[0].orderValue, 80);
   assert.equal(stats.byRestaurant[0].earnings, 7.25);
 });
 

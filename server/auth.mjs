@@ -271,6 +271,53 @@ export async function requireSession(req, requiredRole) {
   };
 }
 
+export async function updateAdminCredentials(req, adminId, {
+  currentPassword,
+  newUsername,
+  newPassword
+}) {
+  const authorization = req.headers.authorization;
+  const match = typeof authorization === "string"
+    ? authorization.match(/^Bearer ([A-Za-z0-9_-]{40,})$/)
+    : null;
+  if (!match) throw new AuthError(401, "يلزم تسجيل الدخول للمتابعة.");
+  if (typeof currentPassword !== "string" || !currentPassword) {
+    throw new AuthError(400, "كلمة المرور الحالية مطلوبة.");
+  }
+  const tokenHash = hashToken(match[1]);
+  return withTransaction(async (client) => {
+    await client.query("LOCK TABLE admins IN SHARE ROW EXCLUSIVE MODE");
+    const found = await client.query(
+      "SELECT id, username, password_hash FROM admins WHERE id=$1 FOR UPDATE",
+      [adminId]
+    );
+    const admin = found.rows[0];
+    if (!admin || !await bcrypt.compare(currentPassword, admin.password_hash)) {
+      throw new AuthError(401, "كلمة المرور الحالية غير صحيحة.");
+    }
+    if (newUsername !== undefined) {
+      const collision = await client.query(
+        "SELECT id FROM admins WHERE LOWER(username)=LOWER($1) AND id<>$2 LIMIT 1",
+        [newUsername, adminId]
+      );
+      if (collision.rows[0]) throw new AuthError(409, "اسم المستخدم مستخدم بالفعل.");
+    }
+    const username = newUsername ?? admin.username;
+    const passwordHash = newPassword === undefined
+      ? admin.password_hash
+      : await bcrypt.hash(newPassword, 12);
+    await client.query(
+      "UPDATE admins SET username=$2, password_hash=$3 WHERE id=$1",
+      [adminId, username, passwordHash]
+    );
+    await client.query(
+      "DELETE FROM api_sessions WHERE role='ADMIN' AND owner_id=$1 AND token_hash<>$2",
+      [adminId, tokenHash]
+    );
+    return { ok: true };
+  });
+}
+
 export async function revokeSession(req) {
   const authorization = req.headers.authorization;
   const match = typeof authorization === "string"

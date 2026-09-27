@@ -1,4 +1,4 @@
-export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null };
+export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; status?: string };
 export type Product = { id: number; restaurantId: number; name: string; description: string | null; price: number; category: string | null; imageUrl: string | null };
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
 export type OrderItem = { productId: number; productName?: string; quantity: number; unitPrice?: number; totalPrice?: number; selectedSize?: string | null };
@@ -42,7 +42,8 @@ export const api = {
   createOrder: (input: OrderInput, key: string) => request<{ order: Order }>('/api/orders', { method: 'POST', headers: { ...jsonHeaders, 'Idempotency-Key': key }, body: JSON.stringify(input) }),
   adminLogin: (username: string, password: string) => request<{ token: string }>('/api/admin/login', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ username, password }) }),
   adminOverview: (token: string) => request<AdminOverview>('/api/admin/overview', { headers: { Authorization: `Bearer ${token}` } }),
-  adminStats: (token: string) => request<StatsData>('/api/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
+  adminStats: (token: string, filters?: { from?: string; to?: string; period?: string }) => request<StatsData>(`/api/admin/stats${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value) as [string, string][]).toString()}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }),
+  adminRequest: <T>(token: string, path: string, method = 'GET', body?: unknown) => request<T>(path, { method, headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : jsonHeaders) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
 };
 
 export const money = (value: number | string | null | undefined) => new Intl.NumberFormat('ar', { maximumFractionDigits: 2 }).format(Number(value) || 0);

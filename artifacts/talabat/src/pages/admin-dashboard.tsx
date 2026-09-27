@@ -27,7 +27,8 @@ function dailyOrders(orders: AdminOverview['orders']): DailyPoint[] {
 
 export default function AdminDashboard({ overview, stats }: { overview: AdminOverview; stats?: StatsData }) {
   const orders = overview.orders || [];
-  const trend = dailyOrders(orders);
+  const authoritativePeriods = Array.isArray(stats?.periods) ? stats.periods as { period: string; orders: number; orderValue: number }[] : [];
+  const trend = authoritativePeriods.length ? authoritativePeriods.map(p => ({day:p.period,date:p.period,value:Number(p.orderValue) || 0,orders:Number(p.orders) || 0})) : dailyOrders(orders);
   const drivers = overview.drivers || [];
   const hasDriverStatus = drivers.length === 0 || drivers.some(driver => typeof driver.isActive === 'boolean' || typeof driver.status === 'string');
   const activeDrivers = drivers.filter(driver => driver.isActive === true || driver.status === 'ACTIVE').length;
@@ -45,8 +46,9 @@ export default function AdminDashboard({ overview, stats }: { overview: AdminOve
     row.value += Number(order.totalAmount) || 0;
     ranked.set(order.restaurantId, row);
   }
-  const restaurants = [...ranked.values()].sort((a, b) => b.value - a.value || b.orders - a.orders).slice(0, 7);
-  const sampleLabel = `ضمن أحدث ${money(orders.length)} طلب معروض، بكل الحالات`;
+  const authoritativeRestaurants = Array.isArray(stats?.byRestaurant) ? stats.byRestaurant as { name:string; orders:number; orderValue:number }[] : [];
+  const restaurants = authoritativeRestaurants.length ? authoritativeRestaurants.map((r,i) => ({id:i,name:r.name,orders:Number(r.orders)||0,value:Number(r.orderValue)||0})).sort((a,b) => b.value-a.value).slice(0,7) : [...ranked.values()].sort((a, b) => b.value - a.value || b.orders - a.orders).slice(0, 7);
+  const sampleLabel = authoritativePeriods.length ? 'جميع الفترات التي أعادتها الإحصاءات · النطاق الافتراضي للخادم' : `ضمن أحدث ${money(orders.length)} طلب معروض، بكل الحالات`;
 
   return <div className="admin-overview">
     <section className="metric-grid" aria-label="مؤشرات التشغيل">
@@ -59,7 +61,7 @@ export default function AdminDashboard({ overview, stats }: { overview: AdminOve
     <p className="admin-subscription-note" data-testid="text-metric-الاشتراكات">الاشتراكات المدرجة: {money(overview.subscriptions.length)}</p>
 
     <section className="admin-charts" aria-label="اتجاه الطلبات المعروضة">
-      <div className="admin-panel"><div className="admin-panel-head"><h2>قيمة الطلبات بمرور الوقت</h2><p>{sampleLabel} · آخر ١٠ أيام مسجّلة</p></div>
+      <div className="admin-panel"><div className="admin-panel-head"><h2>قيمة الطلبات بمرور الوقت</h2><p>{sampleLabel}</p></div>
         {trend.length ? <div className="admin-chart" role="img" aria-label="رسم لقيمة الطلبات اليومية ضمن أحدث الطلبات المعروضة">
           <ResponsiveContainer width="100%" height="100%"><AreaChart data={trend} margin={{ top: 12, right: 8, left: 2, bottom: 4 }}>
             <defs><linearGradient id="adminValueFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6465e9" stopOpacity={.35}/><stop offset="95%" stopColor="#6465e9" stopOpacity={0}/></linearGradient></defs>
@@ -71,7 +73,7 @@ export default function AdminDashboard({ overview, stats }: { overview: AdminOve
           </AreaChart></ResponsiveContainer>
         </div> : <div className="admin-chart-empty">لا توجد طلبات مؤرخة لرسم الاتجاه.</div>}
       </div>
-      <div className="admin-panel"><div className="admin-panel-head"><h2>الطلبات بمرور الوقت</h2><p>{sampleLabel} · آخر ١٠ أيام مسجّلة</p></div>
+      <div className="admin-panel"><div className="admin-panel-head"><h2>الطلبات بمرور الوقت</h2><p>{sampleLabel}</p></div>
         {trend.length ? <div className="admin-chart" role="img" aria-label="رسم لعدد الطلبات اليومية ضمن أحدث الطلبات المعروضة">
           <ResponsiveContainer width="100%" height="100%"><AreaChart data={trend} margin={{ top: 12, right: 8, left: 2, bottom: 4 }}>
             <defs><linearGradient id="adminOrdersFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#149fbb" stopOpacity={.33}/><stop offset="95%" stopColor="#149fbb" stopOpacity={0}/></linearGradient></defs>
@@ -85,7 +87,7 @@ export default function AdminDashboard({ overview, stats }: { overview: AdminOve
       </div>
     </section>
 
-    <section className="admin-panel" aria-label="ترتيب المطاعم"><div className="admin-rank-head"><h2>أفضل المطاعم</h2><p>حسب قيمة الطلبات ضمن أحدث {money(orders.length)} طلب معروض، بكل الحالات · ليست إجمالي المبيعات</p></div>
+    <section className="admin-panel" aria-label="ترتيب المطاعم"><div className="admin-rank-head"><h2>أفضل المطاعم</h2><p>{authoritativeRestaurants.length ? 'حسب قيمة الطلبات في النطاق الافتراضي لإحصاءات الخادم' : `حسب قيمة الطلبات ضمن أحدث ${money(orders.length)} طلب معروض، بكل الحالات · ليست إجمالي المبيعات`}</p></div>
       {restaurants.length ? <div className="admin-rank-scroll"><table className="admin-rank-table"><thead><tr><th scope="col">اسم المطعم</th><th scope="col">عدد الطلبات المعروضة</th><th scope="col">قيمة الطلبات المعروضة</th></tr></thead><tbody>{restaurants.map((restaurant, index) => <tr key={restaurant.id} data-testid={`row-top-restaurant-${restaurant.id}`}><td><div className="admin-rank-name"><span className="admin-rank-number">{index + 1}</span><span>{restaurant.name}</span></div></td><td><span className="admin-rank-count">{money(restaurant.orders)}</span></td><td className="admin-rank-value">{money(restaurant.value)} ر.س</td></tr>)}</tbody></table></div> : <div className="admin-empty">لا توجد طلبات لعرض ترتيب المطاعم بعد.</div>}
     </section>
   </div>;
