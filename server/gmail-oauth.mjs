@@ -28,6 +28,22 @@ function oauthConfig() {
     : null;
 }
 
+function missingOAuthConfiguration() {
+  const missing = [];
+  for (const key of ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "SMTP_USER"]) {
+    if (!process.env[key]) missing.push(key);
+  }
+  try {
+    const base = new URL(process.env.PUBLIC_API_URL);
+    if (base.protocol !== "https:" || base.pathname !== "/" || base.search || base.hash) {
+      missing.push("PUBLIC_API_URL (HTTPS origin only)");
+    }
+  } catch {
+    missing.push("PUBLIC_API_URL (HTTPS origin only)");
+  }
+  return missing;
+}
+
 function encryptionKey() {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) throw new Error("SESSION_SECRET is required");
@@ -197,6 +213,7 @@ export async function handleGmailOAuthRoutes(req, res, url, { sendJson }) {
     )).rows[0];
     sendJson(res, 200, {
       configured: Boolean(oauthConfig()),
+      missingConfiguration: missingOAuthConfiguration(),
       connected: Boolean(account),
       email: account?.email ?? null,
       connectedAt: account?.connected_at ?? null,
@@ -205,7 +222,7 @@ export async function handleGmailOAuthRoutes(req, res, url, { sendJson }) {
     const config = oauthConfig();
     if (!config) {
       sendJson(res, 503, { error: "GMAIL_NOT_CONFIGURED",
-        message: "اضبط GOOGLE_OAUTH_CLIENT_ID وGOOGLE_OAUTH_CLIENT_SECRET وPUBLIC_API_URL وSMTP_USER في Render." });
+        message: `أكمل الإعداد التالي في Render: ${missingOAuthConfiguration().join("، ")}` });
       return true;
     }
     const state = randomBytes(32).toString("base64url");

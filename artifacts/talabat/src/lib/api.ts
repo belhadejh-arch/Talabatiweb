@@ -9,7 +9,7 @@ export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[
 export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number };
 export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'itemsSummary' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
-export type DriverGmailStatus = { configured: boolean; connected: boolean; email: string | null; registeredEmail: string | null };
+export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public requestId?: string) { super(message); this.name = 'ApiError'; }

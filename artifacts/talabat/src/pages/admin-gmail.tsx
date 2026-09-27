@@ -6,6 +6,7 @@ import { type Write } from './admin-ui';
 
 type GmailStatus = {
   configured: boolean;
+  missingConfiguration?: string[];
   connected: boolean;
   email: string | null;
   connectedAt: string | null;
@@ -69,17 +70,20 @@ export default function AdminGmail({ token, write }: { token: string; write: Wri
             : <p className="subtle text-sm mt-3" role="status">
               {status.data?.configured
                 ? 'Gmail غير مربوط بعد. اربط حساب الإرسال نفسه لتفعيل الإرسال عبر HTTPS.'
-                : 'اضبط بيانات Google OAuth ورابط الخادم في Render قبل الربط.'}
+                : 'إعداد إرسال Gmail على Render غير مكتمل؛ سيعرض زر الربط الإعدادات المطلوبة.'}
             </p>}
+        {!!status.data?.missingConfiguration?.length && <p className="text-sm mt-2" role="alert">
+          يلزم ضبط: <span dir="ltr">{status.data.missingConfiguration.join('، ')}</span>
+        </p>}
         {error && <p className="text-sm mt-2" role="alert">{error}</p>}
       </div>
     </div>
     <div className="flex flex-wrap gap-2">
       <button type="button" className="admin-action" onClick={() => void status.refetch()} disabled={busy}>تحديث الحالة</button>
-      {status.data?.configured && <button type="button" className="admin-action"
+      <button type="button" className="admin-action"
         onClick={() => void connect()} disabled={busy}>
-        {status.data.connected ? 'إعادة ربط Gmail' : 'ربط Gmail'}
-      </button>}
+        {status.data?.connected ? 'إعادة ربط Gmail' : 'ربط Gmail'}
+      </button>
       {status.data?.connected && <button type="button" className="admin-action"
         onClick={() => void disconnect()} disabled={busy}>فصل الحساب</button>}
     </div>

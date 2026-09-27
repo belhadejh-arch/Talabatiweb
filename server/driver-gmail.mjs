@@ -20,6 +20,41 @@ function config() {
   }
 }
 
+function missingConfiguration() {
+  const missing = [];
+  if (!process.env.GOOGLE_OAUTH_CLIENT_ID) missing.push("GOOGLE_OAUTH_CLIENT_ID");
+  if (!process.env.GOOGLE_OAUTH_CLIENT_SECRET) missing.push("GOOGLE_OAUTH_CLIENT_SECRET");
+  try {
+    const base = new URL(process.env.PUBLIC_API_URL);
+    if (base.protocol !== "https:" || base.pathname !== "/" || base.search || base.hash) {
+      missing.push("PUBLIC_API_URL (HTTPS origin only)");
+    }
+  } catch {
+    missing.push("PUBLIC_API_URL (HTTPS origin only)");
+  }
+  return missing;
+}
+
+async function authorizationFor(driverId, settings) {
+  const state = randomBytes(32).toString("base64url");
+  await pool.query("DELETE FROM driver_gmail_states WHERE expires_at<=now()");
+  await pool.query(
+    `INSERT INTO driver_gmail_states (state_hash,driver_id,expires_at)
+     VALUES ($1,$2,now()+interval '10 minutes')`,
+    [hash(state), driverId],
+  );
+  const authorize = new URL(AUTH_URL);
+  for (const [key, value] of Object.entries({
+    client_id: settings.clientId,
+    redirect_uri: settings.redirectUri,
+    response_type: "code",
+    scope: "openid email",
+    prompt: "select_account",
+    state,
+  })) authorize.searchParams.set(key, value);
+  return authorize.toString();
+}
+
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
 function resultPage(res, status, message) {
@@ -104,6 +139,45 @@ async function callback(res, url) {
 
 export async function handleDriverGmailRoutes(req, res, url, { sendJson }) {
   const path = url.pathname;
+  const adminConnect = path.match(/^\/api\/admin\/drivers\/(\d+)\/gmail\/connect$/);
+  if (path === "/api/admin/drivers/gmail-links" || adminConnect) {
+    await requireSession(req, "admin");
+    if (path === "/api/admin/drivers/gmail-links" && req.method === "GET") {
+      const verified = await pool.query(
+        `SELECT d.id AS driver_id FROM drivers d
+         JOIN driver_gmail_links l ON l.driver_id=d.id
+         WHERE d.is_active=true AND d.status='ACTIVE'
+           AND lower(trim(d.email))=lower(l.email)`,
+      );
+      sendJson(res, 200, { verifiedDriverIds: verified.rows.map((row) => row.driver_id) });
+      return true;
+    }
+    if (adminConnect && req.method === "POST") {
+      const settings = config();
+      if (!settings) {
+        sendJson(res, 503, { error: "GMAIL_NOT_CONFIGURED",
+          message: `إعداد Google غير مكتمل في Render: ${missingConfiguration().join("، ")}` });
+        return true;
+      }
+      const driver = (await pool.query(
+        "SELECT email FROM drivers WHERE id=$1 AND is_active=true AND status='ACTIVE'",
+        [adminConnect[1]],
+      )).rows[0];
+      if (!driver) {
+        sendJson(res, 404, { error: "DRIVER_NOT_FOUND", message: "السائق غير نشط أو غير موجود." });
+        return true;
+      }
+      if (!driver.email || !/^[^@\s]+@gmail\.com$/i.test(driver.email.trim())) {
+        sendJson(res, 409, { error: "DRIVER_EMAIL_MISSING",
+          message: "سجّل بريد Gmail صالحاً للسائق أولاً." });
+        return true;
+      }
+      sendJson(res, 200, { authorizationUrl: await authorizationFor(Number(adminConnect[1]), settings) });
+      return true;
+    }
+    sendJson(res, 405, { error: "METHOD_NOT_ALLOWED" });
+    return true;
+  }
   if (!path.startsWith("/api/driver/gmail/")) return false;
   if (path === "/api/driver/gmail/callback") {
     if (req.method !== "GET") sendJson(res, 405, { error: "METHOD_NOT_ALLOWED" });
@@ -123,6 +197,7 @@ export async function handleDriverGmailRoutes(req, res, url, { sendJson }) {
       driver.email.trim().toLowerCase() === driver.linked_email.toLowerCase());
     sendJson(res, 200, {
       configured: Boolean(config()),
+      missingConfiguration: missingConfiguration(),
       connected,
       email: connected ? driver.linked_email : null,
       registeredEmail: driver?.email ?? null,
@@ -132,7 +207,7 @@ export async function handleDriverGmailRoutes(req, res, url, { sendJson }) {
     const settings = config();
     if (!settings) {
       sendJson(res, 503, { error: "GMAIL_NOT_CONFIGURED",
-        message: "إعداد Google غير مكتمل في Render." });
+        message: `إعداد Google غير مكتمل في Render: ${missingConfiguration().join("، ")}` });
       return true;
     }
     if (!driver?.email || !/^[^@\s]+@gmail\.com$/i.test(driver.email.trim())) {
@@ -140,23 +215,7 @@ export async function handleDriverGmailRoutes(req, res, url, { sendJson }) {
         message: "اطلب من الإدارة تسجيل عنوان Gmail الخاص بك أولاً." });
       return true;
     }
-    const state = randomBytes(32).toString("base64url");
-    await pool.query("DELETE FROM driver_gmail_states WHERE expires_at<=now()");
-    await pool.query(
-      `INSERT INTO driver_gmail_states (state_hash,driver_id,expires_at)
-       VALUES ($1,$2,now()+interval '10 minutes')`,
-      [hash(state), session.ownerId],
-    );
-    const authorize = new URL(AUTH_URL);
-    for (const [key, value] of Object.entries({
-      client_id: settings.clientId,
-      redirect_uri: settings.redirectUri,
-      response_type: "code",
-      scope: "openid email",
-      prompt: "select_account",
-      state,
-    })) authorize.searchParams.set(key, value);
-    sendJson(res, 200, { authorizationUrl: authorize.toString() });
+    sendJson(res, 200, { authorizationUrl: await authorizationFor(session.ownerId, settings) });
   } else {
     sendJson(res, 405, { error: "METHOD_NOT_ALLOWED" });
   }

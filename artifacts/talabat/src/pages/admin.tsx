@@ -69,7 +69,7 @@ export default function Admin() {
       {tab === 'restaurants' && <AdminRestaurants restaurants={data.restaurants} write={write}/>}
       {tab === 'menu' && <AdminMenuPage restaurants={data.restaurants} token={token} write={write}/>}
       {tab === 'subscriptions' && <AdminSubscriptions subscriptions={data.subscriptions} restaurants={data.restaurants} write={write}/>}
-      {tab === 'drivers' && <AdminDrivers drivers={data.drivers} restaurants={data.restaurants} write={write}/>}
+      {tab === 'drivers' && <AdminDrivers drivers={data.drivers} restaurants={data.restaurants} token={token} write={write}/>}
       {(tab === 'analytics' || tab === 'stats') && <AdminAnalytics token={token}/>}
       {tab === 'settings' && <AdminSettingsPage token={token} write={write}/>}
     </>}</div></main>
