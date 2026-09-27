@@ -31,13 +31,13 @@
 | الإعداد | القيمة |
 |---|---|
 | Framework Preset | `Vite` |
-| Root Directory | جذر المستودع (فارغ) |
+| Root Directory | جذر المستودع (فارغ)، أو `artifacts/talabat` |
 | Install Command | `pnpm install --frozen-lockfile` |
 | Build Command | `pnpm --filter @workspace/talabat run build` |
 | Output Directory | `dist/public` |
 | Development Command، إن احتجته | `pnpm --filter @workspace/talabat run dev`، وليس `vite` من الجذر |
 
-يضبط `vercel.json` أمر البناء ومسار الملفات وتحويل `/api/*` إلى عنوان Render، فلا توضع أسرار قاعدة البيانات أو Gmail في واجهة Vercel. عنوان Render هو الخادم الذي ينفذ الطلبات ويُرسل البريد؛ أبقِ `PUBLIC_API_URL` فيه على عنوان Render لتذهب روابط قبول السائق إليه مباشرة. تحديث هذا المستودع في Replit وحده لا يغيّر نسخة GitHub: تأكد من وصول الملفات الجديدة إلى فرع `main` قبل إعادة نشر Vercel.
+يوجد `vercel.json` في جذر المستودع وداخل حزمة الويب لتُقرأ الإعدادات سواء اختار المشروع أيّاً من قيمتَي Root Directory أعلاه. يُنشئ أمر البناء `dist/public` نسبةً إلى كلا الجذرين. يضبط ملف الإعداد المناسب أمر البناء ومسار الملفات وتحويل `/api/*` إلى عنوان Render، فلا توضع أسرار قاعدة البيانات أو Gmail في واجهة Vercel. عنوان Render هو الخادم الذي ينفذ الطلبات ويُرسل البريد؛ أبقِ `PUBLIC_API_URL` فيه على عنوان Render لتذهب روابط قبول السائق إليه مباشرة. تحديث هذا المستودع في Replit وحده لا يغيّر نسخة GitHub: تأكد من وصول الملفات الجديدة إلى فرع `main` قبل إعادة نشر Vercel.
 
 ## تعطل البريد أو نتيجة SMTP غير مؤكدة
 

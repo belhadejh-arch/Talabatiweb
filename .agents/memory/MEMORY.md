@@ -2,3 +2,4 @@
 - [PostgreSQL fixture cleanup](http-fixture-cleanup.md) — recover test-owned rows by a unique parent even if the HTTP request commits before a response assertion fails.
 - [Console workflow startup](workflow-start-state.md) — verify workflow state and port; a successful restart response may leave a stopped console workflow unstarted.
 - [Legacy API preview routing](legacy-api-preview-routing.md) — a running legacy server may still be unreachable at the root API path of an artifact preview.
+- [Vercel project roots](vercel-project-root-output.md) — successful Vite builds can fail upload if Vercel reads config and output relative to a different monorepo root.
