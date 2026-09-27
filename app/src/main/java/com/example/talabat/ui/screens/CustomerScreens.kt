@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.talabat.data.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,21 @@ fun CustomerStorefrontScreen(
     val cartItems by TalabatRepository.cartItems.collectAsState()
     var selectedRestaurant by remember { mutableStateOf<Restaurant?>(null) }
     val products by TalabatRepository.products.collectAsState()
+    val scope = rememberCoroutineScope()
+    var catalogLoading by remember { mutableStateOf(true) }
+    var catalogError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        catalogLoading = true
+        catalogError = null
+        try {
+            TalabatRepository.loadCatalog()
+        } catch (error: Exception) {
+            catalogError = error.message ?: "تعذر تحميل بيانات المطاعم."
+        } finally {
+            catalogLoading = false
+        }
+    }
 
     val totalCartCount = cartItems.sumOf { it.quantity }
     val totalCartAmount = cartItems.sumOf { (it.product.price + it.extraPrice) * it.quantity }
@@ -86,11 +102,60 @@ fun CustomerStorefrontScreen(
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (selectedRestaurant == null) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                when {
+                    catalogLoading && restaurants.isEmpty() -> CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    catalogError != null && restaurants.isEmpty() -> Column(
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(catalogError.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        Button(onClick = {
+                            scope.launch {
+                                catalogLoading = true
+                                catalogError = null
+                                try {
+                                    TalabatRepository.loadCatalog()
+                                } catch (error: Exception) {
+                                    catalogError = error.message ?: "تعذر تحميل بيانات المطاعم."
+                                } finally {
+                                    catalogLoading = false
+                                }
+                            }
+                        }) { Text("إعادة المحاولة") }
+                    }
+                    restaurants.isEmpty() -> Text(
+                        "لا توجد مطاعم متاحة حالياً.",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                    if (catalogError != null) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(catalogError.orEmpty(), color = MaterialTheme.colorScheme.error)
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        catalogLoading = true
+                                        catalogError = null
+                                        try {
+                                            TalabatRepository.loadCatalog()
+                                        } catch (error: Exception) {
+                                            catalogError = error.message ?: "تعذر تحميل بيانات المطاعم."
+                                        } finally {
+                                            catalogLoading = false
+                                        }
+                                    }
+                                }) { Text("إعادة تحميل القائمة") }
+                            }
+                        }
+                    }
                     item {
                         Text(
                             "اختر مطعماً للطلب",
@@ -107,7 +172,7 @@ fun CustomerStorefrontScreen(
                         ) {
                             Column {
                                 AsyncImage(
-                                    model = restaurant.imageUrl,
+                                    model = restaurant.displayImageUrl,
                                     contentDescription = restaurant.name,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -120,21 +185,26 @@ fun CustomerStorefrontScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(restaurant.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                            Text(" ${restaurant.rating}", style = MaterialTheme.typography.bodyMedium)
+                                        if (restaurant.rating > 0) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                Text(" ${restaurant.rating}", style = MaterialTheme.typography.bodyMedium)
+                                            }
                                         }
                                     }
                                     Spacer(Modifier.height(4.dp))
                                     Text(restaurant.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        Text("⏱ ${restaurant.deliveryTime}", style = MaterialTheme.typography.bodySmall)
+                                        if (restaurant.deliveryTime.isNotBlank()) {
+                                            Text("⏱ ${restaurant.deliveryTime}", style = MaterialTheme.typography.bodySmall)
+                                        }
                                         Text("🛵 التوصيل: ${restaurant.deliveryFee} د.ل", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
                             }
                         }
+                    }
                     }
                 }
             } else {
@@ -156,7 +226,9 @@ fun CustomerStorefrontScreen(
                         Text("قائمة الطعام", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
-                    items(restProducts) { product ->
+                    if (restProducts.isEmpty()) {
+                        item { Text("لا توجد منتجات متاحة في هذا المطعم.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    } else items(restProducts) { product ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier
