@@ -276,6 +276,15 @@ async function callback(res, url) {
   console.log(`[Admin Gmail Callback] Path: ${url.pathname}, state_present=${Boolean(state)}, code_present=${Boolean(code)}, error=${errorParam || "none"}`);
   if (errorParam) {
     console.error(`[Admin Gmail Callback Error from Google] error="${errorParam}"`);
+    if (errorParam === "access_denied") {
+      html(
+        res,
+        403,
+        "حساب Gmail غير مضاف كمستخدم اختبار لتطبيق Google.",
+        "Add the SMTP_USER account to OAuth consent screen > Test users, then retry the Gmail connection.",
+      );
+      return;
+    }
     html(res, 400, "انتهى التفويض أو تم إلغاؤه. أعد المحاولة من الإدارة.", `Google error: ${errorParam}`);
     return;
   }
@@ -365,6 +374,7 @@ export async function handleGmailOAuthRoutes(req, res, url, { sendJson }) {
     for (const [key, value] of Object.entries({
       client_id: config.clientId, redirect_uri: config.redirectUri,
       response_type: "code", access_type: "offline", prompt: "consent",
+      login_hint: config.expectedEmail,
       scope: `${SEND_SCOPE} openid email`, state,
     })) authorize.searchParams.set(key, value);
     console.log(`[Admin Gmail OAuth Init] Endpoint: /api/admin/gmail/connect, redirect_uri: ${config.redirectUri}, client_id: ${safeClientIdSnippet(config.clientId)}, client_secret_present: ${Boolean(config.clientSecret)}`);
