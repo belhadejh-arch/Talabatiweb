@@ -5,12 +5,9 @@ import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-// Managed previews provide both variables; a Vercel static build provides neither.
-const port = Number(process.env.PORT || 5173);
-
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
-}
+// Dev server port must be 3000 in AI Studio preview environment.
+const port = Number(process.env.DEV_PORT || 3000);
+const apiTarget = process.env.API_TARGET || process.env.PUBLIC_API_URL || 'https://talabatiweb-wo8o.onrender.com';
 
 const basePath = process.env.BASE_PATH || '/';
 
@@ -62,11 +59,15 @@ export default defineConfig({
     // deployed production backend (which may run an older API version).
     proxy: {
       [`${basePath.replace(/\/$/, '')}/api/storage/db-images`]: {
-        target: 'http://localhost:8080',
+        target: apiTarget,
+        changeOrigin: true,
+        secure: true,
         rewrite: (url) => url.replace(new RegExp(`^${basePath.replace(/\/$/, '')}/api`), '/api'),
       },
       [`${basePath.replace(/\/$/, '')}/api`]: {
-        target: 'http://localhost:8080',
+        target: apiTarget,
+        changeOrigin: true,
+        secure: true,
         rewrite: (url) => url.replace(new RegExp(`^${basePath.replace(/\/$/, '')}/api`), '/api'),
       },
     },

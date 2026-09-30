@@ -698,7 +698,7 @@ private fun FilterDropdown(
 }
 
 @Composable
-private fun DataLine(title: String, value: String) {
+fun DataLine(title: String, value: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),

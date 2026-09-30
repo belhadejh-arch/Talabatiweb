@@ -48,10 +48,11 @@ export function validActionToken(assignment, provided) {
 }
 
 function linkFor(baseUrl, assignment, decision) {
-  if (!baseUrl || !/^https:\/\//.test(baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(baseUrl)) {
+  const cleaned = (baseUrl || "").trim().replace(/^["']|["']$/g, "").trim();
+  if (!cleaned || (!/^https:\/\//.test(cleaned) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(cleaned))) {
     throw new Error("PUBLIC_API_URL must be an HTTPS URL (localhost HTTP is allowed for development)");
   }
-  const url = new URL("/api/driver-action", baseUrl);
+  const url = new URL("/api/driver-action", cleaned);
   url.searchParams.set("order_id", assignment.order_id);
   url.searchParams.set("assignment_id", assignment.assignment_id);
   url.searchParams.set("driver_id", assignment.driver_id);

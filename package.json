@@ -2,11 +2,13 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "workspaces": [
+    "artifacts/*"
+  ],
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "dev": "npm --workspace=@workspace/talabat run dev",
+    "build": "npm --workspace=@workspace/talabat run build",
+    "typecheck": "npm --workspace=@workspace/talabat run typecheck",
     "server:dev": "node server/index.mjs",
     "server:migrate": "node server/migrate.mjs",
     "server:test": "node --test server/*.test.mjs server/test/*.test.mjs"
@@ -17,7 +19,7 @@
     "bcryptjs": "3.0.2",
     "nodemailer": "10.0.10",
     "pg": "8.16.3",
-    "vite": "catalog:"
+    "vite": "^7.3.6"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

@@ -83,7 +83,8 @@ fun DriverPortalScreen(onBack: () -> Unit) {
         }
     }
 
-    if (token == null || driver == null) {
+    val currentDriver = driver
+    if (token == null || currentDriver == null) {
         DriverLoginScreen(
             serialNumber = serialNumber,
             onSerialNumberChange = { serialNumber = it.filter(Char::isDigit).take(6) },
@@ -112,7 +113,7 @@ fun DriverPortalScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("حساب السائق — ${driver.name}") },
+                title = { Text("حساب السائق — ${currentDriver.name}") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "عودة")
@@ -179,7 +180,7 @@ fun DriverPortalScreen(onBack: () -> Unit) {
                 "orders" -> DriverOrdersTab(
                     orders = orders,
                     restaurants = restaurants,
-                    driverRestaurantId = driver.restaurantId,
+                    driverRestaurantId = currentDriver.restaurantId,
                     selectedPeriod = selectedPeriod,
                     from = from,
                     to = to,
@@ -251,7 +252,7 @@ fun DriverPortalScreen(onBack: () -> Unit) {
                     }
                 )
                 "stats" -> DriverStatisticsTab(stats)
-                else -> DriverProfileTab(driver)
+                else -> DriverProfileTab(currentDriver)
             }
         }
     }
@@ -445,8 +446,8 @@ private fun DriverStatisticsTab(stats: StatsData) {
                 StatCard("المكتملة", stats.summary.completed.toString(), Icons.Default.CheckCircle, Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatCard("قيمة الطلبات", money(stats.summary.totalOrderValue), Icons.Default.Payments, Modifier.weight(1f))
-                StatCard("المستحقات", stats.summary.totalEarnings?.let(::money) ?: "—", Icons.Default.AccountBalanceWallet, Modifier.weight(1f))
+                StatCard("قيمة الطلبات", money(stats.summary.totalOrderValue), Icons.Default.CheckCircle, Modifier.weight(1f))
+                StatCard("المستحقات", stats.summary.totalEarnings?.let(::money) ?: "—", Icons.Default.Person, Modifier.weight(1f))
             }
             Text("مقبولة: ${stats.summary.accepted} · مرفوضة: ${stats.summary.rejected} · انتهت مهلتها: ${stats.summary.timeout} · ملغاة: ${stats.summary.cancelled}")
             Text("متوسط الطلب: ${money(stats.summary.averageOrderValue)} · القبول: ${percent(stats.summary.acceptanceRate)} · الرفض: ${percent(stats.summary.rejectionRate)}")

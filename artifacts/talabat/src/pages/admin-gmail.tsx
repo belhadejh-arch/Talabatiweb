@@ -10,6 +10,10 @@ type GmailStatus = {
   connected: boolean;
   email: string | null;
   connectedAt: string | null;
+  diagnostics?: {
+    hasPublicApiUrl: boolean;
+    isHttps: boolean;
+  };
 };
 
 export default function AdminGmail({ token, write }: { token: string; write: Write }) {
@@ -75,6 +79,11 @@ export default function AdminGmail({ token, write }: { token: string; write: Wri
         {!!status.data?.missingConfiguration?.length && <p className="text-sm mt-2" role="alert">
           يلزم ضبط: <span dir="ltr">{status.data.missingConfiguration.join('، ')}</span>
         </p>}
+        {status.data?.diagnostics && (
+          <p className="subtle text-xs mt-2" data-testid="status-public-api-diagnostics">
+            تشخيص الخادم: {status.data.diagnostics.hasPublicApiUrl ? 'PUBLIC_API_URL متوفر' : 'PUBLIC_API_URL غير موجود'} • {status.data.diagnostics.isHttps ? 'HTTPS صالح' : 'ليس برابط HTTPS'}
+          </p>
+        )}
         {error && <p className="text-sm mt-2" role="alert">{error}</p>}
       </div>
     </div>

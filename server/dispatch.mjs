@@ -322,7 +322,7 @@ async function mailPayload(delivery) {
       created_at: row.assignment_created_at,
     },
     items,
-    baseUrl: process.env.PUBLIC_API_URL,
+    baseUrl: process.env.PUBLIC_API_URL?.trim()?.replace(/^["']|["']$/g, "")?.trim(),
   };
 }
 

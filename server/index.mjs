@@ -2,6 +2,7 @@ import http from "node:http";
 import { pool } from "./db.mjs";
 import { handleApi } from "./api.mjs";
 import { previewEmailAction, respondToEmailAction, startDispatchWorker } from "./dispatch.mjs";
+import { logSafeDiagnostics } from "./gmail-oauth.mjs";
 
 function reply(res, status, contentType, content) {
   res.writeHead(status, {
@@ -130,6 +131,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`API listening on port ${port}`);
+  logSafeDiagnostics("Server Startup");
   startDispatchWorker();
 });
 process.on("SIGTERM", () => {
