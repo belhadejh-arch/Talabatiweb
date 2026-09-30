@@ -58,8 +58,19 @@ test("Gmail API sends MIME only to the assigned driver's saved address", async (
 
 test("explicit Gmail rejection is retryable, but an unconfirmed result is not", async () => {
   await assert.rejects(
-    sendGmailMessage(account, payload, message, async () => ({ ok: false, status: 403 })),
-    (error) => error.deliveryNotAccepted === true,
+    sendGmailMessage(account, payload, message, async () => ({
+      ok: false,
+      status: 403,
+      text: async () => JSON.stringify({
+        error: {
+          status: "PERMISSION_DENIED",
+          message: "Gmail API has not been enabled",
+          errors: [{ reason: "forbidden" }],
+        },
+      }),
+    })),
+    (error) => error.deliveryNotAccepted === true &&
+      /PERMISSION_DENIED: Gmail API has not been enabled: forbidden/.test(error.message),
   );
   await assert.rejects(
     sendGmailMessage(account, payload, message, async () => ({ ok: false, status: 503 })),

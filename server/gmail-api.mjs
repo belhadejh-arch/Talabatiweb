@@ -38,7 +38,28 @@ export async function sendGmailMessage(account, payload, message, sendRequest = 
     throw new Error("Gmail API send result unconfirmed; check Gmail Sent");
   }
   if (!response.ok) {
-    const error = new Error(`Gmail API rejected the message (${response.status})`);
+    const rawBody = typeof response.text === "function"
+      ? await response.text().catch(() => "")
+      : "";
+    let detail = "";
+    try {
+      const body = JSON.parse(rawBody);
+      const googleError = body?.error;
+      const reasons = Array.isArray(googleError?.errors)
+        ? googleError.errors
+          .map((item) => item?.reason)
+          .filter(Boolean)
+          .join(", ")
+        : "";
+      detail = [googleError?.status, googleError?.message, reasons]
+        .filter(Boolean)
+        .join(": ");
+    } catch {
+      detail = rawBody.replace(/\s+/g, " ").trim().slice(0, 240);
+    }
+    const error = new Error(
+      `Gmail API rejected the message (${response.status})${detail ? `: ${detail}` : ""}`,
+    );
     // An explicit client-side rejection means Google did not accept the send.
     // Server errors are ambiguous and require checking Gmail Sent.
     if ([400, 401, 403, 404, 429].includes(response.status)) {
