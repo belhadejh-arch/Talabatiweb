@@ -238,6 +238,7 @@ function mapDriver(row) {
     name: row.name,
     phone: row.phone || "",
     email: row.email || "",
+    serialNumber: row.serial_number || "",
     restaurantId: Number(row.restaurant_id),
     isActive: Boolean(row.is_active) && row.status === "ACTIVE",
     status: row.status || "INACTIVE"
@@ -307,6 +308,7 @@ function mapOrder(row, items = []) {
     status: row.status,
     assignmentStatus: row.assignment_status || null,
     driverId: row.driver_id == null ? null : Number(row.driver_id),
+    isArchived: Boolean(row.is_archived),
     createdAt: row.created_at instanceof Date
       ? row.created_at.toISOString()
       : String(row.created_at)
@@ -799,7 +801,7 @@ async function listAdminOrders(limit = 250) {
 
 async function listAdminDrivers() {
   const result = await pool.query(
-    `SELECT d.id, d.restaurant_id, d.name, d.phone, d.email, d.status, d.is_active
+    `SELECT d.id, d.restaurant_id, d.name, d.phone, d.email, d.status, d.is_active, d.serial_number
        FROM drivers d
       ORDER BY d.created_at DESC, d.id DESC`
   );
@@ -982,7 +984,7 @@ async function updateDriver(id, input) {
       `UPDATE drivers
           SET ${updates.join(", ")}
         WHERE id = $${values.length}
-        RETURNING id, restaurant_id, name, phone, email, status, is_active`,
+        RETURNING id, restaurant_id, name, phone, email, status, is_active, serial_number`,
       values
     );
     return mapDriver(result.rows[0]);
@@ -1004,6 +1006,8 @@ async function createRestaurant(input) {
   const phone = requiredText(input.phone, "رقم الهاتف", 40, { minLength: 3 });
   const address = requiredText(input.address, "العنوان", 300);
   const description = optionalText(input.description, "الوصف", 1500) || "";
+  const imageUrl = input.imageUrl ? String(input.imageUrl).trim() : (input.logoUrl ? String(input.logoUrl).trim() : "");
+  const deliveryFee = input.deliveryFee != null ? Math.max(0, Number(input.deliveryFee) || 0) : 0;
   const base = slugBase(name);
 
   return withTransaction(async (client) => {
@@ -1014,11 +1018,11 @@ async function createRestaurant(input) {
       slug = `${base}-${randomUUID().slice(0, 6)}`;
     }
     const inserted = await client.query(
-      `INSERT INTO restaurants (name, slug, phone, address, description, status)
-       VALUES ($1, $2, $3, $4, $5, 'ACTIVE')
+      `INSERT INTO restaurants (name, slug, phone, address, description, logo_url, cover_url, delivery_fee, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, $7, 'ACTIVE')
        RETURNING id, name, slug, phone, address, description,
                  logo_url, cover_url, delivery_fee`,
-      [name, slug, phone, address, description]
+      [name, slug, phone, address, description, imageUrl, deliveryFee]
     );
     return mapRestaurant(inserted.rows[0]);
   });
@@ -1213,8 +1217,26 @@ async function routeApi(req, res, url) {
   if (path === "/api/admin/restaurants") {
     if (method !== "POST") return methodNotAllowed(res);
     await requireSession(req, "admin");
-    const input = await readJson(req, 32 * 1024);
+    const input = await readJson(req, 10 * 1024 * 1024);
     sendJson(res, 201, { restaurant: await createRestaurant(input) });
+    return true;
+  }
+  if (path === "/api/admin/orders/archive-all") {
+    if (method !== "POST") return methodNotAllowed(res);
+    await requireSession(req, "admin");
+    const result = await pool.query(
+      "UPDATE orders SET is_archived = true WHERE is_archived = false RETURNING id"
+    );
+    sendJson(res, 200, { ok: true, count: result.rowCount });
+    return true;
+  }
+  const restoreOrderMatch = path.match(/^\/api\/admin\/orders\/(\d+)\/restore$/);
+  if (restoreOrderMatch) {
+    if (method !== "POST") return methodNotAllowed(res);
+    await requireSession(req, "admin");
+    const orderId = positiveInt(restoreOrderMatch[1], "الطلب");
+    await pool.query("UPDATE orders SET is_archived = false WHERE id = $1", [orderId]);
+    sendJson(res, 200, { ok: true, id: orderId });
     return true;
   }
   const driverMatch = path.match(/^\/api\/admin\/drivers\/(\d+)$/);
@@ -1232,6 +1254,57 @@ async function routeApi(req, res, url) {
     sendJson(res, 200, {
       orders: await getDriverOrders(session.ownerId, filters)
     });
+    return true;
+  }
+  const driverRespondMatch = path.match(/^\/api\/driver\/orders\/(\d+)\/respond$/);
+  if (driverRespondMatch) {
+    if (method !== "POST") return methodNotAllowed(res);
+    const session = await requireSession(req, "driver");
+    const orderId = positiveInt(driverRespondMatch[1], "الطلب");
+    const input = await readJson(req, 1024);
+    const decision = input?.decision === "ACCEPTED" ? "ACCEPTED" : "REJECTED";
+
+    const outcome = await withTransaction(async (client) => {
+      const attempt = (await client.query(
+        `SELECT id, assignment_id, status FROM order_driver_attempts
+          WHERE order_id=$1 AND driver_id=$2 AND status='PENDING'
+          ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+        [orderId, session.ownerId]
+      )).rows[0];
+      if (!attempt) {
+        throw new ApiError(404, "لا يوجد طلب قيد الانتظار لهذا السائق.");
+      }
+      if (decision === "ACCEPTED") {
+        await client.query(
+          `UPDATE order_driver_attempts
+              SET status='ACCEPTED', responded_at=now(), response_at=now(), accepted_at=now()
+            WHERE id=$1`,
+          [attempt.id]
+        );
+        await client.query(
+          `UPDATE orders SET status='ACCEPTED', driver_id=$2, updated_at=now()
+            WHERE id=$1`,
+          [orderId, session.ownerId]
+        );
+        await client.query(
+          `UPDATE order_email_dispatch_jobs SET state='DONE', updated_at=now() WHERE order_id=$1`,
+          [orderId]
+        );
+      } else {
+        await client.query(
+          `UPDATE order_driver_attempts SET status='REJECTED', responded_at=now(), response_at=now()
+            WHERE id=$1`,
+          [attempt.id]
+        );
+        await client.query(
+          `UPDATE order_email_dispatch_jobs SET state='ACTIVE', next_attempt_at=now(), updated_at=now() WHERE order_id=$1`,
+          [orderId]
+        );
+      }
+      return { ok: true, decision, advance: decision === "REJECTED" };
+    });
+    if (outcome.advance) kickDispatch();
+    sendJson(res, 200, outcome);
     return true;
   }
   if (path === "/api/driver/stats") {

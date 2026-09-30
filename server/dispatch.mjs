@@ -169,11 +169,11 @@ async function processJob(orderId) {
           await markAttempt(client, attempt, "CANCELLED");
           continue;
         }
+        if (attempt.timeout_at && new Date(attempt.timeout_at).getTime() <= Date.now()) {
+          await markAttempt(client, attempt, "TIMEOUT");
+          continue;
+        }
         if (attempt.email_status === "SENT") {
-          if (new Date(attempt.timeout_at).getTime() <= Date.now()) {
-            await markAttempt(client, attempt, "TIMEOUT");
-            continue;
-          }
           await updateJob(client, orderId, "ACTIVE", attempt.timeout_at);
           return;
         }
@@ -495,6 +495,7 @@ async function runTick() {
   if (running) return;
   running = true;
   try {
+    await reconcileExpiredDriverAttempts();
     await processDispatchOnce();
   } catch (error) {
     console.error("Email dispatch worker error:", safeError(error));
@@ -517,6 +518,18 @@ export function startDispatchWorker() {
   timer = setInterval(kickDispatch, 1_000);
   timer.unref();
   kickDispatch();
+}
+
+export async function reconcileExpiredDriverAttempts() {
+  try {
+    const expired = await pool.query(
+      `SELECT DISTINCT order_id FROM order_driver_attempts
+        WHERE status='PENDING' AND timeout_at <= NOW()`
+    );
+    for (const row of expired.rows) {
+      await processJob(row.order_id).catch(() => {});
+    }
+  } catch {}
 }
 
 function idsAreValid(input) {

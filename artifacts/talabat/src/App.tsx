@@ -45,6 +45,8 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><CartProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><PageMetadata/><RoutedErrorBoundary><Switch>
     <Route path="/" component={Browse}/>
+    <Route path="/restaurant/:id" component={Browse}/>
+    <Route path="/r/:id" component={Browse}/>
     <Route path="/checkout" component={Checkout}/>
     <Route path="/order-confirmation" component={Confirmation}/>
     <Route path="/admin" component={Admin}/>

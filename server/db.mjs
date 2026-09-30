@@ -14,6 +14,9 @@ pool.on("error", (error) => {
   console.error("PostgreSQL idle client error:", error.code ?? error.name);
 });
 
+// Idempotent schema guarantee for order archiving
+pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false").catch(() => {});
+
 export async function withTransaction(callback) {
   const client = await pool.connect();
   try {

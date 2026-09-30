@@ -2,12 +2,12 @@ export type Restaurant = { id: number; name: string; slug: string; phone: string
 export type Product = { id: number; restaurantId: number; name: string; description: string | null; price: number; category: string | null; imageUrl: string | null };
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
 export type OrderItem = { productId: number; productName?: string; quantity: number; unitPrice?: number; totalPrice?: number; selectedSize?: string | null };
-export type Order = { id: number; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverId?: number | null; createdAt: string; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null };
+export type Order = { id: number; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverId?: number | null; createdAt: string; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null; isArchived?: boolean };
 export type OrderInput = { restaurantId: number; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: { productId: number; quantity: number }[]; notes?: string; latitude?: number; longitude?: number; reservationDate?: string; reservationTime?: string; partySize?: number };
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
-export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number };
-export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'itemsSummary' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
+export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number; serialNumber?: string };
+export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'items' | 'itemsSummary' | 'deliveryFee' | 'subtotal' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
 export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
 
@@ -18,6 +18,7 @@ export class ApiError extends Error {
 // The preview proxy mounts the API below /talabat; Vercel mounts it at /.
 export function catalogImageUrl(url: string | null): string | undefined {
   if (!url) return undefined;
+  if (url.startsWith('data:image/')) return url;
   const previewPrefix = import.meta.env.DEV ? import.meta.env.BASE_URL.replace(/\/$/, '') : '';
   return url.startsWith('/api/storage/db-images/') ? `${previewPrefix}${url}` : url;
 }
@@ -53,8 +54,12 @@ export const api = {
   driverStats: (token: string) => request<DriverStats>('/api/driver/stats', { headers: { Authorization: `Bearer ${token}` } }),
   driverGmailStatus: (token: string) => request<DriverGmailStatus>('/api/driver/gmail/status', { headers: { Authorization: `Bearer ${token}` } }),
   driverGmailConnect: (token: string) => request<{ authorizationUrl: string }>('/api/driver/gmail/connect', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
+  driverRespondOrder: (token: string, orderId: number, decision: 'ACCEPTED' | 'REJECTED') => request<{ ok: boolean; decision: string }>(`/api/driver/orders/${orderId}/respond`, { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` }, body: JSON.stringify({ decision }) }),
+  archiveAllOrders: (token: string) => request<{ ok: boolean; count: number }>('/api/admin/orders/archive-all', { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` } }),
+  restoreOrder: (token: string, orderId: number) => request<{ ok: boolean }>(`/api/admin/orders/${orderId}/restore`, { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` } }),
 };
 
+export const CURRENCY = 'د.ل';
 export const money = (value: number | string | null | undefined) => new Intl.NumberFormat('ar', { maximumFractionDigits: 2 }).format(Number(value) || 0);
 export const dateLabel = (value: string) => {
   const date = new Date(value);
@@ -62,5 +67,5 @@ export const dateLabel = (value: string) => {
 };
 export const statusLabel = (status: string) => ({
   NEW: 'جديد', PENDING: 'قيد الانتظار', CONFIRMED: 'مؤكد', PREPARING: 'قيد التجهيز', READY: 'جاهز', ON_THE_WAY: 'في الطريق',
-  DELIVERED: 'تم التوصيل', COMPLETED: 'مكتمل', CANCELLED: 'ملغي', ASSIGNED: 'تم الإسناد',
+  DELIVERED: 'تم التوصيل', COMPLETED: 'مكتمل', CANCELLED: 'ملغي', ASSIGNED: 'تم التوجيه للسائق',
 } as Record<string, string>)[status] || status;

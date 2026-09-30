@@ -1,4 +1,4 @@
-import { pool } from "./db.mjs";
+import { pool, withTransaction } from "./db.mjs";
 import { requireSession, updateAdminCredentials } from "./auth.mjs";
 
 class AdminApiError extends Error {
@@ -35,8 +35,14 @@ function amount(value, label) {
 }
 
 function imageUrl(value) {
-  const result = text(value, "رابط الصورة", 2048, true);
+  if (value == null || value === "") return "";
+  if (typeof value !== "string") fail("صورة غير صالحة.");
+  const result = value.trim();
   if (!result) return "";
+  if (result.startsWith("data:image/") && result.includes(";base64,")) {
+    if (result.length > 10 * 1024 * 1024) fail("حجم الصورة كبير جداً (أقصى حد 10 ميغابايت).");
+    return result;
+  }
   if (result.startsWith("/") && !result.startsWith("//")) return result;
   try {
     const parsed = new URL(result);
@@ -44,7 +50,7 @@ function imageUrl(value) {
   } catch {
     // Report a stable validation error below.
   }
-  fail("رابط الصورة غير صالح.");
+  fail("رابط أو ملف الصورة غير صالح.");
 }
 
 function date(value, label) {
@@ -131,7 +137,7 @@ function subscriptionMap(row) {
 }
 
 async function updateRestaurant(restaurantId, input) {
-  only(input, ["name", "phone", "address", "description", "deliveryFee", "status"], "المطعم");
+  only(input, ["name", "phone", "address", "description", "deliveryFee", "status", "imageUrl", "logoUrl"], "المطعم");
   if (!Object.keys(input).length) fail("أرسل حقلاً واحداً على الأقل للتحديث.");
   const fields = [];
   const values = [];
@@ -144,6 +150,11 @@ async function updateRestaurant(restaurantId, input) {
   if (Object.hasOwn(input, "address")) set("address", text(input.address, "العنوان", 300));
   if (Object.hasOwn(input, "description")) set("description", text(input.description, "الوصف", 1500, true));
   if (Object.hasOwn(input, "deliveryFee")) set("delivery_fee", amount(input.deliveryFee, "رسوم التوصيل"), "::numeric");
+  if (Object.hasOwn(input, "imageUrl") || Object.hasOwn(input, "logoUrl")) {
+    const img = imageUrl(input.imageUrl ?? input.logoUrl);
+    set("logo_url", img);
+    set("cover_url", img);
+  }
   if (Object.hasOwn(input, "status")) {
     if (!["ACTIVE", "INACTIVE"].includes(input.status)) fail("حالة المطعم يجب أن تكون ACTIVE أو INACTIVE.");
     set("status", input.status);
@@ -413,6 +424,27 @@ async function deactivateDriver(driverId) {
   };
 }
 
+async function deleteDriverPermanently(driverId) {
+  return await withTransaction(async (client) => {
+    await client.query("UPDATE orders SET driver_id=NULL WHERE driver_id=$1", [driverId]);
+    await client.query("DELETE FROM order_email_deliveries WHERE driver_id=$1", [driverId]);
+    await client.query("DELETE FROM order_driver_attempts WHERE driver_id=$1", [driverId]);
+    await client.query("DELETE FROM driver_gmail_tokens WHERE driver_id=$1", [driverId]);
+    await client.query("DELETE FROM driver_gmail_states WHERE driver_id=$1", [driverId]);
+    const result = await client.query(
+      `DELETE FROM drivers WHERE id=$1
+       RETURNING id,restaurant_id,name,phone,email,status,is_active`,
+      [driverId]
+    );
+    if (!result.rows[0]) fail("السائق غير موجود.", 404);
+    const row = result.rows[0];
+    return {
+      id: Number(row.id), name: row.name, phone: row.phone || "", email: row.email || "",
+      restaurantId: Number(row.restaurant_id), isActive: false, status: "DELETED", deleted: true
+    };
+  });
+}
+
 async function settings(adminId) {
   const result = await pool.query(
     `SELECT a.username,s.dispatch_timeout_minutes
@@ -447,7 +479,7 @@ export async function handleAdminManagement(req, res, url, { readJson, sendJson 
   const session = await requireSession(req, "admin");
   if (restaurantMatch) {
     const restaurantId = id(restaurantMatch[1], "المطعم");
-    if (method === "PATCH") sendJson(res, 200, { restaurant: await updateRestaurant(restaurantId, await readJson(req, 32 * 1024)) });
+    if (method === "PATCH") sendJson(res, 200, { restaurant: await updateRestaurant(restaurantId, await readJson(req, 10 * 1024 * 1024)) });
     else if (method === "DELETE") sendJson(res, 200, { restaurant: await archiveRestaurant(restaurantId) });
     else sendJson(res, 405, { error: "METHOD_NOT_ALLOWED", message: "طريقة الطلب غير مدعومة." });
     return true;
@@ -470,13 +502,13 @@ export async function handleAdminManagement(req, res, url, { readJson, sendJson 
     return true;
   }
   if (products) {
-    if (method === "POST") sendJson(res, 201, { product: await saveProduct(null, await readJson(req, 32 * 1024)) });
+    if (method === "POST") sendJson(res, 201, { product: await saveProduct(null, await readJson(req, 10 * 1024 * 1024)) });
     else sendJson(res, 405, { error: "METHOD_NOT_ALLOWED", message: "طريقة الطلب غير مدعومة." });
     return true;
   }
   if (productMatch) {
     const productId = id(productMatch[1], "المنتج");
-    if (method === "PATCH") sendJson(res, 200, { product: await saveProduct(productId, await readJson(req, 32 * 1024)) });
+    if (method === "PATCH") sendJson(res, 200, { product: await saveProduct(productId, await readJson(req, 10 * 1024 * 1024)) });
     else if (method === "DELETE") sendJson(res, 200, { product: await hideProduct(productId) });
     else sendJson(res, 405, { error: "METHOD_NOT_ALLOWED", message: "طريقة الطلب غير مدعومة." });
     return true;
@@ -498,7 +530,14 @@ export async function handleAdminManagement(req, res, url, { readJson, sendJson 
   }
   if (driverMatch) {
     if (method !== "DELETE") sendJson(res, 405, { error: "METHOD_NOT_ALLOWED", message: "طريقة الطلب غير مدعومة." });
-    else sendJson(res, 200, { driver: await deactivateDriver(id(driverMatch[1], "السائق")) });
+    else {
+      const permanent = url.searchParams.get("permanent") === "true";
+      if (permanent) {
+        sendJson(res, 200, { driver: await deleteDriverPermanently(id(driverMatch[1], "السائق")) });
+      } else {
+        sendJson(res, 200, { driver: await deactivateDriver(id(driverMatch[1], "السائق")) });
+      }
+    }
     return true;
   }
   if (settingsRoute) {
