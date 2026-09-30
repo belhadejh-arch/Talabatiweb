@@ -28,9 +28,9 @@ function savedSession(): DriverSession | null {
 function attemptLabel(status: string | null | undefined) {
   return ({
     ACCEPTED: 'تم قبول الطلب',
-    REJECTED: 'تم الاعتذار عن الطلب',
+    REJECTED: 'تم رفض الطلب',
     CANCELLED: 'أُلغي الطلب',
-    TIMEOUT: 'انتهت المهلة (حُوّل للسائق التالي)',
+    TIMEOUT: 'انتهت المهلة وتحول الطلب تلقائياً',
     PENDING: 'طلب جديد بانتظار ردك',
     SENT: 'طلب جديد بانتظار ردك',
     AWAITING_EMAIL: 'بانتظار التحقق'
@@ -102,11 +102,11 @@ function OrderCard({
               disabled={responding}
               onClick={() => handleAction('REJECTED')}
               className="btn btn-outline text-xs px-2.5 py-1 flex items-center gap-1 border-rose-300 text-rose-600 hover:bg-rose-50 rounded-lg"
-              title="اعتذار ونقل الطلب للسائق التالي"
+              title="رفض الطلب ليحوّله النظام تلقائياً للسائق التالي"
               data-testid={`button-driver-reject-${order.id}`}
             >
               <ThumbsDown size={13}/>
-              <span>اعتذار (تحويل للتالي)</span>
+              <span>رفض الطلب</span>
             </button>
           </div>
         )}

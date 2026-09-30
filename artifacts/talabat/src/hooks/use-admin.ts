@@ -6,9 +6,31 @@ export type AdminProduct = { id: number; restaurantId: number; categoryId?: numb
 export type AdminMenu = { categories: AdminCategory[]; products: AdminProduct[] };
 export type AdminSettings = { settings: { adminUsername: string; dispatchTimeoutMinutes: number } };
 export type AdminRow = Record<string, unknown> & { id?: number };
+export type AdminRestaurantRevenue = {
+  restaurantId: number;
+  dailyOrders: number;
+  dailyRevenue: number;
+  weeklyOrders: number;
+  weeklyRevenue: number;
+  monthlyOrders: number;
+  monthlyRevenue: number;
+  yearlyOrders: number;
+  yearlyRevenue: number;
+};
 
 export function useAdminMenu(token: string, restaurantId: number | null) {
   return useQuery({ queryKey: ['admin', 'menu', restaurantId], queryFn: () => api.adminRequest<AdminMenu>(token, `/api/admin/menu?restaurantId=${restaurantId}`), enabled: !!token && !!restaurantId, retry: 1 });
+}
+export function useAdminRestaurantRevenues(token: string, date: string) {
+  return useQuery({
+    queryKey: ['admin', 'restaurant-revenues', token, date],
+    queryFn: () => api.adminRequest<{ revenues: AdminRestaurantRevenue[] }>(
+      token,
+      `/api/admin/restaurant-revenues?date=${encodeURIComponent(date)}`
+    ),
+    enabled: !!token && !!date,
+    retry: 1
+  });
 }
 export function useAdminSettings(token: string) {
   return useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api.adminRequest<AdminSettings>(token, '/api/admin/settings'), enabled: !!token, retry: 1 });

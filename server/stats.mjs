@@ -395,6 +395,80 @@ export async function getAdminStats(filters) {
   return stats;
 }
 
+export async function getAdminRestaurantRevenues(anchorDate) {
+  const today = parseDate(anchorDate, "date");
+  if (!today) throw new StatsError("التاريخ مطلوب.");
+
+  const end = new Date(`${today}T00:00:00.000Z`);
+  const formatDate = (date) => date.toISOString().slice(0, 10);
+  const tomorrow = new Date(end);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const weekStart = new Date(end);
+  weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7));
+  const monthStart = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  const yearStart = new Date(Date.UTC(end.getUTCFullYear(), 0, 1));
+
+  const result = await pool.query(
+    `SELECT r.id AS restaurant_id,
+            COUNT(o.id) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $1::date AND o.created_at < $2::date
+            )::int AS daily_orders,
+            COALESCE(SUM(o.total_amount) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $1::date AND o.created_at < $2::date
+            ), 0)::float8 AS daily_revenue,
+            COUNT(o.id) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $3::date AND o.created_at < $4::date
+            )::int AS weekly_orders,
+            COALESCE(SUM(o.total_amount) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $3::date AND o.created_at < $4::date
+            ), 0)::float8 AS weekly_revenue,
+            COUNT(o.id) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $5::date AND o.created_at < $6::date
+            )::int AS monthly_orders,
+            COALESCE(SUM(o.total_amount) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $5::date AND o.created_at < $6::date
+            ), 0)::float8 AS monthly_revenue,
+            COUNT(o.id) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $7::date AND o.created_at < $8::date
+            )::int AS yearly_orders,
+            COALESCE(SUM(o.total_amount) FILTER (
+              WHERE o.status <> 'CANCELLED'
+                AND o.created_at >= $7::date AND o.created_at < $8::date
+            ), 0)::float8 AS yearly_revenue
+       FROM restaurants r
+       LEFT JOIN orders o ON o.restaurant_id = r.id
+      GROUP BY r.id
+      ORDER BY r.id`,
+    [
+      today, formatDate(tomorrow),
+      formatDate(weekStart), formatDate(tomorrow),
+      formatDate(monthStart), formatDate(tomorrow),
+      formatDate(yearStart), formatDate(tomorrow)
+    ]
+  );
+
+  return {
+    revenues: result.rows.map((row) => ({
+      restaurantId: Number(row.restaurant_id),
+      dailyOrders: Number(row.daily_orders),
+      dailyRevenue: roundMoney(row.daily_revenue),
+      weeklyOrders: Number(row.weekly_orders),
+      weeklyRevenue: roundMoney(row.weekly_revenue),
+      monthlyOrders: Number(row.monthly_orders),
+      monthlyRevenue: roundMoney(row.monthly_revenue),
+      yearlyOrders: Number(row.yearly_orders),
+      yearlyRevenue: roundMoney(row.yearly_revenue)
+    }))
+  };
+}
+
 async function loadDriverOrderRows(driverId, filters, limit = null) {
   const clauses = ["a.driver_id = $1"];
   const values = [driverId];

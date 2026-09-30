@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Plus, Archive, RotateCcw, Receipt, Link as LinkIcon, Check } from 'lucide-react';
 import { CURRENCY, money, catalogImageUrl, type Restaurant, type Order } from '../lib/api';
+import { useAdminRestaurantRevenues } from '../hooks/use-admin';
 import { ConfirmDialog, EmptyBlock, EntityDialog, InvoiceDialog, SectionHeading, type Field, type Write, number } from './admin-ui';
 
 const fields: Field[] = [
@@ -12,12 +13,18 @@ const fields: Field[] = [
   { key:'description', label:'وصف المطعم', type:'textarea' },
 ];
 
-export default function AdminRestaurants({ restaurants, orders = [], write }: { restaurants: Restaurant[]; orders?: Order[]; write: Write }) {
+export default function AdminRestaurants({ restaurants, orders = [], token, write }: { restaurants: Restaurant[]; orders?: Order[]; token: string; write: Write }) {
   const [editing, setEditing] = useState<Restaurant | 'new' | null>(null);
   const [archiving, setArchiving] = useState<Restaurant | null>(null);
   const [restoring, setRestoring] = useState<Restaurant | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [selectedSummary, setSelectedSummary] = useState<{ restaurantName: string; date: string; ordersCount: number; totalRevenue: number; deliveryFees: number; orders: Order[] } | null>(null);
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const revenuesQuery = useAdminRestaurantRevenues(token, date);
+  const revenueByRestaurant = new Map(
+    (revenuesQuery.data?.revenues || []).map(revenue => [revenue.restaurantId, revenue])
+  );
 
   const getTodayStats = (restaurantId: number) => {
     const todayStr = new Date().toDateString();
@@ -38,11 +45,16 @@ export default function AdminRestaurants({ restaurants, orders = [], write }: { 
   };
 
   return <div className="admin-workspace">
-    <SectionHeading title="المطاعم" subtitle={`${money(restaurants.length)} مطعم مدرج · إدارة بيانات المطاعم والصور ومتابعة المداخيل اليومية`}>
+    <SectionHeading title="المطاعم" subtitle={`${money(restaurants.length)} مطعم مدرج · إدارة بيانات المطاعم ومداخيل كل مطعم اليومية والأسبوعية والشهرية والسنوية`}>
       <button className="admin-action primary" onClick={() => setEditing('new')} data-testid="button-add-restaurant">
         <Plus size={16}/>إضافة مطعم
       </button>
     </SectionHeading>
+
+    {revenuesQuery.error && <div className="admin-flash error" role="alert" data-testid="status-restaurant-revenues-error">
+      تعذّر تحميل المداخيل. <button className="admin-action" type="button" onClick={() => void revenuesQuery.refetch()}>إعادة المحاولة</button>
+    </div>}
+    {revenuesQuery.isLoading && <p className="subtle text-sm" role="status">جارٍ تحميل المداخيل حسب الفترات…</p>}
 
     <div className="admin-card">{restaurants.length ? <div className="admin-table-scroll"><table className="admin-table">
       <thead>
@@ -51,7 +63,7 @@ export default function AdminRestaurants({ restaurants, orders = [], write }: { 
           <th>التواصل</th>
           <th>العنوان</th>
           <th>رسوم التوصيل</th>
-          <th>المداخيل اليومية</th>
+          <th>المداخيل حسب الفترة</th>
           <th>الحالة</th>
           <th>الإجراءات</th>
         </tr>
@@ -59,6 +71,7 @@ export default function AdminRestaurants({ restaurants, orders = [], write }: { 
       <tbody>
         {restaurants.map(r => {
           const stats = getTodayStats(r.id);
+          const revenue = revenueByRestaurant.get(r.id);
           return <tr key={r.id} data-testid={`row-restaurant-${r.id}`}>
             <td>
               <div className="flex items-center gap-2.5">
@@ -79,8 +92,12 @@ export default function AdminRestaurants({ restaurants, orders = [], write }: { 
             <td>{r.address || '—'}</td>
             <td>{money(r.deliveryFee)} {CURRENCY}</td>
             <td>
-              <span className="font-bold text-primary">{money(stats.todayRevenue)} {CURRENCY}</span>
-              <small className="block text-xs text-muted-foreground">({stats.todayOrders.length} طلب اليوم)</small>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 min-w-[210px]" data-testid={`revenue-periods-${r.id}`}>
+                <small className="flex justify-between gap-2"><span>يومي</span><strong>{revenue ? money(revenue.dailyRevenue) : '—'} {CURRENCY}</strong></small>
+                <small className="flex justify-between gap-2"><span>أسبوعي</span><strong>{revenue ? money(revenue.weeklyRevenue) : '—'} {CURRENCY}</strong></small>
+                <small className="flex justify-between gap-2"><span>شهري</span><strong>{revenue ? money(revenue.monthlyRevenue) : '—'} {CURRENCY}</strong></small>
+                <small className="flex justify-between gap-2"><span>سنوي</span><strong>{revenue ? money(revenue.yearlyRevenue) : '—'} {CURRENCY}</strong></small>
+              </div>
             </td>
             <td><span className="status-pill">{r.status === 'ARCHIVED' ? 'مؤرشف' : r.status === 'INACTIVE' ? 'غير نشط' : 'مدرج'}</span></td>
             <td>

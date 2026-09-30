@@ -12,6 +12,7 @@ import {
 } from "./auth.mjs";
 import {
   StatsError,
+  getAdminRestaurantRevenues,
   getAdminStats,
   getDriverOrders,
   getDriverStats,
@@ -1160,6 +1161,12 @@ async function routeApi(req, res, url) {
     sendJson(res, 200, await getAdminStats(filters));
     return true;
   }
+  if (path === "/api/admin/restaurant-revenues") {
+    if (method !== "GET") return methodNotAllowed(res);
+    await requireSession(req, "admin");
+    sendJson(res, 200, await getAdminRestaurantRevenues(url.searchParams.get("date")));
+    return true;
+  }
   if (path === "/api/admin/email-deliveries") {
     if (method !== "GET") return methodNotAllowed(res);
     await requireSession(req, "admin");
@@ -1297,7 +1304,9 @@ async function routeApi(req, res, url) {
           [attempt.id]
         );
         await client.query(
-          `UPDATE order_email_dispatch_jobs SET state='ACTIVE', next_attempt_at=now(), updated_at=now() WHERE order_id=$1`,
+          `UPDATE order_email_dispatch_jobs
+              SET state='ACTIVE', next_check_at=now(), updated_at=now()
+            WHERE order_id=$1`,
           [orderId]
         );
       }

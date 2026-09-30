@@ -5,8 +5,7 @@ import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-// Dev server port must be 3000 in AI Studio preview environment.
-const port = Number(process.env.DEV_PORT || 3000);
+const port = Number(process.env.PORT || process.env.DEV_PORT || 3000);
 const apiTarget = process.env.API_TARGET || process.env.PUBLIC_API_URL || 'https://talabatiweb-wo8o.onrender.com';
 
 const basePath = process.env.BASE_PATH || '/';
