@@ -183,9 +183,16 @@ export async function gmailAccessToken() {
     error.deliveryNotAccepted = true;
     throw error;
   }
-  const account = result.rows[0];
-  if (!account) return null;
   const config = oauthConfig();
+  const account = result.rows[0];
+  if (!account) {
+    if (!config) return null;
+    const error = new Error(
+      "Central Gmail sender is not connected; link Gmail from admin settings before sending orders",
+    );
+    error.deliveryNotAccepted = true;
+    throw error;
+  }
   if (!config) {
     const error = new Error("Gmail API credentials or PUBLIC_API_URL are not configured");
     error.deliveryNotAccepted = true;
