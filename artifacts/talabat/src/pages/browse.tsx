@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
-import { Info, MapPin, Plus, Search, UtensilsCrossed, Share2, Check, Crosshair, Navigation, X } from 'lucide-react';
+import { Info, MapPin, Plus, UtensilsCrossed, Share2, Check, Crosshair, Navigation, X } from 'lucide-react';
 import { Header, CartPanel, ErrorState, LoadingState } from '../components/common';
 import { useCatalog } from '../hooks/use-data';
 import { useCart } from '../lib/cart';
@@ -26,7 +26,6 @@ export default function Browse() {
   const routeParam = paramsRest?.id || paramsR?.id;
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [search, setSearch] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
 
   // User location state
@@ -110,11 +109,7 @@ export default function Browse() {
   // Sort restaurants by real calculated distance if userLocation is available
   const restaurants = useMemo(() => {
     if (!data?.restaurants) return [];
-    const filtered = data.restaurants.filter(r =>
-      `${r.name} ${r.description || ''} ${r.address || ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
-    );
-
-    const mapped = filtered.map(r => {
+    const mapped = data.restaurants.map(r => {
       const distanceKm = (userLocation && r.latitude != null && r.longitude != null)
         ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, r.latitude, r.longitude)
         : null;
@@ -130,18 +125,14 @@ export default function Browse() {
       if (b.distanceKm != null) return 1;
       return 0;
     });
-  }, [data, search, userLocation]);
+  }, [data, userLocation]);
 
   const selected = data?.restaurants.find(r => r.id === selectedId) || restaurants[0];
   const products = data?.products.filter(p => p.restaurantId === selected?.id) || [];
   const categories = [...new Set(products.map(p => p.category || 'القائمة'))];
 
   const handleSelectRestaurant = (id: number) => {
-    setSelectedId(id);
-    const url = new URL(window.location.href);
-    url.searchParams.set('restaurant', String(id));
-    window.history.replaceState({}, '', url.pathname + url.search);
-    document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setLocation(`/restaurant/${id}`);
   };
 
   const copyDirectRestaurantLink = () => {
@@ -271,8 +262,7 @@ export default function Browse() {
           </div>
         </div>
 
-        <label className="searchbox"><Search size={16} className="subtle"/><input type="search" placeholder="ابحث عن مطعم..." value={search} onChange={e => setSearch(e.target.value)} aria-label="ابحث عن مطعم" data-testid="input-search-restaurants"/></label>
-        {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : !data || data.restaurants.length === 0 ? <div className="surface text-center py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h3 className="display text-2xl">لا توجد مطاعم حالياً</h3><p className="subtle mt-2">عد لاحقاً لرؤية المطاعم المتاحة.</p></div> : restaurants.length === 0 ? <div className="surface text-center py-10"><h3 className="display text-2xl">لا توجد نتائج</h3><p className="subtle mt-2">جرّب البحث باسم آخر.</p><button className="btn btn-outline mt-5" onClick={() => setSearch('')} data-testid="button-clear-search">مسح البحث</button></div> : <div className="restaurant-grid">{restaurants.map(restaurant => <button key={restaurant.id} onClick={() => handleSelectRestaurant(restaurant.id)} className={`restaurant-card ${selected?.id === restaurant.id ? 'active' : ''}`} data-testid={`button-restaurant-${restaurant.id}`} aria-pressed={selected?.id === restaurant.id}>
+        {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : !data || data.restaurants.length === 0 ? <div className="surface text-center py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h3 className="display text-2xl">لا توجد مطاعم حالياً</h3><p className="subtle mt-2">عد لاحقاً لرؤية المطاعم المتاحة.</p></div> : <div className="restaurant-grid">{restaurants.map(restaurant => <button key={restaurant.id} onClick={() => handleSelectRestaurant(restaurant.id)} className={`restaurant-card ${selected?.id === restaurant.id ? 'active' : ''}`} data-testid={`button-restaurant-${restaurant.id}`} aria-pressed={selected?.id === restaurant.id}>
           {restaurant.imageUrl && <img className="restaurant-cover" src={catalogImageUrl(restaurant.imageUrl)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}
           <div className="flex items-center justify-between gap-1 mt-1">
             <h3 className="mb-0">{restaurant.name}</h3>
