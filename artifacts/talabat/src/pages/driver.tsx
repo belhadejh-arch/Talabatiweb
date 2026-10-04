@@ -190,6 +190,17 @@ export default function Driver() {
       sessionStorage.setItem(storageKey, JSON.stringify(next));
       setSession(next);
       form.reset();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = Number(pos.coords.latitude.toFixed(6));
+            const lng = Number(pos.coords.longitude.toFixed(6));
+            api.driverUpdateLocation(result.token, lat, lng).catch(() => {});
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'تعذّر تسجيل الدخول. حاول مرة أخرى.');
     } finally { setLoggingIn(false); }

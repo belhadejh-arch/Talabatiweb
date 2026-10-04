@@ -266,19 +266,38 @@ export default function Browse() {
           {restaurant.imageUrl && <img className="restaurant-cover" src={catalogImageUrl(restaurant.imageUrl)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}
           <div className="flex items-center justify-between gap-1 mt-1">
             <h3 className="mb-0">{restaurant.name}</h3>
-            {restaurant.distanceKm != null && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0" data-testid={`badge-distance-${restaurant.id}`}>
-                <MapPin size={10}/>
-                {formatDistance(restaurant.distanceKm)}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {!restaurant.isOpen && (
+                <span className="text-[10px] font-bold bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded-full" data-testid={`badge-closed-${restaurant.id}`}>
+                  مغلق (يفتح {restaurant.openingTime})
+                </span>
+              )}
+              {restaurant.distanceKm != null && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0" data-testid={`badge-distance-${restaurant.id}`}>
+                  <MapPin size={10}/>
+                  {formatDistance(restaurant.distanceKm)}
+                </span>
+              )}
+            </div>
           </div>
           <p className="subtle text-xs mt-1 line-clamp-2">{restaurant.description || restaurant.address}</p>
         </button>)}</div>}
       </section>
 
-      {selected && <section id="menu" className="scroll-mt-28"><div className="menu-heading flex items-center justify-between gap-3 flex-wrap"><h2 className="section-title">قائمة {selected.name}</h2><button type="button" onClick={copyDirectRestaurantLink} className="text-xs text-primary font-bold hover:underline flex items-center gap-1"><Share2 size={13}/>{copiedLink ? 'تم نسخ الرابط' : 'مشاركة قائمة هذا المطعم'}</button></div>
-        {products.length === 0 ? <div className="surface text-center py-9 subtle">لم تُضف أطباق إلى هذه القائمة بعد.</div> : <><nav className="category-nav" aria-label="أقسام القائمة">{categories.map((category, index) => <a href={`#menu-category-${index}`} key={category} data-testid={`link-category-${index}`}>{category}</a>)}</nav>{categories.map((category, index) => <div className="category-block" id={`menu-category-${index}`} key={category}><h3 className="category-title"><span>{category}</span><span className="category-count">{products.filter(p => (p.category || 'القائمة') === category).length}</span></h3><div className="product-list">{products.filter(p => (p.category || 'القائمة') === category).map(product => <div className="product-row" key={product.id} data-testid={`card-product-${product.id}`}>{product.imageUrl ? <img className="product-image" src={catalogImageUrl(product.imageUrl)} alt={product.name} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : <div className="product-placeholder" aria-hidden="true">{product.name.charAt(0)}</div>}<div className="min-w-0 flex-1"><h4>{product.name}</h4>{product.description && <p>{product.description}</p>}</div><div className="product-actions"><span className="price text-sm" data-testid={`text-price-${product.id}`}>{money(product.price)} {CURRENCY}</span><button type="button" className="icon-button" onClick={() => cart.add(product.restaurantId, product.id)} aria-label={`أضف ${product.name} إلى السلة`} data-testid={`button-add-product-${product.id}`}><Plus size={19}/></button></div></div>)}</div></div>)}</>}
+      {selected && <section id="menu" className="scroll-mt-28">
+        {!selected.isOpen && (
+          <div className="mb-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-sm font-bold flex items-center gap-2" data-testid="banner-restaurant-closed">
+            <span>⚠️ هذا المطعم مغلق حالياً (ساعات العمل: من {selected.openingTime} إلى {selected.closingTime}). لا يمكن إرسال طلبات في الوقت الحالي.</span>
+          </div>
+        )}
+        <div className="menu-heading flex items-center justify-between gap-3 flex-wrap"><h2 className="section-title">قائمة {selected.name}</h2><button type="button" onClick={copyDirectRestaurantLink} className="text-xs text-primary font-bold hover:underline flex items-center gap-1"><Share2 size={13}/>{copiedLink ? 'تم نسخ الرابط' : 'مشاركة قائمة هذا المطعم'}</button></div>
+        {products.length === 0 ? <div className="surface text-center py-9 subtle">لم تُضف أطباق إلى هذه القائمة بعد.</div> : <><nav className="category-nav" aria-label="أقسام القائمة">{categories.map((category, index) => <a href={`#menu-category-${index}`} key={category} data-testid={`link-category-${index}`}>{category}</a>)}</nav>{categories.map((category, index) => <div className="category-block" id={`menu-category-${index}`} key={category}><h3 className="category-title"><span>{category}</span><span className="category-count">{products.filter(p => (p.category || 'القائمة') === category).length}</span></h3><div className="product-list">{products.filter(p => (p.category || 'القائمة') === category).map(product => <div className="product-row" key={product.id} data-testid={`card-product-${product.id}`}>{product.imageUrl ? <img className="product-image" src={catalogImageUrl(product.imageUrl)} alt={product.name} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : <div className="product-placeholder" aria-hidden="true">{product.name.charAt(0)}</div>}<div className="min-w-0 flex-1"><h4>{product.name}</h4>{product.description && <p>{product.description}</p>}</div><div className="product-actions"><span className="price text-sm" data-testid={`text-price-${product.id}`}>{money(product.price)} {CURRENCY}</span><button type="button" className="icon-button" onClick={() => {
+          if (!selected.isOpen) {
+            alert('عذراً، هذا المطعم مغلق حالياً ولا يمكن إضافة منتجات للسلة أو إنشاء طلبات.');
+            return;
+          }
+          cart.add(product.restaurantId, product.id);
+        }} aria-label={`أضف ${product.name} إلى السلة`} data-testid={`button-add-product-${product.id}`}><Plus size={19}/></button></div></div>)}</div></div>)}</>}
       </section>}
     </div><div>{data ? <CartPanel catalog={data}/> : <div className="cart-panel"><div className="skeleton h-44"/></div>}</div></main>
 
