@@ -1,21 +1,28 @@
 import pg from "pg";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for the API server");
-}
-
-export const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  connectionTimeoutMillis: 10_000,
-});
+export const pool = new pg.Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        max: 10,
+        connectionTimeoutMillis: 10_000,
+      }
+    : undefined
+);
 
 pool.on("error", (error) => {
   console.error("PostgreSQL idle client error:", error.code ?? error.name);
 });
 
-// Idempotent schema guarantee for order archiving
-pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false").catch(() => {});
+// Idempotent schema guarantee for order archiving and location coordinates
+if (process.env.DATABASE_URL) {
+  pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false").catch(() => {});
+  pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude double precision").catch(() => {});
+  pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude double precision").catch(() => {});
+  pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS latitude double precision").catch(() => {});
+  pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS longitude double precision").catch(() => {});
+  pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS location_updated_at timestamptz").catch(() => {});
+}
 
 export async function withTransaction(callback) {
   const client = await pool.connect();

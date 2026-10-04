@@ -110,14 +110,18 @@ async function processJob(orderId) {
       await updateJob(client, orderId, "DONE");
       return;
     }
-    const membership = (await client.query(
-      `SELECT EXISTS (
-         SELECT 1 FROM restaurants r JOIN subscriptions s ON s.restaurant_id=r.id
-         WHERE r.id=$1 AND r.status='ACTIVE' AND s.status='ACTIVE'
-           AND s.start_date<=CURRENT_DATE AND s.expiry_date>=CURRENT_DATE
-       ) AS active`,
+    const restaurant = (await client.query(
+      `SELECT r.id, r.latitude, r.longitude,
+              EXISTS (
+                SELECT 1 FROM subscriptions s
+                WHERE s.restaurant_id=r.id AND s.status='ACTIVE'
+                  AND s.start_date<=CURRENT_DATE AND s.expiry_date>=CURRENT_DATE
+              ) AS active
+         FROM restaurants r
+        WHERE r.id=$1 AND r.status='ACTIVE'`,
       [order.restaurant_id],
-    )).rows[0].active;
+    )).rows[0];
+    const membership = Boolean(restaurant?.active);
     if (!membership) {
       const pending = (await client.query(
         `SELECT id,driver_id FROM order_driver_attempts
@@ -207,15 +211,25 @@ async function processJob(orderId) {
       }
 
       const driver = (await client.query(
-        `SELECT d.id, d.email FROM drivers d
+        `SELECT d.id, d.email, d.latitude, d.longitude FROM drivers d
          WHERE d.restaurant_id=$1 AND ${ACTIVE_DRIVER}
            AND d.email IS NOT NULL AND d.email<>''
            AND NOT EXISTS (
              SELECT 1 FROM order_driver_attempts a
              WHERE a.order_id=$2 AND a.driver_id=d.id
            )
-          ORDER BY d.id FOR UPDATE OF d LIMIT 1`,
-        [order.restaurant_id, orderId],
+         ORDER BY
+           CASE
+             WHEN $3::float IS NOT NULL AND $4::float IS NOT NULL AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+             THEN (
+               (d.latitude - $3::float) * (d.latitude - $3::float) +
+               (d.longitude - $4::float) * (d.longitude - $4::float) * COS(RADIANS(COALESCE($3::float, 0))) * COS(RADIANS(COALESCE($3::float, 0)))
+             )
+             ELSE 999999999
+           END ASC,
+           d.id ASC
+         FOR UPDATE OF d LIMIT 1`,
+        [order.restaurant_id, orderId, restaurant?.latitude ?? null, restaurant?.longitude ?? null],
       )).rows[0];
       if (!driver) {
         await updateJob(client, orderId, "DONE");

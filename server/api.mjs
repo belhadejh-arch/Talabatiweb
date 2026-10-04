@@ -192,6 +192,8 @@ function mapRestaurant(row) {
     deliveryTime: null,
     deliveryFee: Number(row.delivery_fee || 0),
     imageUrl: row.logo_url || row.cover_url || "",
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
     status: row.status || "ACTIVE"
   };
 }
@@ -241,6 +243,9 @@ function mapDriver(row) {
     email: row.email || "",
     serialNumber: row.serial_number || "",
     restaurantId: Number(row.restaurant_id),
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
+    locationUpdatedAt: row.location_updated_at ? new Date(row.location_updated_at).toISOString() : null,
     isActive: Boolean(row.is_active) && row.status === "ACTIVE",
     status: row.status || "INACTIVE"
   };
@@ -357,7 +362,7 @@ async function loadOrder(client, id) {
 async function getCatalog() {
   const restaurantsResult = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
-            r.logo_url, r.cover_url, r.delivery_fee
+            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude
        FROM restaurants r
       WHERE r.status = 'ACTIVE'
         AND EXISTS (
@@ -802,7 +807,8 @@ async function listAdminOrders(limit = 250) {
 
 async function listAdminDrivers() {
   const result = await pool.query(
-    `SELECT d.id, d.restaurant_id, d.name, d.phone, d.email, d.status, d.is_active, d.serial_number
+    `SELECT d.id, d.restaurant_id, d.name, d.phone, d.email, d.status, d.is_active, d.serial_number,
+            d.latitude, d.longitude, d.location_updated_at
        FROM drivers d
       ORDER BY d.created_at DESC, d.id DESC`
   );
@@ -812,7 +818,7 @@ async function listAdminDrivers() {
 async function listRestaurants({ activeOnly = false } = {}) {
   const result = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
-            r.logo_url, r.cover_url, r.delivery_fee
+            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude
        FROM restaurants r
       ${activeOnly ? "WHERE r.status = 'ACTIVE'" : ""}
       ORDER BY r.name, r.id`
@@ -1009,6 +1015,10 @@ async function createRestaurant(input) {
   const description = optionalText(input.description, "الوصف", 1500) || "";
   const imageUrl = input.imageUrl ? String(input.imageUrl).trim() : (input.logoUrl ? String(input.logoUrl).trim() : "");
   const deliveryFee = input.deliveryFee != null ? Math.max(0, Number(input.deliveryFee) || 0) : 0;
+  const lat = input.latitude == null || input.latitude === "" ? null : Number(input.latitude);
+  const latitude = (lat != null && Number.isFinite(lat) && lat >= -90 && lat <= 90) ? lat : null;
+  const lng = input.longitude == null || input.longitude === "" ? null : Number(input.longitude);
+  const longitude = (lng != null && Number.isFinite(lng) && lng >= -180 && lng <= 180) ? lng : null;
   const base = slugBase(name);
 
   return withTransaction(async (client) => {
@@ -1019,11 +1029,11 @@ async function createRestaurant(input) {
       slug = `${base}-${randomUUID().slice(0, 6)}`;
     }
     const inserted = await client.query(
-      `INSERT INTO restaurants (name, slug, phone, address, description, logo_url, cover_url, delivery_fee, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $6, $7, 'ACTIVE')
+      `INSERT INTO restaurants (name, slug, phone, address, description, logo_url, cover_url, delivery_fee, latitude, longitude, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, 'ACTIVE')
        RETURNING id, name, slug, phone, address, description,
-                 logo_url, cover_url, delivery_fee`,
-      [name, slug, phone, address, description, imageUrl, deliveryFee]
+                 logo_url, cover_url, delivery_fee, latitude, longitude, status`,
+      [name, slug, phone, address, description, imageUrl, deliveryFee, latitude, longitude]
     );
     return mapRestaurant(inserted.rows[0]);
   });
@@ -1261,6 +1271,25 @@ async function routeApi(req, res, url) {
     sendJson(res, 200, {
       orders: await getDriverOrders(session.ownerId, filters)
     });
+    return true;
+  }
+  if (path === "/api/driver/location") {
+    if (method !== "POST") return methodNotAllowed(res);
+    const session = await requireSession(req, "driver");
+    const input = await readJson(req, 1024);
+    const lat = Number(input?.latitude);
+    const lng = Number(input?.longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+        !Number.isFinite(lng) || lng < -180 || lng > 180) {
+      throw new ApiError(400, "إحداثيات الموقع غير صالحة.");
+    }
+    await pool.query(
+      `UPDATE drivers
+          SET latitude = $1, longitude = $2, location_updated_at = NOW()
+        WHERE id = $3`,
+      [lat, lng, session.ownerId]
+    );
+    sendJson(res, 200, { ok: true, latitude: lat, longitude: lng });
     return true;
   }
   const driverRespondMatch = path.match(/^\/api\/driver\/orders\/(\d+)\/respond$/);

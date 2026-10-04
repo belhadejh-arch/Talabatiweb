@@ -4,9 +4,10 @@ import { Link, useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { Form } from '@/components/ui/form';
 import { Header, ErrorState, LoadingState } from '../components/common';
+import LocationPickerMap from '../components/location-map';
 import { useCatalog } from '../hooks/use-data';
 import { useCart } from '../lib/cart';
-import { api, money, type OrderInput } from '../lib/api';
+import { api, money, CURRENCY, type OrderInput } from '../lib/api';
 
 type CheckoutFields = { customerName: string; customerPhone: string; notes: string; latitude: string; longitude: string; reservationDate: string; reservationTime: string; partySize: string };
 type PendingAttempt = { key: string; input: OrderInput };
@@ -15,6 +16,18 @@ function readPending(): PendingAttempt | null {
     const value = JSON.parse(sessionStorage.getItem('talabat-pending-order') || 'null') as PendingAttempt | null;
     return value?.key && value?.input?.items?.length ? value : null;
   } catch { return null; }
+}
+function getSavedUserLocation(): { lat: string; lng: string } {
+  try {
+    const raw = localStorage.getItem('talabat-user-location');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.latitude != null && parsed?.longitude != null) {
+        return { lat: String(parsed.latitude), lng: String(parsed.longitude) };
+      }
+    }
+  } catch {}
+  return { lat: '', lng: '' };
 }
 const today = () => { const d = new Date(); const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
 
@@ -28,18 +41,33 @@ export default function Checkout() {
   const [geoState, setGeoState] = useState('');
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const form = useForm<CheckoutFields>({ defaultValues: { customerName: pending?.input.customerName || '', customerPhone: pending?.input.customerPhone || '', notes: pending?.input.notes || '', latitude: pending?.input.latitude == null ? '' : String(pending.input.latitude), longitude: pending?.input.longitude == null ? '' : String(pending.input.longitude), reservationDate: pending?.input.reservationDate || '', reservationTime: pending?.input.reservationTime || '', partySize: String(pending?.input.partySize || 2) } });
+  const savedLoc = getSavedUserLocation();
+  const form = useForm<CheckoutFields>({
+    defaultValues: {
+      customerName: pending?.input.customerName || '',
+      customerPhone: pending?.input.customerPhone || '',
+      notes: pending?.input.notes || '',
+      latitude: pending?.input.latitude == null ? savedLoc.lat : String(pending.input.latitude),
+      longitude: pending?.input.longitude == null ? savedLoc.lng : String(pending.input.longitude),
+      reservationDate: pending?.input.reservationDate || '',
+      reservationTime: pending?.input.reservationTime || '',
+      partySize: String(pending?.input.partySize || 2)
+    }
+  });
   const restaurant = data?.restaurants.find(r => r.id === cart.restaurantId);
   const rows = cart.items.map(item => ({ ...item, product: data?.products.find(p => p.id === item.productId) }));
   const estimate = rows.reduce((sum, row) => sum + (row.product ? Number(row.product.price) * row.quantity : 0), 0);
+  const currentLat = Number(form.watch('latitude'));
+  const currentLng = Number(form.watch('longitude'));
+
   const getLocation = () => {
-    if (!navigator.geolocation) { setGeoState('المتصفح لا يدعم تحديد الموقع. أدخل الإحداثيات يدوياً.'); return; }
+    if (!navigator.geolocation) { setGeoState('المتصفح لا يدعم تحديد الموقع. حدد موقعك على الخريطة أدناه.'); return; }
     setLocating(true); setGeoState('');
     navigator.geolocation.getCurrentPosition(position => {
-      form.setValue('latitude', String(position.coords.latitude), { shouldValidate: true });
-      form.setValue('longitude', String(position.coords.longitude), { shouldValidate: true });
-      setGeoState('تم تحديد موقع التوصيل بدقة.'); setLocating(false);
-    }, () => { setGeoState('تعذّر تحديد الموقع. اسمح بالوصول أو أدخل الإحداثيات يدوياً.'); setLocating(false); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+      form.setValue('latitude', String(position.coords.latitude.toFixed(6)), { shouldValidate: true });
+      form.setValue('longitude', String(position.coords.longitude.toFixed(6)), { shouldValidate: true });
+      setGeoState('تم تحديد موقع التوصيل بنجاح.'); setLocating(false);
+    }, () => { setGeoState('تعذّر تحديد الموقع عبر GPS. يمكنك النقر على الخريطة لتحديده.'); setLocating(false); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
   };
   const sendAttempt = async (attempt: PendingAttempt) => {
     setError('');
@@ -87,13 +115,30 @@ export default function Checkout() {
         </section>
         <section className="surface form-stack"><div><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>02 / طريقة الطلب</span><h2 className="display text-2xl mt-2">على راحتك</h2></div>
           <div className="choice-grid"><button type="button" disabled={!!pending} onClick={() => setOrderType('DELIVERY')} className={`choice ${orderType === 'DELIVERY' ? 'active' : ''}`} aria-pressed={orderType === 'DELIVERY'} data-testid="button-type-delivery"><MapPin size={20} className="mb-2"/><strong className="block">توصيل</strong><span className="subtle text-xs">إلى موقعك</span></button><button type="button" disabled={!!pending} onClick={() => setOrderType('RESERVATION')} className={`choice ${orderType === 'RESERVATION' ? 'active' : ''}`} aria-pressed={orderType === 'RESERVATION'} data-testid="button-type-reservation"><ShoppingBag size={20} className="mb-2"/><strong className="block">حجز</strong><span className="subtle text-xs">موعد في المطعم</span></button></div>
-          {!pending && (orderType === 'DELIVERY' ? <div className="form-stack"><div className="notice">نحتاج إحداثيات حقيقية لتحديد موقع التوصيل. يمكنك السماح للمتصفح بتحديدها، أو إدخال خط العرض وخط الطول بنفسك.</div><button type="button" className="btn btn-outline justify-self-start" onClick={getLocation} disabled={locating} data-testid="button-geolocate"><Crosshair size={17}/>{locating ? 'جارٍ تحديد الموقع...' : 'تحديد موقعي الحالي'}</button>{geoState && <p className="text-sm subtle" role="status" data-testid="status-location">{geoState}</p>}<div className="field-grid"><label className="field">خط العرض<input {...form.register('latitude')} type="number" step="any" min="-90" max="90" dir="ltr" placeholder="24.7136" data-testid="input-latitude"/></label><label className="field">خط الطول<input {...form.register('longitude')} type="number" step="any" min="-180" max="180" dir="ltr" placeholder="46.6753" data-testid="input-longitude"/></label></div></div> : <div className="field-grid"><label className="field">تاريخ الحجز<input {...form.register('reservationDate')} type="date" min={today()} data-testid="input-reservation-date"/></label><label className="field">الوقت<input {...form.register('reservationTime')} type="time" data-testid="input-reservation-time"/></label><label className="field">عدد الأشخاص<input {...form.register('partySize')} type="number" min="1" max="100" data-testid="input-party-size"/></label></div>)}
+          {!pending && (orderType === 'DELIVERY' ? <div className="form-stack">
+            <div className="notice">يرجى التأكد من موقع التوصيل على الخريطة قبل إرسال الطلب. يمكنك النقر على الخريطة لتعديل وتحديد مكان استلام الوجبة بدقة أو استخدام زر GPS.</div>
+            <LocationPickerMap
+              latitude={Number.isFinite(currentLat) && currentLat !== 0 ? currentLat : null}
+              longitude={Number.isFinite(currentLng) && currentLng !== 0 ? currentLng : null}
+              onChange={(lat, lng) => {
+                form.setValue('latitude', String(lat), { shouldValidate: true });
+                form.setValue('longitude', String(lng), { shouldValidate: true });
+                setGeoState(`تم تحديد الموقع: (${lat}, ${lng})`);
+              }}
+              label="تأكيد وتعديل موقع التوصيل على الخريطة"
+            />
+            {geoState && <p className="text-sm subtle" role="status" data-testid="status-location">{geoState}</p>}
+            <div className="field-grid">
+              <label className="field">خط العرض (Latitude)<input {...form.register('latitude')} type="number" step="any" min="-90" max="90" dir="ltr" placeholder="32.8872" data-testid="input-latitude"/></label>
+              <label className="field">خط الطول (Longitude)<input {...form.register('longitude')} type="number" step="any" min="-180" max="180" dir="ltr" placeholder="13.1913" data-testid="input-longitude"/></label>
+            </div>
+          </div> : <div className="field-grid"><label className="field">تاريخ الحجز<input {...form.register('reservationDate')} type="date" min={today()} data-testid="input-reservation-date"/></label><label className="field">الوقت<input {...form.register('reservationTime')} type="time" data-testid="input-reservation-time"/></label><label className="field">عدد الأشخاص<input {...form.register('partySize')} type="number" min="1" max="100" data-testid="input-party-size"/></label></div>)}
         </section>
         <section className="surface"><label className="field">ملاحظات إضافية <span className="subtle font-normal">اختياري</span><textarea {...form.register('notes', { maxLength: 2000 })} disabled={!!pending} placeholder="أي شيء ينبغي أن يعرفه المطعم؟" data-testid="input-order-notes"/></label></section>
         {error && <div className="error-box" role="alert" data-testid="status-submit-error">{error}</div>}
         {pending ? <button type="button" onClick={() => { void sendAttempt(pending); }} className="btn btn-primary w-full py-4" disabled={submitting} data-testid="button-submit-order">{submitting ? 'جارٍ إرسال الطلب...' : 'إعادة محاولة إرسال الطلب'}</button> : <button type="submit" className="btn btn-primary w-full py-4" disabled={submitting} data-testid="button-submit-order">{submitting ? 'جارٍ إرسال الطلب...' : 'تأكيد وإرسال الطلب'}</button>}
       </form></Form>
-       <aside className="surface checkout-summary md:sticky md:top-24"><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>ملخص الطلب</span><h2 className="display text-2xl mt-2 mb-5">{restaurant?.name || 'طلبك'}</h2>{rows.map(row => <div className="total-line text-sm border-b border-border" key={row.productId}><span>{row.quantity} × {row.product?.name || `منتج #${row.productId}`}</span><span>{row.product ? `${money(Number(row.product.price) * row.quantity)} ر.س` : 'غير متاح'}</span></div>)}<div className="total-line font-bold mt-4"><span>تقدير المنتجات</span><span data-testid="text-checkout-estimate">{money(estimate)} ر.س</span></div><p className="subtle text-xs leading-6 mt-3">السعر النهائي ورسوم التوصيل يُحتسبان على الخادم بعد إرسال الطلب.</p></aside>
+       <aside className="surface checkout-summary md:sticky md:top-24"><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>ملخص الطلب</span><h2 className="display text-2xl mt-2 mb-5">{restaurant?.name || 'طلبك'}</h2>{rows.map(row => <div className="total-line text-sm border-b border-border" key={row.productId}><span>{row.quantity} × {row.product?.name || `منتج #${row.productId}`}</span><span>{row.product ? `${money(Number(row.product.price) * row.quantity)} ${CURRENCY}` : 'غير متاح'}</span></div>)}<div className="total-line font-bold mt-4"><span>تقدير المنتجات</span><span data-testid="text-checkout-estimate">{money(estimate)} {CURRENCY}</span></div><p className="subtle text-xs leading-6 mt-3">السعر النهائي ورسوم التوصيل يُحتسبان على الخادم بعد إرسال الطلب.</p></aside>
     </div>}
   </main></div>;
 }

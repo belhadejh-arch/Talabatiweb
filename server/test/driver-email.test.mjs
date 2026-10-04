@@ -51,7 +51,9 @@ test("mail includes saved delivery and reservation details; tokens bind all IDs"
   }), /coordinates/);
 });
 
-test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no replay", async () => {
+test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no replay", {
+  skip: !process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL
+}, async () => {
   const ids = { restaurants: [], categories: [], products: [], drivers: [], orders: [] };
   const mails = [];
   let originalTimeout;

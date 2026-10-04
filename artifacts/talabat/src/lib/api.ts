@@ -1,4 +1,4 @@
-export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; status?: string };
+export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; latitude?: number | null; longitude?: number | null; status?: string };
 export type Product = { id: number; restaurantId: number; name: string; description: string | null; price: number; category: string | null; imageUrl: string | null };
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
 export type OrderItem = { productId: number; productName?: string; quantity: number; unitPrice?: number; totalPrice?: number; selectedSize?: string | null };
@@ -6,7 +6,7 @@ export type Order = { id: number; restaurantId: number; restaurantName?: string;
 export type OrderInput = { restaurantId: number; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: { productId: number; quantity: number }[]; notes?: string; latitude?: number; longitude?: number; reservationDate?: string; reservationTime?: string; partySize?: number };
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
-export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number; serialNumber?: string };
+export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number; serialNumber?: string; latitude?: number | null; longitude?: number | null; locationUpdatedAt?: string | null };
 export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'items' | 'itemsSummary' | 'deliveryFee' | 'subtotal' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
 export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
@@ -54,10 +54,31 @@ export const api = {
   driverStats: (token: string) => request<DriverStats>('/api/driver/stats', { headers: { Authorization: `Bearer ${token}` } }),
   driverGmailStatus: (token: string) => request<DriverGmailStatus>('/api/driver/gmail/status', { headers: { Authorization: `Bearer ${token}` } }),
   driverGmailConnect: (token: string) => request<{ authorizationUrl: string }>('/api/driver/gmail/connect', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
+  driverUpdateLocation: (token: string, latitude: number, longitude: number) => request<{ ok: boolean; latitude: number; longitude: number }>('/api/driver/location', { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` }, body: JSON.stringify({ latitude, longitude }) }),
   driverRespondOrder: (token: string, orderId: number, decision: 'ACCEPTED' | 'REJECTED') => request<{ ok: boolean; decision: string }>(`/api/driver/orders/${orderId}/respond`, { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` }, body: JSON.stringify({ decision }) }),
   archiveAllOrders: (token: string) => request<{ ok: boolean; count: number }>('/api/admin/orders/archive-all', { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` } }),
   restoreOrder: (token: string, orderId: number) => request<{ ok: boolean }>(`/api/admin/orders/${orderId}/restore`, { method: 'POST', headers: { ...jsonHeaders, Authorization: `Bearer ${token}` } }),
 };
+
+export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function formatDistance(km: number): string {
+  if (!Number.isFinite(km) || km < 0) return '';
+  if (km < 1) {
+    return `${Math.round(km * 1000)} م`;
+  }
+  return `${km.toFixed(1)} كم`;
+}
 
 export const CURRENCY = 'د.ل';
 export const money = (value: number | string | null | undefined) => new Intl.NumberFormat('ar', { maximumFractionDigits: 2 }).format(Number(value) || 0);

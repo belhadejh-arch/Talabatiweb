@@ -92,6 +92,8 @@ function restaurantMap(row) {
     deliveryTime: null,
     deliveryFee: Number(row.delivery_fee || 0),
     imageUrl: row.logo_url || row.cover_url || "",
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
     status: row.status || "INACTIVE"
   };
 }
@@ -150,19 +152,29 @@ async function updateRestaurant(restaurantId, input) {
   if (Object.hasOwn(input, "address")) set("address", text(input.address, "العنوان", 300));
   if (Object.hasOwn(input, "description")) set("description", text(input.description, "الوصف", 1500, true));
   if (Object.hasOwn(input, "deliveryFee")) set("delivery_fee", amount(input.deliveryFee, "رسوم التوصيل"), "::numeric");
+  if (Object.hasOwn(input, "latitude")) {
+    const lat = input.latitude == null || input.latitude === "" ? null : Number(input.latitude);
+    if (lat != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) fail("خط العرض غير صالح.");
+    set("latitude", lat);
+  }
+  if (Object.hasOwn(input, "longitude")) {
+    const lng = input.longitude == null || input.longitude === "" ? null : Number(input.longitude);
+    if (lng != null && (!Number.isFinite(lng) || lng < -180 || lng > 180)) fail("خط الطول غير صالح.");
+    set("longitude", lng);
+  }
   if (Object.hasOwn(input, "imageUrl") || Object.hasOwn(input, "logoUrl")) {
     const img = imageUrl(input.imageUrl ?? input.logoUrl);
     set("logo_url", img);
     set("cover_url", img);
   }
   if (Object.hasOwn(input, "status")) {
-    if (!["ACTIVE", "INACTIVE"].includes(input.status)) fail("حالة المطعم يجب أن تكون ACTIVE أو INACTIVE.");
+    if (!["ACTIVE", "INACTIVE", "FROZEN", "PAUSED", "ARCHIVED"].includes(input.status)) fail("حالة المطعم غير صالحة.");
     set("status", input.status);
   }
   values.push(restaurantId);
   const result = await pool.query(
     `UPDATE restaurants SET ${fields.join(",")} WHERE id=$${values.length}
-     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee`,
+     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee,latitude,longitude`,
     values
   );
   if (!result.rows[0]) fail("المطعم غير موجود.", 404);
@@ -172,7 +184,7 @@ async function updateRestaurant(restaurantId, input) {
 async function archiveRestaurant(restaurantId) {
   const result = await pool.query(
     `UPDATE restaurants SET status='ARCHIVED' WHERE id=$1
-     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee`,
+     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee,latitude,longitude`,
     [restaurantId]
   );
   if (!result.rows[0]) fail("المطعم غير موجود.", 404);

@@ -11,7 +11,9 @@ CREATE TABLE restaurants (
   status text NOT NULL DEFAULT 'ACTIVE',
   logo_url text,
   cover_url text,
-  delivery_fee numeric(12,3) NOT NULL DEFAULT 0
+  delivery_fee numeric(12,3) NOT NULL DEFAULT 0,
+  latitude double precision,
+  longitude double precision
 );
 
 CREATE TABLE categories (
@@ -64,6 +66,9 @@ CREATE TABLE drivers (
   status text NOT NULL DEFAULT 'ACTIVE',
   serial_number text NOT NULL UNIQUE,
   total_deliveries integer NOT NULL DEFAULT 0,
+  latitude double precision,
+  longitude double precision,
+  location_updated_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
