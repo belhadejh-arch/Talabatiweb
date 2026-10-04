@@ -9,6 +9,10 @@ const fields: Field[] = [
   { key:'phone', label:'رقم الهاتف', type:'tel', required:true },
   { key:'address', label:'العنوان', required:true },
   { key:'deliveryFee', label:`رسوم التوصيل (${CURRENCY})`, type:'number', min:0, step:'0.01' },
+  { key:'latitude', label:'خط العرض (Latitude)', type:'number', step:'0.000001' },
+  { key:'longitude', label:'خط الطول (Longitude)', type:'number', step:'0.000001' },
+  { key:'openingTime', label:'وقت الفتح (مثال: 08:00)', type:'text' },
+  { key:'closingTime', label:'وقت الإغلاق (مثال: 22:00)', type:'text' },
   { key:'imageUrl', label:'صورة المطعم (رفع مباشر من الجهاز)', type:'image-upload' },
   { key:'description', label:'وصف المطعم', type:'textarea' },
 ];
@@ -164,6 +168,10 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
           address,
           description: values.description || null,
           deliveryFee: number(values.deliveryFee),
+          latitude: values.latitude !== '' && values.latitude != null ? Number(values.latitude) : null,
+          longitude: values.longitude !== '' && values.longitude != null ? Number(values.longitude) : null,
+          openingTime: values.openingTime ? String(values.openingTime).trim() : '08:00',
+          closingTime: values.closingTime ? String(values.closingTime).trim() : '22:00',
           imageUrl: values.imageUrl ? String(values.imageUrl) : null,
           logoUrl: values.imageUrl ? String(values.imageUrl) : null,
         };

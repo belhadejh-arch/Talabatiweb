@@ -94,6 +94,8 @@ function restaurantMap(row) {
     imageUrl: row.logo_url || row.cover_url || "",
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
+    openingTime: row.opening_time ? String(row.opening_time).slice(0, 5) : "08:00",
+    closingTime: row.closing_time ? String(row.closing_time).slice(0, 5) : "22:00",
     status: row.status || "INACTIVE"
   };
 }
@@ -139,7 +141,7 @@ function subscriptionMap(row) {
 }
 
 async function updateRestaurant(restaurantId, input) {
-  only(input, ["name", "phone", "address", "description", "deliveryFee", "status", "imageUrl", "logoUrl"], "المطعم");
+  only(input, ["name", "phone", "address", "description", "deliveryFee", "status", "imageUrl", "logoUrl", "latitude", "longitude", "openingTime", "closingTime"], "المطعم");
   if (!Object.keys(input).length) fail("أرسل حقلاً واحداً على الأقل للتحديث.");
   const fields = [];
   const values = [];
@@ -162,6 +164,14 @@ async function updateRestaurant(restaurantId, input) {
     if (lng != null && (!Number.isFinite(lng) || lng < -180 || lng > 180)) fail("خط الطول غير صالح.");
     set("longitude", lng);
   }
+  if (Object.hasOwn(input, "openingTime")) {
+    const ot = text(input.openingTime, "وقت الفتح", 10);
+    set("opening_time", ot, "::time");
+  }
+  if (Object.hasOwn(input, "closingTime")) {
+    const ct = text(input.closingTime, "وقت الإغلاق", 10);
+    set("closing_time", ct, "::time");
+  }
   if (Object.hasOwn(input, "imageUrl") || Object.hasOwn(input, "logoUrl")) {
     const img = imageUrl(input.imageUrl ?? input.logoUrl);
     set("logo_url", img);
@@ -174,7 +184,7 @@ async function updateRestaurant(restaurantId, input) {
   values.push(restaurantId);
   const result = await pool.query(
     `UPDATE restaurants SET ${fields.join(",")} WHERE id=$${values.length}
-     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee,latitude,longitude`,
+     RETURNING id,name,slug,phone,address,description,status,logo_url,cover_url,delivery_fee,latitude,longitude,opening_time,closing_time`,
     values
   );
   if (!result.rows[0]) fail("المطعم غير موجود.", 404);

@@ -160,6 +160,26 @@ export default function Driver() {
     if (token && errors.some(error => error instanceof ApiError && error.status === 401)) logout();
   }, [ordersQuery.error, statsQuery.error, gmailQuery.error, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!token) return;
+    const sendLocation = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = Number(pos.coords.latitude.toFixed(6));
+            const lng = Number(pos.coords.longitude.toFixed(6));
+            api.driverUpdateLocation(token, lat, lng).catch(() => {});
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    };
+    sendLocation();
+    const interval = setInterval(sendLocation, 60000);
+    return () => clearInterval(interval);
+  }, [token]);
+
   async function login(values: { serialNumber: string }) {
     setLoggingIn(true);
     setLoginError('');

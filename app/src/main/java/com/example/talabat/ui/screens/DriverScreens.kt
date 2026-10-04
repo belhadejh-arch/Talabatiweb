@@ -506,3 +506,28 @@ private fun DriverFilterDropdown(
 
 private fun money(value: Double): String = String.format("%.2f د.ل", value)
 private fun percent(value: Double): String = String.format("%.1f%%", value)
+
+@Composable
+private fun StatCard(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun DataLine(title: String, subtitle: String) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(subtitle)
+        }
+    }
+}

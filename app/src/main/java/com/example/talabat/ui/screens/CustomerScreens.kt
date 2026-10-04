@@ -280,3 +280,36 @@ fun BadgeBox(count: Int, content: @Composable () -> Unit) {
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdminDashboardScreen(
+    onBack: () -> Unit,
+    onOpenDriverPortal: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("لوحة الإدارة") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "عودة")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("لوحة إدارة المطاعم والطلبات", style = MaterialTheme.typography.titleLarge)
+            Button(onClick = onOpenDriverPortal) {
+                Text("الانتقال إلى مساحة السائق")
+            }
+        }
+    }
+}

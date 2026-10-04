@@ -19,6 +19,8 @@ if (process.env.DATABASE_URL) {
   pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false").catch(() => {});
   pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude double precision").catch(() => {});
   pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude double precision").catch(() => {});
+  pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS opening_time time DEFAULT '08:00:00'").catch(() => {});
+  pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS closing_time time DEFAULT '22:00:00'").catch(() => {});
   pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS latitude double precision").catch(() => {});
   pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS longitude double precision").catch(() => {});
   pool.query("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS location_updated_at timestamptz").catch(() => {});

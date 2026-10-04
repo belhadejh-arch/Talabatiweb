@@ -180,6 +180,21 @@ function numberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isRestaurantOpen(row) {
+  if (row.status !== "ACTIVE") return false;
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentTimeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const open = (row.opening_time || '08:00:00').slice(0, 5);
+  const close = (row.closing_time || '22:00:00').slice(0, 5);
+  if (open <= close) {
+    return currentTimeStr >= open && currentTimeStr < close;
+  } else {
+    return currentTimeStr >= open || currentTimeStr < close;
+  }
+}
+
 function mapRestaurant(row) {
   return {
     id: Number(row.id),
@@ -194,6 +209,9 @@ function mapRestaurant(row) {
     imageUrl: row.logo_url || row.cover_url || "",
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
+    openingTime: row.opening_time ? String(row.opening_time).slice(0, 5) : "08:00",
+    closingTime: row.closing_time ? String(row.closing_time).slice(0, 5) : "22:00",
+    isOpen: isRestaurantOpen(row),
     status: row.status || "ACTIVE"
   };
 }
@@ -362,7 +380,8 @@ async function loadOrder(client, id) {
 async function getCatalog() {
   const restaurantsResult = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
-            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude
+            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude,
+            r.opening_time, r.closing_time
        FROM restaurants r
       WHERE r.status = 'ACTIVE'
         AND EXISTS (
@@ -529,7 +548,7 @@ async function createOrder(input, idempotencyKey) {
     }
 
     const restaurantResult = await client.query(
-      `SELECT r.id, r.name, r.delivery_fee
+      `SELECT r.id, r.name, r.delivery_fee, r.opening_time, r.closing_time, r.status
          FROM restaurants r
          JOIN subscriptions s ON s.restaurant_id = r.id
         WHERE r.id = $1
@@ -544,6 +563,14 @@ async function createOrder(input, idempotencyKey) {
     const restaurant = restaurantResult.rows[0];
     if (!restaurant) {
       throw new ApiError(409, "المطعم غير متاح أو لا يملك عضوية نشطة.");
+    }
+    const open = (restaurant.opening_time || '08:00:00').slice(0, 5);
+    const close = (restaurant.closing_time || '22:00:00').slice(0, 5);
+    const now = new Date();
+    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const isOpen = open <= close ? (currentTimeStr >= open && currentTimeStr < close) : (currentTimeStr >= open || currentTimeStr < close);
+    if (!isOpen) {
+      throw new ApiError(409, "المطعم مغلق حالياً ولا يمكن استقبال طلبات في هذا الوقت.");
     }
     if (data.reservationDate) {
       const validDate = await client.query(
@@ -818,7 +845,8 @@ async function listAdminDrivers() {
 async function listRestaurants({ activeOnly = false } = {}) {
   const result = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
-            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude
+            r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude,
+            r.opening_time, r.closing_time
        FROM restaurants r
       ${activeOnly ? "WHERE r.status = 'ACTIVE'" : ""}
       ORDER BY r.name, r.id`
@@ -1019,6 +1047,8 @@ async function createRestaurant(input) {
   const latitude = (lat != null && Number.isFinite(lat) && lat >= -90 && lat <= 90) ? lat : null;
   const lng = input.longitude == null || input.longitude === "" ? null : Number(input.longitude);
   const longitude = (lng != null && Number.isFinite(lng) && lng >= -180 && lng <= 180) ? lng : null;
+  const openingTime = input.openingTime ? String(input.openingTime).trim() : '08:00';
+  const closingTime = input.closingTime ? String(input.closingTime).trim() : '22:00';
   const base = slugBase(name);
 
   return withTransaction(async (client) => {
@@ -1029,11 +1059,11 @@ async function createRestaurant(input) {
       slug = `${base}-${randomUUID().slice(0, 6)}`;
     }
     const inserted = await client.query(
-      `INSERT INTO restaurants (name, slug, phone, address, description, logo_url, cover_url, delivery_fee, latitude, longitude, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, 'ACTIVE')
+      `INSERT INTO restaurants (name, slug, phone, address, description, logo_url, cover_url, delivery_fee, latitude, longitude, opening_time, closing_time, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10::time, $11::time, 'ACTIVE')
        RETURNING id, name, slug, phone, address, description,
-                 logo_url, cover_url, delivery_fee, latitude, longitude, status`,
-      [name, slug, phone, address, description, imageUrl, deliveryFee, latitude, longitude]
+                 logo_url, cover_url, delivery_fee, latitude, longitude, opening_time, closing_time, status`,
+      [name, slug, phone, address, description, imageUrl, deliveryFee, latitude, longitude, openingTime, closingTime]
     );
     return mapRestaurant(inserted.rows[0]);
   });
