@@ -1,10 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Crosshair, MapPin, Check } from 'lucide-react';
 
-// Custom SVG pin marker to avoid missing Leaflet icon images
-const createCustomPin = () => {
+function ensureLeaflet(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('No window'));
+  if ((window as any).L) return Promise.resolve((window as any).L);
+
+  return new Promise((resolve, reject) => {
+    if (!document.querySelector('link[data-leaflet="true"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.setAttribute('data-leaflet', 'true');
+      document.head.appendChild(link);
+    }
+    const existing = document.querySelector('script[data-leaflet="true"]') as HTMLScriptElement;
+    if (existing) {
+      existing.addEventListener('load', () => resolve((window as any).L));
+      existing.addEventListener('error', () => reject(new Error('Failed to load map')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.setAttribute('data-leaflet', 'true');
+    script.async = true;
+    script.onload = () => resolve((window as any).L);
+    script.onerror = () => reject(new Error('Failed to load map'));
+    document.body.appendChild(script);
+  });
+}
+
+const createCustomPin = (L: any) => {
   return L.divIcon({
     className: 'custom-map-pin',
     html: `<div style="transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center;">
@@ -33,55 +58,64 @@ export default function LocationPickerMap({
   readOnly = false
 }: LocationPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Default coordinate: Tripoli, Libya (32.8872, 13.1913) if none provided
   const initialLat = latitude != null && Number.isFinite(latitude) ? latitude : 32.8872;
   const initialLng = longitude != null && Number.isFinite(longitude) ? longitude : 13.1913;
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (mapInstanceRef.current) return;
+    let cancelled = false;
 
-    const map = L.map(containerRef.current, {
-      center: [initialLat, initialLng],
-      zoom: latitude != null ? 15 : 12,
-      attributionControl: false
+    ensureLeaflet().then((L) => {
+      if (cancelled || !containerRef.current || mapInstanceRef.current) return;
+
+      const map = L.map(containerRef.current, {
+        center: [initialLat, initialLng],
+        zoom: latitude != null ? 15 : 12,
+        attributionControl: false
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      L.control.attribution({ position: 'bottomright', prefix: 'OpenStreetMap' }).addTo(map);
+
+      const marker = L.marker([initialLat, initialLng], {
+        icon: createCustomPin(L),
+        draggable: !readOnly
+      }).addTo(map);
+
+      if (!readOnly) {
+        marker.on('dragend', () => {
+          const pos = marker.getLatLng();
+          onChange(Number(pos.lat.toFixed(6)), Number(pos.lng.toFixed(6)));
+        });
+
+        map.on('click', (e: any) => {
+          marker.setLatLng(e.latlng);
+          onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)));
+        });
+      }
+
+      mapInstanceRef.current = map;
+      markerRef.current = marker;
+      setMapLoaded(true);
+    }).catch(() => {
+      if (!cancelled) setGeoError('تعذر تحميل الخريطة. يمكنك الاستمرار بتحديد الموقع عبر GPS.');
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19
-    }).addTo(map);
-
-    L.control.attribution({ position: 'bottomright', prefix: 'OpenStreetMap' }).addTo(map);
-
-    const marker = L.marker([initialLat, initialLng], {
-      icon: createCustomPin(),
-      draggable: !readOnly
-    }).addTo(map);
-
-    if (!readOnly) {
-      marker.on('dragend', () => {
-        const pos = marker.getLatLng();
-        onChange(Number(pos.lat.toFixed(6)), Number(pos.lng.toFixed(6)));
-      });
-
-      map.on('click', (e) => {
-        marker.setLatLng(e.latlng);
-        onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)));
-      });
-    }
-
-    mapInstanceRef.current = map;
-    markerRef.current = marker;
-
     return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-      markerRef.current = null;
+      cancelled = true;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -144,10 +178,14 @@ export default function LocationPickerMap({
 
       <div
         ref={containerRef}
-        className="w-full h-64 rounded-xl border border-border shadow-sm overflow-hidden z-0 relative"
+        className="w-full h-64 rounded-xl border border-border shadow-sm overflow-hidden z-0 relative bg-muted flex items-center justify-center"
         style={{ minHeight: '260px' }}
         data-testid="map-container"
-      />
+      >
+        {!mapLoaded && !geoError && (
+          <p className="text-xs text-muted-foreground animate-pulse">جارٍ تحميل الخريطة…</p>
+        )}
+      </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2 pt-1">
         {latitude != null && longitude != null ? (
