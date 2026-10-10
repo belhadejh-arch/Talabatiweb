@@ -15,7 +15,7 @@ export function automaticDispatchEnabled(env = process.env) {
 
 function safeError(error) {
   let text = String(error?.message ?? error);
-  for (const key of ["SMTP_PASS", "DATABASE_URL", "SESSION_SECRET", "GOOGLE_OAUTH_CLIENT_SECRET"]) {
+  for (const key of ["SMTP_PASS", "DATABASE_URL", "EXTERNAL_DATABASE_URL", "SESSION_SECRET", "GOOGLE_OAUTH_CLIENT_SECRET"]) {
     const secret = process.env[key];
     if (secret) text = text.replaceAll(secret, "[REDACTED]");
   }

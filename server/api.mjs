@@ -282,6 +282,7 @@ function sanitizeDeliveryError(value) {
     "SMTP_PASS",
     "SMTP_USER",
     "DATABASE_URL",
+    "EXTERNAL_DATABASE_URL",
     "SESSION_SECRET"
   ]) {
     const secret = process.env[key];

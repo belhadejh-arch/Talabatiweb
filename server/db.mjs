@@ -1,9 +1,13 @@
 import pg from "pg";
 
+const databaseUrl = process.env.TALABAT_TEST_MODE === "1"
+  ? process.env.DATABASE_URL
+  : process.env.EXTERNAL_DATABASE_URL || process.env.DATABASE_URL;
+
 export const pool = new pg.Pool(
-  process.env.DATABASE_URL
+  databaseUrl
     ? {
-        connectionString: process.env.DATABASE_URL,
+        connectionString: databaseUrl,
         max: 10,
         connectionTimeoutMillis: 10_000,
       }
@@ -15,7 +19,7 @@ pool.on("error", (error) => {
 });
 
 // Idempotent schema guarantee for order archiving and location coordinates
-if (process.env.DATABASE_URL) {
+if (databaseUrl) {
   pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false").catch(() => {});
   pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude double precision").catch(() => {});
   pool.query("ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude double precision").catch(() => {});

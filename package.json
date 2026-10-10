@@ -11,7 +11,7 @@
     "typecheck": "npm --workspace=@workspace/talabat run typecheck",
     "server:dev": "node server/index.mjs",
     "server:migrate": "node server/migrate.mjs",
-    "server:test": "SESSION_SECRET=${SESSION_SECRET:-12345678901234567890123456789012} node --test server/*.test.mjs server/test/*.test.mjs"
+    "server:test": "TALABAT_TEST_MODE=1 SESSION_SECRET=${SESSION_SECRET:-12345678901234567890123456789012} node --test server/*.test.mjs server/test/*.test.mjs"
   },
   "private": true,
   "dependencies": {
