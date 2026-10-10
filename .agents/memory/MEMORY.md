@@ -8,3 +8,4 @@
 - [Shared database test isolation](shared-db-test-isolation.md) — fixture cleanup count assertions are unreliable when independent test files run concurrently against one database.
 - [External production verification](external-production-verification.md) — GitHub deployment URLs can be Vercel-login protected even while the production alias is public; verify the alias separately.
 - [Render SMTP egress](render-smtp-egress.md) — Render Free blocks Gmail SMTP on port 465; a healthy API and correct recipient do not imply email delivery.
+- [Restaurant access credentials](restaurant-account-credentials.md) — restaurant serials are encrypted and keyed by the stable SESSION_SECRET; rotate them before changing that secret.

@@ -4,12 +4,13 @@ This checkout contains a Kotlin/Jetpack Compose Android customer, admin, and dri
 
 ## Development
 
-- Apply additive schema changes once to the intended database: `pnpm run server:migrate` (migrations 001 and 002). The current development API uses an external Neon database; confirm its target and obtain authorization before applying schema changes, since it can be shared with production.
+- Apply additive schema changes once to the intended database: `pnpm run server:migrate` (migrations 001–007). The current development API uses an external Neon database; confirm its target and obtain authorization before applying schema changes, since it can be shared with production.
 - Run the API: `PORT=8080 pnpm run server:dev`. Check `GET /health`.
 - Run the web artifact through its managed workflow. In preview, its `/talabat/api` proxy reaches the local API workflow; the published static site has a separate API rewrite and needs the matching backend deployed before new admin routes work there.
 - Run server tests: `pnpm run server:test`. The HTTP integration test needs `TEST_DATABASE_URL`, or an explicit development-database fixture opt-in.
 - Android emulator defaults to `http://10.0.2.2:8080` in debug only. For a release build, supply the HTTPS backend URL via `-PAPI_BASE_URL=https://your-backend.example`.
 - Required server secrets: `DATABASE_URL`, `SESSION_SECRET` (at least 32 characters), `SMTP_USER` (central Gmail account). Required server environment: `PUBLIC_API_URL` (public HTTPS origin for action links). Gmail API on Render free additionally needs `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` configured in Render, an additive migration 003, and a one-time admin OAuth connection; connected Gmail API takes precedence. Gmail SMTP fallback requires `SMTP_PASS` (Gmail App Password) and `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true` on a host permitting SMTP. Use Gmail only, not another mail provider. `PORT` is provided by the host.
+- Restaurant portal: `/restaurant-portal`. Admin provisions unique six-digit restaurant sign-in numbers when creating restaurants and the first admin overview provisions existing restaurants. The serial is encrypted in PostgreSQL with `SESSION_SECRET`; changing it invalidates all active sessions for that restaurant.
 - Production setup, Render instructions, and operational recovery are in `DEPLOYMENT.md`.
 
 ## Data and behavior

@@ -1,10 +1,18 @@
-import { createHmac, createHash, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  createHash,
+  randomBytes,
+  randomInt
+} from "node:crypto";
 import bcrypt from "bcryptjs";
 import { pool, withTransaction } from "./db.mjs";
 
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const SESSION_HOURS = 12;
 const DRIVER_SESSION_DAYS = 30;
+const RESTAURANT_SESSION_HOURS = 12;
 const RATE_LIMIT = 5;
 const DRIVER_IP_RATE_LIMIT = 30;
 const RATE_WINDOW_MINUTES = 15;
@@ -25,6 +33,120 @@ function keyedHash(value) {
     throw new Error("SESSION_SECRET must contain at least 32 characters.");
   }
   return createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
+}
+
+function restaurantSerialHash(serial) {
+  return keyedHash(`restaurant-serial:${serial}`);
+}
+
+function encryptionKey() {
+  if (!SESSION_SECRET || SESSION_SECRET.length < 32) {
+    throw new Error("SESSION_SECRET must contain at least 32 characters.");
+  }
+  return createHash("sha256").update(SESSION_SECRET).digest();
+}
+
+function encryptRestaurantSerial(serial) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(serial, "utf8"), cipher.final()]);
+  return [
+    iv.toString("base64url"),
+    cipher.getAuthTag().toString("base64url"),
+    encrypted.toString("base64url")
+  ].join(".");
+}
+
+function decryptRestaurantSerial(value) {
+  const [ivText, tagText, encryptedText] = String(value || "").split(".");
+  if (!ivText || !tagText || !encryptedText) {
+    throw new Error("Restaurant serial credential is not valid encrypted data.");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    encryptionKey(),
+    Buffer.from(ivText, "base64url")
+  );
+  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encryptedText, "base64url")),
+    decipher.final()
+  ]).toString("utf8");
+}
+
+export async function createRestaurantAccountSerial(client, restaurantId) {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended('restaurant-serial-allocation', 0))"
+  );
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const serial = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const hash = restaurantSerialHash(serial);
+    const used = await client.query(
+      "SELECT 1 FROM restaurants WHERE account_serial_hash=$1 LIMIT 1",
+      [hash]
+    );
+    if (used.rows[0]) continue;
+    const updated = await client.query(
+      `UPDATE restaurants
+          SET account_serial_hash=$2, account_serial_encrypted=$3
+        WHERE id=$1
+        RETURNING id`,
+      [restaurantId, hash, encryptRestaurantSerial(serial)]
+    );
+    if (!updated.rows[0]) throw new AuthError(404, "المطعم غير موجود.");
+    return serial;
+  }
+  throw new Error("Could not allocate a unique restaurant serial number.");
+}
+
+export async function readRestaurantAccountSerial(restaurantId) {
+  const result = await pool.query(
+    `SELECT id, account_serial_encrypted
+       FROM restaurants
+      WHERE id=$1
+      LIMIT 1`,
+    [restaurantId]
+  );
+  const row = result.rows[0];
+  if (!row) throw new AuthError(404, "المطعم غير موجود.");
+  if (!row.account_serial_encrypted) {
+    const serial = await withTransaction(async (client) =>
+      createRestaurantAccountSerial(client, restaurantId)
+    );
+    return { serialNumber: serial };
+  }
+  return { serialNumber: decryptRestaurantSerial(row.account_serial_encrypted) };
+}
+
+export async function ensureRestaurantAccountSerials() {
+  return withTransaction(async (client) => {
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('restaurant-serial-allocation', 0))"
+    );
+    const missing = await client.query(
+      `SELECT id
+         FROM restaurants
+        WHERE account_serial_hash IS NULL
+        ORDER BY id
+        FOR UPDATE`
+    );
+    for (const restaurant of missing.rows) {
+      await createRestaurantAccountSerial(client, Number(restaurant.id));
+    }
+    return missing.rowCount;
+  });
+}
+
+export async function regenerateRestaurantAccountSerial(restaurantId) {
+  return withTransaction(async (client) => {
+    await client.query("SELECT id FROM restaurants WHERE id=$1 FOR UPDATE", [restaurantId]);
+    const serialNumber = await createRestaurantAccountSerial(client, restaurantId);
+    await client.query(
+      "DELETE FROM api_sessions WHERE role='RESTAURANT' AND owner_id=$1",
+      [restaurantId]
+    );
+    return { serialNumber };
+  });
 }
 
 function requestIp(req) {
@@ -214,6 +336,56 @@ export async function loginDriver(req, serialNumber) {
   };
 }
 
+export async function loginRestaurant(req, serialNumber) {
+  const serial = typeof serialNumber === "string" ? serialNumber.trim() : "";
+  if (!/^\d{6}$/.test(serial)) {
+    throw new AuthError(400, "أدخل الرقم التسلسلي المكوّن من ستة أرقام.");
+  }
+
+  const keys = rateLimitKeys(req, "restaurant", serial);
+  const result = await withTransaction(async (client) => {
+    const allowed = await checkAndIncrementRateLimit(client, keys, [
+      DRIVER_IP_RATE_LIMIT,
+      RATE_LIMIT
+    ]);
+    if (!allowed) return { error: "rate-limit" };
+    const found = await client.query(
+      `SELECT id, name, phone, address, status
+         FROM restaurants
+        WHERE account_serial_hash=$1
+          AND status='ACTIVE'
+        LIMIT 1`,
+      [restaurantSerialHash(serial)]
+    );
+    const restaurant = found.rows[0];
+    if (!restaurant) return { error: "invalid" };
+    await clearRateLimit(client, [keys[1]]);
+    const token = await createSession(
+      client,
+      "RESTAURANT",
+      restaurant.id,
+      RESTAURANT_SESSION_HOURS * 60 * 60
+    );
+    return { token, restaurant };
+  });
+
+  if (result.error === "rate-limit") {
+    throw new AuthError(429, "محاولات كثيرة. حاول مجدداً بعد فترة.");
+  }
+  if (result.error) {
+    throw new AuthError(401, "الرقم التسلسلي غير صحيح أو المطعم غير نشط.");
+  }
+  return {
+    token: result.token,
+    restaurant: {
+      id: Number(result.restaurant.id),
+      name: result.restaurant.name,
+      phone: result.restaurant.phone || "",
+      address: result.restaurant.address || ""
+    }
+  };
+}
+
 export async function requireSession(req, requiredRole) {
   const authorization = req.headers.authorization;
   const match = typeof authorization === "string"
@@ -253,6 +425,15 @@ export async function requireSession(req, requiredRole) {
       "SELECT id FROM admins WHERE id = $1 LIMIT 1",
       [session.owner_id]
     )).rows[0];
+  } else if (session.role === "RESTAURANT") {
+    account = (await pool.query(
+      `SELECT id
+         FROM restaurants
+        WHERE id=$1
+          AND status='ACTIVE'
+        LIMIT 1`,
+      [session.owner_id]
+    )).rows[0];
   }
 
   if (!account) {
@@ -267,7 +448,9 @@ export async function requireSession(req, requiredRole) {
     ownerId: Number(session.owner_id),
     restaurantId: session.role === "DRIVER"
       ? Number(account.restaurant_id)
-      : null
+      : session.role === "RESTAURANT"
+        ? Number(account.id)
+        : null
   };
 }
 

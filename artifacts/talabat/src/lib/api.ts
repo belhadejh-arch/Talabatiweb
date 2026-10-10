@@ -1,4 +1,4 @@
-export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; latitude?: number | null; longitude?: number | null; status?: string };
+export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; latitude?: number | null; longitude?: number | null; openingTime?: string; closingTime?: string; isOpen?: boolean; status?: string };
 export type Product = { id: number; restaurantId: number; name: string; description: string | null; price: number; category: string | null; imageUrl: string | null };
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
 export type OrderItem = { productId: number; productName?: string; quantity: number; unitPrice?: number; totalPrice?: number; selectedSize?: string | null };
@@ -7,6 +7,18 @@ export type OrderInput = { restaurantId: number; customerName: string; customerP
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
 export type DriverIdentity = { id: number; name: string; email: string; restaurantId: number; serialNumber?: string; latitude?: number | null; longitude?: number | null; locationUpdatedAt?: string | null };
+export type RestaurantIdentity = { id: number; name: string; phone: string; address: string };
+export type RestaurantPortal = {
+  restaurant: RestaurantIdentity;
+  orders: Order[];
+  summary: {
+    totalOrders: number;
+    activeOrders: number;
+    archivedOrders: number;
+    payableOrders: number;
+    revenue: number;
+  };
+};
 export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'items' | 'itemsSummary' | 'deliveryFee' | 'subtotal' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
 export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
@@ -50,6 +62,8 @@ export const api = {
   adminStats: (token: string, filters?: { from?: string; to?: string; period?: string }) => request<StatsData>(`/api/admin/stats${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value) as [string, string][]).toString()}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }),
   adminRequest: <T>(token: string, path: string, method = 'GET', body?: unknown) => request<T>(path, { method, headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : jsonHeaders) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
   driverLogin: (serialNumber: string) => request<{ token: string; driver: DriverIdentity }>('/api/driver/login', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ serialNumber }) }),
+  restaurantLogin: (serialNumber: string) => request<{ token: string; restaurant: RestaurantIdentity }>('/api/restaurant/login', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ serialNumber }) }),
+  restaurantOverview: (token: string) => request<RestaurantPortal>('/api/restaurant/overview', { headers: { Authorization: `Bearer ${token}` } }),
   driverOrders: (token: string) => request<{ orders: DriverOrder[] }>('/api/driver/orders', { headers: { Authorization: `Bearer ${token}` } }),
   driverStats: (token: string) => request<DriverStats>('/api/driver/stats', { headers: { Authorization: `Bearer ${token}` } }),
   driverGmailStatus: (token: string) => request<DriverGmailStatus>('/api/driver/gmail/status', { headers: { Authorization: `Bearer ${token}` } }),

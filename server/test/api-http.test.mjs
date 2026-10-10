@@ -43,11 +43,13 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
   let server;
   let baseline;
   let beforeOrders;
+  let baselineRateLimitKeys;
   let originalDispatchTimeout;
   const cleanupErrors = [];
 
   const requiredColumns = {
     restaurants: ["id", "name", "slug", "phone", "address", "description", "status",
+      "account_serial_hash", "account_serial_encrypted",
       "logo_url", "cover_url", "delivery_fee"],
     categories: ["id", "restaurant_id", "name", "name_ar", "is_available"],
     products: ["id", "restaurant_id", "category_id", "name", "name_ar",
@@ -231,7 +233,8 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     for (const row of savedOrders.rows) {
       if (![
         `HTTP customer ${fixtures.suffix}`,
-        `HTTP reservation ${fixtures.suffix}`
+        `HTTP reservation ${fixtures.suffix}`,
+        `Foreign customer ${fixtures.suffix}`
       ].includes(row.customer_name)) {
         throw new Error("Refusing fixture cleanup: unexpected order in temporary restaurant.");
       }
@@ -308,6 +311,9 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     }
     baseline = await snapshotCounts();
     beforeOrders = await snapshotOrders();
+    baselineRateLimitKeys = (await pool.query(
+      "SELECT key_hash FROM auth_rate_limits"
+    )).rows.map((row) => row.key_hash);
 
     const baseUrl = await startHttpServer();
     const suffix = randomUUID();
@@ -335,6 +341,41 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     const restaurantId = createdRestaurant.payload.restaurant.id;
     fixtures.restaurants.push(restaurantId);
     assert.equal((await pool.query("SELECT name FROM restaurants WHERE id=$1", [restaurantId])).rows[0].name, `HTTP fixture ${suffix}`);
+    const initialRestaurantSerial = createdRestaurant.payload.accountSerialNumber;
+    assert.match(initialRestaurantSerial, /^\d{6}$/);
+    const storedRestaurantAccount = (await pool.query(
+      "SELECT account_serial_hash, account_serial_encrypted FROM restaurants WHERE id=$1",
+      [restaurantId]
+    )).rows[0];
+    assert.notEqual(storedRestaurantAccount.account_serial_hash, initialRestaurantSerial);
+    assert.notEqual(storedRestaurantAccount.account_serial_encrypted, initialRestaurantSerial);
+    const restaurantLogin = await request(baseUrl, "/api/restaurant/login", {
+      method: "POST", body: { serialNumber: initialRestaurantSerial }
+    });
+    assert.equal(restaurantLogin.status, 200);
+    const restaurantToken = restaurantLogin.payload.token;
+    fixtures.sessionHashes.push(createHash("sha256").update(restaurantToken).digest("hex"));
+    assert.equal(restaurantLogin.payload.restaurant.id, restaurantId);
+    assert.equal((await request(baseUrl, "/api/restaurant/overview")).status, 401);
+
+    const otherRestaurant = await request(baseUrl, "/api/admin/restaurants", {
+      method: "POST", token: adminToken,
+      body: {
+        name: `HTTP other ${suffix}`, phone: "000-other",
+        address: "Other integration fixture"
+      }
+    });
+    assert.equal(otherRestaurant.status, 201);
+    const otherRestaurantId = otherRestaurant.payload.restaurant.id;
+    fixtures.restaurants.push(otherRestaurantId);
+    const otherOrder = (await pool.query(
+      `INSERT INTO orders
+         (restaurant_id, customer_name, customer_phone, total_amount, status)
+       VALUES ($1, $2, $3, 99.000, 'NEW')
+       RETURNING id`,
+      [otherRestaurantId, `Foreign customer ${suffix}`, "000-foreign"]
+    )).rows[0];
+    fixtures.orders.push(Number(otherOrder.id));
 
     const category = (await pool.query(
       `INSERT INTO categories (restaurant_id, name)
@@ -463,7 +504,48 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     assert.equal(reservation.payload.order.reservationTime, "19:30");
     fixtures.orders.push(reservation.payload.order.id);
 
-    const fixtureOrderIds = fixtures.orders;
+    const restaurantOverview = await request(baseUrl, "/api/restaurant/overview", {
+      token: restaurantToken
+    });
+    assert.equal(restaurantOverview.status, 200);
+    assert.equal(restaurantOverview.payload.restaurant.id, restaurantId);
+    assert.ok(restaurantOverview.payload.orders.length >= 2);
+    assert.ok(restaurantOverview.payload.orders.every((order) => order.restaurantId === restaurantId));
+    assert.ok(!restaurantOverview.payload.orders.some((order) => order.id === Number(otherOrder.id)));
+    assert.equal(
+      (await request(baseUrl, "/api/restaurant/overview", { token: adminToken })).status,
+      403
+    );
+
+    const accountView = await request(
+      baseUrl,
+      `/api/admin/restaurants/${restaurantId}/account`,
+      { token: adminToken }
+    );
+    assert.equal(accountView.status, 200);
+    assert.equal(accountView.payload.serialNumber, initialRestaurantSerial);
+    const changedAccount = await request(
+      baseUrl,
+      `/api/admin/restaurants/${restaurantId}/account`,
+      { method: "POST", token: adminToken, body: {} }
+    );
+    assert.equal(changedAccount.status, 200);
+    assert.match(changedAccount.payload.serialNumber, /^\d{6}$/);
+    assert.notEqual(changedAccount.payload.serialNumber, initialRestaurantSerial);
+    assert.equal((await request(baseUrl, "/api/restaurant/overview", { token: restaurantToken })).status, 401);
+    assert.equal((await request(baseUrl, "/api/restaurant/login", {
+      method: "POST", body: { serialNumber: initialRestaurantSerial }
+    })).status, 401);
+    const rotatedRestaurantLogin = await request(baseUrl, "/api/restaurant/login", {
+      method: "POST", body: { serialNumber: changedAccount.payload.serialNumber }
+    });
+    assert.equal(rotatedRestaurantLogin.status, 200);
+    fixtures.sessionHashes.push(createHash("sha256").update(rotatedRestaurantLogin.payload.token).digest("hex"));
+
+    const fixtureOrderIds = [
+      firstDelivery.payload.order.id,
+      reservation.payload.order.id
+    ];
     const persistedCounts = await pool.query(
       `SELECT
          (SELECT count(*)::integer FROM orders WHERE id = ANY($1::integer[])) AS orders,
@@ -737,6 +819,16 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
       await cleanup();
     } catch (error) {
       cleanupErrors.push(error);
+    }
+    if (baselineRateLimitKeys) {
+      try {
+        await pool.query(
+          "DELETE FROM auth_rate_limits WHERE NOT (key_hash = ANY($1::text[]))",
+          [baselineRateLimitKeys]
+        );
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
     }
 
     if (baseline && beforeOrders) {

@@ -6,8 +6,14 @@ import { handleGmailOAuthRoutes } from "./gmail-oauth.mjs";
 import { handleDriverGmailRoutes } from "./driver-gmail.mjs";
 import {
   AuthError,
+  createRestaurantAccountSerial,
+  ensureRestaurantAccountSerials,
   loginAdmin,
   loginDriver,
+  loginRestaurant,
+  readRestaurantAccountSerial,
+  regenerateRestaurantAccountSerial,
+  revokeSession,
   requireSession
 } from "./auth.mjs";
 import {
@@ -799,7 +805,7 @@ async function handleCreateOrder(req, res) {
   sendJson(res, result.created ? 201 : 200, { order: result.order });
 }
 
-async function listAdminOrders(limit = 250) {
+async function listAdminOrders(limit = 250, restaurantId = null) {
   const result = await pool.query(
     `SELECT o.*, r.name AS restaurant_name,
             last_attempt.status AS assignment_status,
@@ -825,11 +831,54 @@ async function listAdminOrders(limit = 250) {
            FROM order_items oi
           WHERE oi.order_id = o.id
        ) order_lines ON TRUE
+      WHERE ($2::integer IS NULL OR o.restaurant_id = $2)
       ORDER BY o.created_at DESC, o.id DESC
       LIMIT $1`,
-    [limit]
+    [limit, restaurantId]
   );
   return result.rows.map((row) => mapOrder(row, row.items || []));
+}
+
+async function getRestaurantPortal(restaurantId) {
+  const [restaurantResult, orders, totalsResult] = await Promise.all([
+    pool.query(
+      `SELECT id, name, phone, address, status
+         FROM restaurants
+        WHERE id=$1
+        LIMIT 1`,
+      [restaurantId]
+    ),
+    listAdminOrders(500, restaurantId),
+    pool.query(
+      `SELECT COUNT(*)::integer AS total_orders,
+              COUNT(*) FILTER (WHERE is_archived=FALSE)::integer AS active_orders,
+              COUNT(*) FILTER (WHERE is_archived=TRUE)::integer AS archived_orders,
+              COUNT(*) FILTER (WHERE status<>'CANCELLED')::integer AS payable_orders,
+              COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'), 0)::numeric AS revenue
+         FROM orders
+        WHERE restaurant_id=$1`,
+      [restaurantId]
+    )
+  ]);
+  const restaurant = restaurantResult.rows[0];
+  if (!restaurant) throw new AuthError(404, "المطعم غير موجود.");
+  const totals = totalsResult.rows[0];
+  return {
+    restaurant: {
+      id: Number(restaurant.id),
+      name: restaurant.name,
+      phone: restaurant.phone || "",
+      address: restaurant.address || ""
+    },
+    orders,
+    summary: {
+      totalOrders: Number(totals.total_orders),
+      activeOrders: Number(totals.active_orders),
+      archivedOrders: Number(totals.archived_orders),
+      payableOrders: Number(totals.payable_orders),
+      revenue: Number(totals.revenue)
+    }
+  };
 }
 
 async function listAdminDrivers() {
@@ -1065,7 +1114,11 @@ async function createRestaurant(input) {
                  logo_url, cover_url, delivery_fee, latitude, longitude, opening_time, closing_time, status`,
       [name, slug, phone, address, description, imageUrl, deliveryFee, latitude, longitude, openingTime, closingTime]
     );
-    return mapRestaurant(inserted.rows[0]);
+    const accountSerialNumber = await createRestaurantAccountSerial(
+      client,
+      Number(inserted.rows[0].id)
+    );
+    return { restaurant: mapRestaurant(inserted.rows[0]), accountSerialNumber };
   });
 }
 
@@ -1188,9 +1241,29 @@ async function routeApi(req, res, url) {
     sendJson(res, 200, result);
     return true;
   }
+  if (path === "/api/restaurant/login") {
+    if (method !== "POST") return methodNotAllowed(res);
+    const input = await readJson(req, 1024);
+    sendJson(res, 200, await loginRestaurant(req, input.serialNumber));
+    return true;
+  }
+  if (path === "/api/restaurant/overview") {
+    if (method !== "GET") return methodNotAllowed(res);
+    const session = await requireSession(req, "restaurant");
+    sendJson(res, 200, await getRestaurantPortal(session.restaurantId));
+    return true;
+  }
+  if (path === "/api/restaurant/logout") {
+    if (method !== "POST") return methodNotAllowed(res);
+    await requireSession(req, "restaurant");
+    await revokeSession(req);
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
   if (path === "/api/admin/overview") {
     if (method !== "GET") return methodNotAllowed(res);
     await requireSession(req, "admin");
+    await ensureRestaurantAccountSerials();
     sendJson(res, 200, await getAdminOverview());
     return true;
   }
@@ -1265,7 +1338,21 @@ async function routeApi(req, res, url) {
     if (method !== "POST") return methodNotAllowed(res);
     await requireSession(req, "admin");
     const input = await readJson(req, 10 * 1024 * 1024);
-    sendJson(res, 201, { restaurant: await createRestaurant(input) });
+    sendJson(res, 201, await createRestaurant(input));
+    return true;
+  }
+  const restaurantAccountMatch = path.match(
+    /^\/api\/admin\/restaurants\/(\d+)\/account$/
+  );
+  if (restaurantAccountMatch) {
+    if (method !== "GET" && method !== "POST") return methodNotAllowed(res);
+    await requireSession(req, "admin");
+    const restaurantId = positiveInt(restaurantAccountMatch[1], "المطعم");
+    if (method === "GET") {
+      sendJson(res, 200, await readRestaurantAccountSerial(restaurantId));
+    } else {
+      sendJson(res, 200, await regenerateRestaurantAccountSerial(restaurantId));
+    }
     return true;
   }
   if (path === "/api/admin/orders/archive-all") {

@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { pool } from "./db.mjs";
-import { AuthError, loginDriver, requireSession } from "./auth.mjs";
+import {
+  AuthError,
+  loginDriver,
+  loginRestaurant,
+  requireSession
+} from "./auth.mjs";
 
 const requestWithBearerToken = {
   headers: { authorization: `Bearer ${"A".repeat(43)}` }
@@ -21,7 +26,7 @@ async function withMockedPoolQuery(handler, callback) {
   }
 }
 
-function makeLoginDatabase(driverRows = []) {
+function makeLoginDatabase(driverRows = [], restaurantRows = []) {
   const rateLimits = new Map();
   const calls = [];
   const client = {
@@ -64,6 +69,9 @@ function makeLoginDatabase(driverRows = []) {
             ? driverRows(values[0])
             : driverRows
         };
+      }
+      if (sql.includes("FROM restaurants")) {
+        return { rows: restaurantRows };
       }
       if (sql.startsWith("DELETE FROM api_sessions")) return { rows: [] };
       if (sql.includes("INSERT INTO api_sessions")) return { rows: [] };
@@ -344,5 +352,68 @@ test("deactivated drivers cannot log in", async () => {
     assert.match(driverLookup.sql, /is_active = TRUE/);
     assert.match(driverLookup.sql, /status = 'ACTIVE'/);
     assert.equal(calls.some(({ sql }) => sql.includes("INSERT INTO api_sessions")), false);
+  });
+});
+
+test("a valid restaurant serial creates a restaurant-owned session", async () => {
+  await withTestSessionSecret(async () => {
+    const restaurant = {
+      id: 84,
+      name: "Restaurant",
+      phone: "0500000000",
+      address: "Test street"
+    };
+    const { client, calls, rateLimits } = makeLoginDatabase([], [restaurant]);
+    await withMockedPoolConnect(client, async () => {
+      const result = await loginRestaurant({
+        headers: {},
+        socket: { remoteAddress: "203.0.113.84" }
+      }, "001284");
+      assert.match(result.token, /^[A-Za-z0-9_-]{40,}$/);
+      assert.deepEqual(result.restaurant, {
+        id: 84,
+        name: "Restaurant",
+        phone: "0500000000",
+        address: "Test street"
+      });
+    });
+    const lookup = calls.find(({ sql }) => sql.includes("FROM restaurants"));
+    assert.match(lookup.sql, /account_serial_hash=\$1/);
+    assert.match(lookup.sql, /status='ACTIVE'/);
+    assert.notEqual(lookup.values[0], "001284");
+    assert.ok(calls.some(({ sql, values }) =>
+      sql.includes("INSERT INTO api_sessions") && values[1] === "RESTAURANT" && values[2] === 84
+    ));
+    assert.equal(rateLimits.size, 1);
+  });
+});
+
+test("restaurant sessions return their own restaurant ID and inactive accounts are revoked", async () => {
+  await withMockedPoolQuery((sql) => {
+    if (sql.includes("FROM api_sessions")) {
+      return { rows: [{ role: "RESTAURANT", owner_id: 84 }] };
+    }
+    if (sql.includes("FROM restaurants")) return { rows: [{ id: 84 }] };
+    throw new Error(`Unexpected query: ${sql}`);
+  }, async () => {
+    const session = await requireSession(requestWithBearerToken, "restaurant");
+    assert.deepEqual(session, {
+      role: "restaurant",
+      ownerId: 84,
+      restaurantId: 84
+    });
+  });
+  await withMockedPoolQuery((sql) => {
+    if (sql.includes("FROM api_sessions")) {
+      return { rows: [{ role: "RESTAURANT", owner_id: 84 }] };
+    }
+    if (sql.includes("FROM restaurants")) return { rows: [] };
+    if (sql.startsWith("DELETE FROM api_sessions")) return { rows: [] };
+    throw new Error(`Unexpected query: ${sql}`);
+  }, async () => {
+    await assert.rejects(
+      requireSession(requestWithBearerToken, "restaurant"),
+      (error) => error instanceof AuthError && error.status === 401
+    );
   });
 });

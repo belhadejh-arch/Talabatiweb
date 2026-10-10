@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Pencil, Plus, Archive, RotateCcw, Receipt, Link as LinkIcon, Check } from 'lucide-react';
-import { CURRENCY, money, catalogImageUrl, type Restaurant, type Order } from '../lib/api';
+import { Pencil, Plus, Archive, RotateCcw, Receipt, Link as LinkIcon, Check, KeyRound, Copy } from 'lucide-react';
+import { api, CURRENCY, money, catalogImageUrl, type Restaurant, type Order } from '../lib/api';
 import { useAdminRestaurantRevenues } from '../hooks/use-admin';
 import { ConfirmDialog, EmptyBlock, EntityDialog, InvoiceDialog, SectionHeading, type Field, type Write, number } from './admin-ui';
 
@@ -23,6 +23,10 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
   const [restoring, setRestoring] = useState<Restaurant | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [selectedSummary, setSelectedSummary] = useState<{ restaurantName: string; date: string; ordersCount: number; totalRevenue: number; deliveryFees: number; orders: Order[] } | null>(null);
+  const [account, setAccount] = useState<{ restaurantId: number; restaurantName: string; serialNumber: string } | null>(null);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
   const now = new Date();
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const revenuesQuery = useAdminRestaurantRevenues(token, date);
@@ -48,12 +52,52 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
     }).catch(() => {});
   };
 
+  const loadRestaurantAccount = async (restaurant: Restaurant) => {
+    setAccountBusy(true);
+    setAccountError('');
+    try {
+      const result = await api.adminRequest<{ serialNumber: string }>(
+        token,
+        `/api/admin/restaurants/${restaurant.id}/account`
+      );
+      setAccount({ restaurantId: restaurant.id, restaurantName: restaurant.name, ...result });
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : 'تعذّر تحميل الرقم التسلسلي.');
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const rotateRestaurantAccount = async () => {
+    if (!account) return;
+    const result = await write<{ serialNumber: string }>(
+      `/api/admin/restaurants/${account.restaurantId}/account`,
+      'POST',
+      {}
+    );
+    setAccount({ ...account, serialNumber: result.serialNumber });
+    setRegenerating(false);
+  };
+
   return <div className="admin-workspace">
     <SectionHeading title="المطاعم" subtitle={`${money(restaurants.length)} مطعم مدرج · إدارة بيانات المطاعم ومداخيل كل مطعم اليومية والأسبوعية والشهرية والسنوية`}>
       <button className="admin-action primary" onClick={() => setEditing('new')} data-testid="button-add-restaurant">
         <Plus size={16}/>إضافة مطعم
       </button>
     </SectionHeading>
+
+    {account && <div className="admin-inline-card mb-4" dir="rtl" data-testid="restaurant-account-credential">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div><h3>دخول لوحة {account.restaurantName}</h3><p className="subtle text-sm">الرقم التسلسلي الحالي (6 أرقام)</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="rounded-lg border bg-muted px-4 py-2 text-xl font-bold tracking-[0.25em]" dir="ltr" data-testid="text-restaurant-serial">{account.serialNumber}</code>
+          <button className="admin-action" type="button" onClick={() => void navigator.clipboard?.writeText(account.serialNumber)} data-testid="button-copy-restaurant-serial"><Copy size={14}/>نسخ</button>
+          <button className="admin-action danger" type="button" onClick={() => setRegenerating(true)} data-testid="button-regenerate-restaurant-serial"><RotateCcw size={14}/>إعادة إنشاء</button>
+        </div>
+      </div>
+      <p className="subtle text-xs mt-3">إعادة الإنشاء تلغي الجلسات الحالية لهذا المطعم فوراً، ويجب تسليم الرقم الجديد لصاحب الحساب بأمان.</p>
+    </div>}
+    {accountError && <div className="admin-flash error mb-4" role="alert" data-testid="status-restaurant-account-error">{accountError}</div>}
 
     {revenuesQuery.error && <div className="admin-flash error" role="alert" data-testid="status-restaurant-revenues-error">
       تعذّر تحميل المداخيل. <button className="admin-action" type="button" onClick={() => void revenuesQuery.refetch()}>إعادة المحاولة</button>
@@ -122,6 +166,10 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
                   <Receipt size={14}/>فاتورة المطعم
                 </button>
 
+                <button className="admin-action" type="button" disabled={accountBusy} onClick={() => void loadRestaurantAccount(r)} data-testid={`button-restaurant-account-${r.id}`}>
+                  <KeyRound size={14}/>{accountBusy && account?.restaurantId === r.id ? 'جارٍ التحميل...' : 'حساب المطعم'}
+                </button>
+
                 <button
                   className="admin-action"
                   title="نسخ الرابط المستقل للمطعم لمشاركته مع الزبائن"
@@ -175,7 +223,14 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
           imageUrl: values.imageUrl ? String(values.imageUrl) : null,
           logoUrl: values.imageUrl ? String(values.imageUrl) : null,
         };
-        if (editing === 'new') await write('/api/admin/restaurants', 'POST', body);
+        if (editing === 'new') {
+          const result = await write<{ restaurant: Restaurant; accountSerialNumber: string }>('/api/admin/restaurants', 'POST', body);
+          setAccount({
+            restaurantId: result.restaurant.id,
+            restaurantName: result.restaurant.name,
+            serialNumber: result.accountSerialNumber
+          });
+        }
         else if (editing) await write(`/api/admin/restaurants/${editing.id}`, 'PATCH', body);
       }}
     />
@@ -188,6 +243,15 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
       action="أرشفة المطعم"
       testId="restaurant"
       onConfirm={async () => { if (archiving) await write(`/api/admin/restaurants/${archiving.id}`, 'DELETE'); }}
+    />
+    <ConfirmDialog
+      open={regenerating}
+      onClose={() => setRegenerating(false)}
+      title="إعادة إنشاء رقم دخول المطعم؟"
+      description={`سيتم إلغاء الرقم الحالي وجميع جلسات ${account?.restaurantName || 'المطعم'} فوراً. لا يمكن استخدام الرقم القديم بعد التأكيد.`}
+      action="إعادة إنشاء الرقم"
+      testId="restaurant-account-regenerate"
+      onConfirm={rotateRestaurantAccount}
     />
 
     <ConfirmDialog
