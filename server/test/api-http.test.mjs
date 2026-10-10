@@ -234,6 +234,9 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
       if (![
         `HTTP customer ${fixtures.suffix}`,
         `HTTP reservation ${fixtures.suffix}`,
+        `HTTP acceptance customer ${fixtures.suffix}`,
+        `HTTP rejection customer ${fixtures.suffix}`,
+        `HTTP cancellation customer ${fixtures.suffix}`,
         `Foreign customer ${fixtures.suffix}`
       ].includes(row.customer_name)) {
         throw new Error("Refusing fixture cleanup: unexpected order in temporary restaurant.");
@@ -245,7 +248,10 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
       [fixtures.restaurants]
     );
     for (const row of savedDrivers.rows) {
-      if (row.name !== `HTTP driver ${fixtures.suffix}`) {
+      if (![
+        `HTTP driver ${fixtures.suffix}`,
+        `HTTP second driver ${fixtures.suffix}`
+      ].includes(row.name)) {
         throw new Error("Refusing fixture cleanup: unexpected driver in temporary restaurant.");
       }
       if (!fixtures.drivers.includes(Number(row.id))) fixtures.drivers.push(Number(row.id));
@@ -553,7 +559,8 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
       method: "POST", body: { serialNumber: changedAccount.payload.serialNumber }
     });
     assert.equal(rotatedRestaurantLogin.status, 200);
-    fixtures.sessionHashes.push(createHash("sha256").update(rotatedRestaurantLogin.payload.token).digest("hex"));
+    const currentRestaurantToken = rotatedRestaurantLogin.payload.token;
+    fixtures.sessionHashes.push(createHash("sha256").update(currentRestaurantToken).digest("hex"));
 
     const fixtureOrderIds = [
       firstDelivery.payload.order.id,
@@ -802,6 +809,201 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     assert.equal(restoredRestaurant.status, 200);
     assert.equal(restoredRestaurant.payload.restaurant.status, "ACTIVE");
     assert.equal((await pool.query("SELECT count(*)::integer AS count FROM orders WHERE restaurant_id=$1", [restaurantId])).rows[0].count, 2);
+
+    const lifecycleCategory = (await pool.query(
+      `INSERT INTO categories (restaurant_id,name)
+       VALUES ($1,$2) RETURNING id`,
+      [restaurantId, `Lifecycle category ${suffix}`]
+    )).rows[0];
+    fixtures.categories.push(Number(lifecycleCategory.id));
+    const lifecycleProduct = (await pool.query(
+      `INSERT INTO products (restaurant_id,category_id,name,price)
+       VALUES ($1,$2,$3,7.250) RETURNING id`,
+      [restaurantId, Number(lifecycleCategory.id), `Lifecycle product ${suffix}`]
+    )).rows[0];
+    fixtures.products.push(Number(lifecycleProduct.id));
+    const lifecycleProductId = Number(lifecycleProduct.id);
+
+    const secondDriverResult = await request(baseUrl, "/api/admin/drivers", {
+      method: "POST",
+      token: adminToken,
+      body: {
+        name: `HTTP second driver ${suffix}`,
+        phone: "555-0104",
+        email: `second-driver-${suffix}@example.test`,
+        restaurantId
+      }
+    });
+    assert.equal(secondDriverResult.status, 201);
+    const secondDriverId = secondDriverResult.payload.driver.id;
+    fixtures.drivers.push(secondDriverId);
+    const driverTokens = new Map([
+      [driverId, await createSession("DRIVER", driverId)],
+      [secondDriverId, await createSession("DRIVER", secondDriverId)]
+    ]);
+
+    async function createLifecycleOrder(customerName) {
+      const response = await request(baseUrl, "/api/orders", {
+        method: "POST",
+        body: {
+          restaurantId,
+          customerName: `${customerName} ${suffix}`,
+          customerPhone: "555-0199",
+          orderType: "DELIVERY",
+          latitude: 32.8872,
+          longitude: 13.1913,
+          items: [{ productId: lifecycleProductId, quantity: 1 }]
+        },
+        headers: { "Idempotency-Key": randomUUID() }
+      });
+      assert.equal(response.status, 201);
+      fixtures.orders.push(response.payload.order.id);
+      return response.payload.order;
+    }
+
+    async function waitForPendingAssignment(orderId, differentFrom = null) {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        const result = await pool.query(
+          `SELECT driver_id FROM order_driver_attempts
+            WHERE order_id=$1 AND status='PENDING'
+              AND ($2::integer IS NULL OR driver_id<>$2)
+            ORDER BY created_at DESC LIMIT 1`,
+          [orderId, differentFrom]
+        );
+        if (result.rows[0]) return Number(result.rows[0].driver_id);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assert.fail(`No pending driver assignment was created for order ${orderId}.`);
+    }
+
+    const acceptanceOrder = await createLifecycleOrder("HTTP acceptance customer");
+    const acceptanceDriverId = await waitForPendingAssignment(acceptanceOrder.id);
+    const acceptanceToken = driverTokens.get(acceptanceDriverId);
+    assert.ok(acceptanceToken, "The assigned driver must have a test session.");
+    const simultaneousAccepts = await Promise.all([
+      request(baseUrl, `/api/driver/orders/${acceptanceOrder.id}/respond`, {
+        method: "POST", token: acceptanceToken, body: { decision: "ACCEPTED" }
+      }),
+      request(baseUrl, `/api/driver/orders/${acceptanceOrder.id}/respond`, {
+        method: "POST", token: acceptanceToken, body: { decision: "ACCEPTED" }
+      })
+    ]);
+    assert.deepEqual(simultaneousAccepts.map((response) => response.status).sort(), [200, 409]);
+
+    const acceptedState = (await pool.query(
+      `SELECT o.status, o.driver_id, count(a.id)::integer AS accepted_attempts
+         FROM orders o
+         LEFT JOIN order_driver_attempts a
+           ON a.order_id=o.id AND a.status='ACCEPTED'
+        WHERE o.id=$1
+        GROUP BY o.id`,
+      [acceptanceOrder.id]
+    )).rows[0];
+    assert.equal(acceptedState.status, "CONFIRMED");
+    assert.equal(Number(acceptedState.driver_id), acceptanceDriverId);
+    assert.equal(acceptedState.accepted_attempts, 1);
+
+    const competingDriverId = acceptanceDriverId === driverId ? secondDriverId : driverId;
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO order_driver_attempts (order_id,driver_id,restaurant_id,status)
+         VALUES ($1,$2,$3,'ACCEPTED')`,
+        [acceptanceOrder.id, competingDriverId, restaurantId]
+      ),
+      (error) => error.code === "23505" &&
+        error.constraint === "order_driver_attempts_one_accepted"
+    );
+
+    const adminOverviewAfterAccept = await request(baseUrl, "/api/admin/overview", {
+      token: adminToken
+    });
+    assert.equal(adminOverviewAfterAccept.status, 200);
+    const adminAcceptedOrder = adminOverviewAfterAccept.payload.orders.find(
+      (order) => order.id === acceptanceOrder.id
+    );
+    assert.equal(adminAcceptedOrder.status, "CONFIRMED");
+    assert.equal(adminAcceptedOrder.invoiceNumber, acceptanceOrder.invoiceNumber);
+    const restaurantOverviewAfterAccept = await request(baseUrl, "/api/restaurant/overview", {
+      token: currentRestaurantToken
+    });
+    assert.equal(restaurantOverviewAfterAccept.status, 200);
+    const restaurantAcceptedOrder = restaurantOverviewAfterAccept.payload.orders.find(
+      (order) => order.id === acceptanceOrder.id
+    );
+    assert.equal(restaurantAcceptedOrder.status, "CONFIRMED");
+    assert.equal(restaurantAcceptedOrder.invoiceNumber, acceptanceOrder.invoiceNumber);
+
+    const rejectionOrder = await createLifecycleOrder("HTTP rejection customer");
+    const rejectingDriverId = await waitForPendingAssignment(rejectionOrder.id);
+    const rejectionResponse = await request(
+      baseUrl,
+      `/api/driver/orders/${rejectionOrder.id}/respond`,
+      {
+        method: "POST",
+        token: driverTokens.get(rejectingDriverId),
+        body: { decision: "REJECTED" }
+      }
+    );
+    assert.equal(rejectionResponse.status, 200);
+    assert.equal(rejectionResponse.payload.status, "REJECTED");
+    const rejectedHistory = await pool.query(
+      `SELECT count(*)::integer AS count
+         FROM order_status_history
+        WHERE order_id=$1 AND status='REJECTED'`,
+      [rejectionOrder.id]
+    );
+    assert.equal(rejectedHistory.rows[0].count, 1);
+
+    const nextDriverId = await waitForPendingAssignment(rejectionOrder.id, rejectingDriverId);
+    const nextDriverAccept = await request(
+      baseUrl,
+      `/api/driver/orders/${rejectionOrder.id}/respond`,
+      {
+        method: "POST",
+        token: driverTokens.get(nextDriverId),
+        body: { decision: "ACCEPTED" }
+      }
+    );
+    assert.equal(nextDriverAccept.status, 200);
+    assert.equal(nextDriverAccept.payload.status, "CONFIRMED");
+    const rejectionOrderState = (await pool.query(
+      "SELECT status,driver_id FROM orders WHERE id=$1",
+      [rejectionOrder.id]
+    )).rows[0];
+    assert.equal(rejectionOrderState.status, "CONFIRMED");
+    assert.equal(Number(rejectionOrderState.driver_id), nextDriverId);
+    assert.equal((await pool.query(
+      `SELECT count(*)::integer AS count FROM order_status_history
+        WHERE order_id=$1 AND status='CANCELLED'`,
+      [rejectionOrder.id]
+    )).rows[0].count, 0);
+
+    const cancellationOrder = await createLifecycleOrder("HTTP cancellation customer");
+    const cancellationReason = "تعذّر الوصول إلى العميل";
+    const cancelled = await request(
+      baseUrl,
+      `/api/admin/orders/${cancellationOrder.id}/cancel`,
+      {
+        method: "POST",
+        token: adminToken,
+        body: { reason: cancellationReason }
+      }
+    );
+    assert.equal(cancelled.status, 200);
+    assert.equal(cancelled.payload.order.status, "CANCELLED");
+    assert.equal(cancelled.payload.order.cancellationReason, cancellationReason);
+    assert.ok(cancelled.payload.order.cancelledAt);
+    const restaurantOverviewAfterCancel = await request(baseUrl, "/api/restaurant/overview", {
+      token: currentRestaurantToken
+    });
+    const restaurantCancelledOrder = restaurantOverviewAfterCancel.payload.orders.find(
+      (order) => order.id === cancellationOrder.id
+    );
+    assert.equal(restaurantCancelledOrder.status, "CANCELLED");
+    assert.equal(restaurantCancelledOrder.cancellationReason, cancellationReason);
+    assert.equal(restaurantCancelledOrder.cancelledAt, cancelled.payload.order.cancelledAt);
+
     if (legacyBefore) {
       const legacyAfter = (await pool.query(
         `SELECT o.id,o.status,o.total_amount,i.product_name,h.note,

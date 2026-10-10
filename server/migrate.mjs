@@ -8,7 +8,8 @@ const migrations = [
   ["004_driver_gmail_verification.sql", new URL("./migrations/004_driver_gmail_verification.sql", import.meta.url)],
   ["005_order_archive.sql", new URL("./migrations/005_order_archive.sql", import.meta.url)],
   ["006_location_coordinates.sql", new URL("./migrations/006_location_coordinates.sql", import.meta.url)],
-  ["007_restaurant_accounts.sql", new URL("./migrations/007_restaurant_accounts.sql", import.meta.url)]
+  ["007_restaurant_accounts.sql", new URL("./migrations/007_restaurant_accounts.sql", import.meta.url)],
+  ["008_one_accepted_driver_per_order.sql", new URL("./migrations/008_one_accepted_driver_per_order.sql", import.meta.url)]
 ];
 const selected = process.argv[2];
 if (selected && !migrations.some(([name]) => name === selected)) {

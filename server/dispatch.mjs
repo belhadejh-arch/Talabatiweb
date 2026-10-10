@@ -2,6 +2,7 @@ import { pool, withTransaction } from "./db.mjs";
 import { actionToken, validActionToken, sendAssignmentEmail } from "./email.mjs";
 
 let running = false;
+let rerunRequested = false;
 let timer;
 const ACTIVE_DRIVER = "d.is_active = true AND d.status = 'ACTIVE'";
 
@@ -508,7 +509,10 @@ export async function reconcileEmailDelivery({ id, result }, schedule = kickDisp
 }
 
 async function runTick() {
-  if (running) return;
+  if (running) {
+    rerunRequested = true;
+    return;
+  }
   running = true;
   try {
     await reconcileExpiredDriverAttempts();
@@ -517,11 +521,19 @@ async function runTick() {
     console.error("Email dispatch worker error:", safeError(error));
   } finally {
     running = false;
+    if (rerunRequested) {
+      rerunRequested = false;
+      kickDispatch();
+    }
   }
 }
 
 export function kickDispatch() {
   if (!automaticDispatchEnabled()) return;
+  if (running) {
+    rerunRequested = true;
+    return;
+  }
   queueMicrotask(() => void runTick());
 }
 

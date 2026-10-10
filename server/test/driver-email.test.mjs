@@ -208,7 +208,7 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
     const saved = (await pool.query(
       "SELECT status,driver_id FROM orders WHERE id=$1", [orderId],
     )).rows[0];
-    assert.equal(saved.status, "ACCEPTED");
+    assert.equal(saved.status, "CONFIRMED");
     assert.equal(saved.driver_id, second);
 
     const reservationId = await createOrder(rest.restaurantId, rest.productId, "RESERVATION");

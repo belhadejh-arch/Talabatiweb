@@ -6,12 +6,17 @@ import { defineConfig } from 'vite';
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
 const port = Number(process.env.PORT || process.env.DEV_PORT || 3000);
-const apiTarget = process.env.API_TARGET || process.env.PUBLIC_API_URL || 'https://talabatiweb-wo8o.onrender.com';
-
 const basePath = process.env.BASE_PATH || '/';
 
-export default defineConfig({
-  base: basePath,
+export default defineConfig(async ({ mode }) => {
+  const apiTarget =
+    process.env.API_TARGET ||
+    (mode === 'development'
+      ? 'http://127.0.0.1:8080'
+      : process.env.PUBLIC_API_URL || 'https://talabatiweb-wo8o.onrender.com');
+
+  return {
+    base: basePath,
   plugins: [
     react(),
     tailwindcss(),
@@ -79,4 +84,5 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
   },
+  };
 });

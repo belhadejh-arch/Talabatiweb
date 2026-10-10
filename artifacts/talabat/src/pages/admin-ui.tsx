@@ -21,7 +21,7 @@ function driverApprovalLabel(status?: string) {
   } as Record<string, string>)[normalized] || statusLabel(normalized);
 }
 
-export function EntityDialog({ open, onClose, title, description, fields, initial = {}, onSave, testId, submitLabel }: { open: boolean; onClose: () => void; title: string; description?: string; fields: Field[]; initial?: Record<string, unknown>; onSave: (values: Record<string, string | boolean>) => Promise<void>; testId: string; submitLabel?: string }) {
+export function EntityDialog({ open, onClose, title, description, fields, initial = {}, onSave, testId, submitLabel, submitVariant = 'primary' }: { open: boolean; onClose: () => void; title: string; description?: string; fields: Field[]; initial?: Record<string, unknown>; onSave: (values: Record<string, string | boolean>) => Promise<void>; testId: string; submitLabel?: string; submitVariant?: 'primary' | 'danger' }) {
   const form = useForm<Record<string, string | boolean>>({ defaultValues: {} });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -109,7 +109,7 @@ export function EntityDialog({ open, onClose, title, description, fields, initia
         {form.formState.errors[field.key] && <span id={`error-${testId}-${field.key}`} className="text-xs text-rose-700" role="alert">{String(form.formState.errors[field.key]?.message || 'تحقق من القيمة المدخلة')}</span>}
       </label>;
     })}
-  </div>{error && <div className="admin-flash error" role="alert" data-testid={`error-${testId}`}>{error}</div>}<div className="admin-dialog-footer"><button className="admin-action" type="button" onClick={onClose} data-testid={`button-cancel-${testId}`}>تراجع</button><button className="admin-action primary" type="submit" disabled={saving} data-testid={`button-save-${testId}`}>{saving ? 'جارٍ الحفظ...' : submitLabel || 'حفظ التغييرات'}</button></div></form></Form></DialogContent></Dialog>;
+  </div>{error && <div className="admin-flash error" role="alert" data-testid={`error-${testId}`}>{error}</div>}<div className="admin-dialog-footer"><button className="admin-action" type="button" onClick={onClose} data-testid={`button-cancel-${testId}`}>تراجع</button><button className={`admin-action ${submitVariant}`} type="submit" disabled={saving} data-testid={`button-save-${testId}`}>{saving ? 'جارٍ الحفظ...' : submitLabel || 'حفظ التغييرات'}</button></div></form></Form></DialogContent></Dialog>;
 }
 
 export function ConfirmDialog({ open, onClose, title, description, action, onConfirm, testId }: { open: boolean; onClose: () => void; title: string; description: string; action: string; onConfirm: () => Promise<void>; testId: string }) {

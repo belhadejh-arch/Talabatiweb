@@ -77,7 +77,7 @@ export default function RestaurantPortalPage() {
   useEffect(() => {
     if (!session) return;
     void loadPortal();
-    const interval = window.setInterval(() => void loadPortal(true), 15_000);
+    const interval = window.setInterval(() => void loadPortal(true), 5_000);
     // The token is the ownership boundary; clear polling when the session changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => window.clearInterval(interval);
@@ -180,7 +180,7 @@ export default function RestaurantPortalPage() {
         {loading && !portal ? <div className="restaurant-orders-empty" role="status">جارٍ تحميل الطلبات...</div>
           : displayedOrders.length ? <div className="restaurant-order-list">
             {displayedOrders.map(order => <article className="restaurant-order-card" key={order.id} data-testid={`card-restaurant-order-${order.id}`}>
-              <div className="restaurant-order-card-head"><div><strong>طلب <span dir="ltr">#{order.id}</span></strong><small dir="ltr" style={{ display: 'block', marginTop: 4, color: 'var(--rp-soft)', fontWeight: 700 }}>{order.invoiceNumber}</small><time>{dateLabel(order.createdAt)}</time></div><span className={`restaurant-order-status status-${order.status.toLowerCase()}`}>{statusLabel(order.status)}</span></div>
+              <div className="restaurant-order-card-head"><div><strong>طلب <span dir="ltr">#{order.id}</span></strong><small dir="ltr" style={{ display: 'block', marginTop: 4, color: 'var(--rp-soft)', fontWeight: 700 }}>{order.invoiceNumber}</small><time>{dateLabel(order.createdAt)}</time></div><div className="restaurant-order-status-group"><span className={`restaurant-order-status status-${order.status.toLowerCase()}`}>{statusLabel(order.status)}</span>{order.status === 'CANCELLED' && <small className="restaurant-cancellation-details" data-testid={`text-restaurant-cancellation-${order.id}`}>{order.cancellationReason ? `السبب: ${order.cancellationReason}` : 'لم يُسجّل سبب الإلغاء'}{order.cancelledAt ? ` · ${dateLabel(order.cancelledAt)}` : ''}</small>}</div></div>
               <p className="restaurant-order-items">{order.orderType === 'RESERVATION' ? 'حجز' : 'توصيل'} · {order.itemsSummary || order.items.map(item => `${item.quantity} × ${item.productName || 'صنف'}`).join('، ') || 'لا توجد أصناف'}</p>
               <div className="restaurant-order-card-foot"><div><span>العميل: {order.customerName}</span><span dir="ltr">{order.customerPhone}</span></div><strong>{money(order.totalAmount)} {CURRENCY}</strong>
                 <button type="button" className="restaurant-invoice-button" onClick={() => setSelectedOrder(order)} data-testid={`button-restaurant-invoice-${order.id}`}><Receipt size={15}/>عرض الفاتورة</button>

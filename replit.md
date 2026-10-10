@@ -4,7 +4,7 @@ This checkout contains a Kotlin/Jetpack Compose Android customer, admin, and dri
 
 ## Development
 
-- Apply additive schema changes once to the intended database: `pnpm run server:migrate` (migrations 001–007). On Replit, `EXTERNAL_DATABASE_URL` can point to the existing external PostgreSQL database and takes precedence over Replit's managed `DATABASE_URL`; add it through Replit Secrets, not in chat or source. Confirm its target and obtain authorization before applying schema changes, since it can be shared with production. Render continues to use `DATABASE_URL`.
+- Apply additive schema changes once to the intended database: `pnpm run server:migrate` (migrations 001–008). On Replit, `EXTERNAL_DATABASE_URL` can point to the existing external PostgreSQL database and takes precedence over Replit's managed `DATABASE_URL`; add it through Replit Secrets, not in chat or source. Confirm its target and obtain authorization before applying schema changes, since it can be shared with production. Render continues to use `DATABASE_URL`.
 - Run the API: `PORT=8080 pnpm run server:dev`. Check `GET /health`.
 - Run the web artifact through its managed workflow. In preview, its `/talabat/api` proxy reaches the local API workflow; the published static site has a separate API rewrite and needs the matching backend deployed before new admin routes work there.
 - Run server tests: `pnpm run server:test`. The HTTP integration test needs `TEST_DATABASE_URL`, or an explicit development-database fixture opt-in.

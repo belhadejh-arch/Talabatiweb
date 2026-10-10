@@ -57,7 +57,7 @@ test("driver order history is scoped to that driver's unique attempt rows", asyn
 
   assert.deepEqual(captured.values, [23]);
   assert.match(captured.sql, /WHERE a\.driver_id = \$1/);
-  assert.doesNotMatch(captured.sql, /\bLIMIT\b/);
+  assert.match(captured.sql, /ORDER BY o\.created_at DESC, o\.id DESC\s*$/);
 });
 
 test("completed-order history only includes the driver currently assigned to that order", async () => {

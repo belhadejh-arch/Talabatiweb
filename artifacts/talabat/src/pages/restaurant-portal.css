@@ -70,6 +70,11 @@
 .restaurant-order-card-head>div { justify-content: flex-start; }
 .restaurant-order-card-head time, .restaurant-order-items { color: var(--rp-soft); font-size: .82rem; }
 .restaurant-order-status { padding: 5px 9px; border-radius: 99px; background: #f0f3f5; color: #53616b; font-size: .75rem; font-weight: 800; }
+.restaurant-order-status-group { display: grid; justify-items: start; gap: 5px; }
+.restaurant-cancellation-details { max-width: 260px; color: #8b3a2e; font-size: .72rem; line-height: 1.5; }
+.restaurant-order-status.status-confirmed { background: #e8f6ed; color: #257044; }
+.restaurant-order-status.status-rejected { background: #fff0ed; color: #b84230; }
+.restaurant-order-status.status-assigned { background: #fff6df; color: #855d06; }
 .restaurant-order-status.status-completed, .restaurant-order-status.status-delivered { background: #e8f6ed; color: #257044; }
 .restaurant-order-status.status-cancelled { background: #fff0ed; color: #b84230; }
 .restaurant-order-items { margin: 14px 0; }
