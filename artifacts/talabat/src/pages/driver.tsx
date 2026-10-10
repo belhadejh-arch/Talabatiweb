@@ -53,8 +53,10 @@ function OrderCard({
   onRespond?: (orderId: number, decision: 'ACCEPTED' | 'REJECTED') => Promise<void>;
 }) {
   const cancelled = order.status?.toUpperCase() === 'CANCELLED';
-  const isAccepted = order.assignmentStatus?.toUpperCase() === 'ACCEPTED';
-  const isPending = order.assignmentStatus?.toUpperCase() === 'PENDING' || order.assignmentStatus?.toUpperCase() === 'SENT';
+  const assignmentStatus = order.assignmentStatus?.toUpperCase();
+  const isAccepted = assignmentStatus === 'ACCEPTED';
+  const isPending = assignmentStatus === 'PENDING' || assignmentStatus === 'SENT';
+  const canViewInvoice = !cancelled && ['PENDING', 'SENT', 'ACCEPTED'].includes(assignmentStatus || '');
   const [responding, setResponding] = useState(false);
 
   const handleAction = async (decision: 'ACCEPTED' | 'REJECTED') => {
@@ -69,7 +71,7 @@ function OrderCard({
 
   return <article className="driver-order" data-testid={`card-driver-order-${order.id}-${index}`}>
     <div className="driver-order-head">
-      <div><div className="driver-order-id"><ClipboardList size={18} aria-hidden="true"/><span dir="ltr">#{order.id}</span></div><time className="driver-order-time" dateTime={order.createdAt}>{dateLabel(order.createdAt)}</time></div>
+      <div><div className="driver-order-id"><ClipboardList size={18} aria-hidden="true"/><span dir="ltr">#{order.id}</span></div><span className="driver-invoice-number" dir="ltr">{order.invoiceNumber}</span><time className="driver-order-time" dateTime={order.createdAt}>{dateLabel(order.createdAt)}</time></div>
       <div className="driver-order-badges">
         <span className={`driver-badge ${attemptTone(order.assignmentStatus)}`} data-testid={`status-driver-assignment-${order.id}-${index}`}>{attemptLabel(order.assignmentStatus)}</span>
         <span className={`driver-badge ${cancelled ? 'cancelled' : ''}`} data-testid={`status-driver-order-${order.id}-${index}`}>الطلب: {statusLabel(order.status)}</span>
@@ -111,7 +113,7 @@ function OrderCard({
           </div>
         )}
 
-        {isAccepted && (
+        {canViewInvoice && (
           <button
             type="button"
             onClick={() => onInvoice(order)}
@@ -119,7 +121,7 @@ function OrderCard({
             data-testid={`button-driver-invoice-${order.id}`}
           >
             <Receipt size={13}/>
-            <span>استخراج فاتورة</span>
+            <span>{isAccepted ? 'استخراج فاتورة' : 'عرض الفاتورة'}</span>
           </button>
         )}
       </div>
@@ -259,13 +261,14 @@ export default function Driver() {
 
   const orders = ordersQuery.data?.orders || [];
   const acceptedOrders = orders.filter(order => order.assignmentStatus?.toUpperCase() === 'ACCEPTED');
+  const invoiceOrders = orders.filter(order => ['PENDING', 'SENT', 'ACCEPTED'].includes(order.assignmentStatus?.toUpperCase() || '') && order.status?.toUpperCase() !== 'CANCELLED');
   const rejectedOrders = orders.filter(order => order.assignmentStatus?.toUpperCase() === 'REJECTED');
   const cancelledOrders = orders.filter(order => order.status?.toUpperCase() === 'CANCELLED' || order.assignmentStatus?.toUpperCase() === 'CANCELLED');
 
   const filtered = orders.filter(order => {
     if (tab === 'all') return true;
     if (tab === 'accepted') return order.assignmentStatus?.toUpperCase() === 'ACCEPTED';
-    if (tab === 'invoices') return order.assignmentStatus?.toUpperCase() === 'ACCEPTED';
+    if (tab === 'invoices') return ['PENDING', 'SENT', 'ACCEPTED'].includes(order.assignmentStatus?.toUpperCase() || '') && order.status?.toUpperCase() !== 'CANCELLED';
     if (tab === 'rejected') return order.assignmentStatus?.toUpperCase() === 'REJECTED';
     if (tab === 'cancelled') return order.status?.toUpperCase() === 'CANCELLED' || order.assignmentStatus?.toUpperCase() === 'CANCELLED';
     return true;
@@ -274,7 +277,7 @@ export default function Driver() {
   const counts = {
     all: orders.length,
     accepted: acceptedOrders.length,
-    invoices: acceptedOrders.length,
+    invoices: invoiceOrders.length,
     rejected: rejectedOrders.length,
     cancelled: cancelledOrders.length
   };
@@ -310,13 +313,13 @@ export default function Driver() {
       <div className="driver-metrics" aria-label="ملخص نشاطك">
         <div className="driver-metric featured"><div className="driver-metric-label"><ClipboardList size={16}/> إجمالي الطلبات</div><strong data-testid="text-driver-total-count">{statsQuery.data ? arabicNumber(statsQuery.data.summary.totalOrders) : statsQuery.isLoading ? '—' : '—'}</strong><small>طلبات وردت إليك</small></div>
         <div className="driver-metric"><div className="driver-metric-label"><CheckCircle2 size={16}/> طلبات مقبولة</div><strong data-testid="text-driver-accepted-count">{statsQuery.data ? arabicNumber(statsQuery.data.summary.accepted) : '—'}</strong><small>طلبات تم قبولها للتوصيل</small></div>
-        <div className="driver-metric"><div className="driver-metric-label"><Receipt size={16}/> فواتير جاهزة</div><strong data-testid="text-driver-invoices-count">{statsQuery.data ? arabicNumber(statsQuery.data.summary.accepted) : '—'}</strong><small>فواتير طلبات متاحة للطباعة</small></div>
+        <div className="driver-metric"><div className="driver-metric-label"><Receipt size={16}/> فواتير الطلبات المسندة</div><strong data-testid="text-driver-invoices-count">{ordersQuery.isLoading ? '—' : arabicNumber(invoiceOrders.length)}</strong><small>متاحة بمجرد إسناد الطلب إليك</small></div>
         <div className="driver-metric"><div className="driver-metric-label"><PackageCheck size={16}/> طلبات ملغاة</div><strong data-testid="text-driver-cancelled-count">{statsQuery.data ? arabicNumber(statsQuery.data.summary.cancelled) : '—'}</strong><small>طلبات أُلغيت من النظام</small></div>
       </div>
       {statsQuery.error && <div className="driver-error" role="alert" style={{ marginTop: 14 }} data-testid="status-driver-stats-error">تعذّر تحميل الإحصاءات: {(statsQuery.error as Error).message}<br/><button type="button" className="driver-retry" onClick={() => void statsQuery.refetch()} data-testid="button-driver-stats-retry">إعادة المحاولة</button></div>}
       <div className="driver-content-grid">
         <section aria-labelledby="driver-orders-title">
-          <div className="driver-section-heading"><div><h2 id="driver-orders-title">{tab === 'invoices' ? 'قسم فواتير الطلبات المقبولة' : 'سجل الطلبات'}</h2><p>{tab === 'invoices' ? 'يمكنك استخراج وطباعة فاتورة أي طلب تم قبوله بالدينار الليبي.' : 'يعرض قائمة الطلبات الموجهة لحسابك فقط.'}</p></div>{ordersQuery.dataUpdatedAt > 0 && <span className="driver-updated" data-testid="text-driver-updated">آخر تحديث {new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(ordersQuery.dataUpdatedAt)}</span>}</div>
+          <div className="driver-section-heading"><div><h2 id="driver-orders-title">{tab === 'invoices' ? 'فواتير الطلبات المسندة إليك' : 'سجل الطلبات'}</h2><p>{tab === 'invoices' ? 'تظهر الفاتورة الموحدة من لحظة إسناد الطلب، ويمكنك طباعتها بعد القبول.' : 'يعرض قائمة الطلبات الموجهة لحسابك فقط.'}</p></div>{ordersQuery.dataUpdatedAt > 0 && <span className="driver-updated" data-testid="text-driver-updated">آخر تحديث {new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(ordersQuery.dataUpdatedAt)}</span>}</div>
           <div className="driver-tabs" role="tablist" aria-label="تصفية الطلبات">{tabs.map(item => <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} aria-controls="driver-order-list" className="driver-tab" onClick={() => setTab(item.key)} data-testid={`button-driver-tab-${item.key}`}>{item.label} <span>{arabicNumber(counts[item.key])}</span></button>)}</div>
           <div id="driver-order-list" role="tabpanel" aria-live="polite">
             {ordersQuery.isLoading ? <LoadingCards/> : ordersQuery.error ? <div className="driver-error" role="alert" data-testid="status-driver-orders-error">تعذّر تحميل طلباتك: {(ordersQuery.error as Error).message}<br/><button type="button" className="driver-retry" onClick={() => void ordersQuery.refetch()} data-testid="button-driver-orders-retry"><RefreshCw size={15}/> إعادة المحاولة</button></div> : filtered.length ? <div className="driver-list">{filtered.map((order, index) => <OrderCard key={`${order.id}-${order.assignmentStatus}-${index}`} order={order} index={index} onInvoice={o => setSelectedInvoice(o)} onRespond={respondOrder}/>)}</div> : <div className="driver-empty" data-testid="status-driver-orders-empty"><ClipboardList size={30}/><h3>{tab === 'invoices' ? 'لا توجد فواتير بعد' : tab === 'all' ? 'لا توجد طلبات في سجلك بعد' : 'لا توجد طلبات في هذا القسم'}</h3><p>{tab === 'invoices' ? 'تظهر الفواتير فور قبولك لأي طلب توصيل جديد.' : tab === 'all' ? 'ستظهر هنا طلبات التوصيل الخاصة بك عند وصولها.' : 'جرّب قسمًا آخر، أو حدّث البيانات للتحقق من الجديد.'}</p></div>}

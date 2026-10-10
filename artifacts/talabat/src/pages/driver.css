@@ -52,6 +52,7 @@
 .driver-order-id { display: flex; align-items: center; gap: 9px; font-family: Outfit,var(--app-font-sans); font-size: 1.08rem; font-weight: 700; }
 .driver-order-id svg { color: var(--driver-orange); }
 .driver-order-time { display: block; color: #75848b; font-size: .72rem; margin-top: 6px; }
+.driver-invoice-number { display: inline-block; margin-top: 5px; color: #526a74; font: 700 .7rem Outfit,var(--app-font-sans); }
 .driver-order-badges { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .driver-badge { border-radius: 100px; padding: 5px 9px; font-size: .69rem; font-weight: 800; background: #e8eef1; color: #3c5a67; white-space: nowrap; }
 .driver-badge.accepted { background: #e2f1e7; color: #22734a; }
