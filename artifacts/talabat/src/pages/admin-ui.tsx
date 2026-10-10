@@ -21,7 +21,7 @@ function driverApprovalLabel(status?: string) {
   } as Record<string, string>)[normalized] || statusLabel(normalized);
 }
 
-export function EntityDialog({ open, onClose, title, description, fields, initial = {}, onSave, testId }: { open: boolean; onClose: () => void; title: string; description?: string; fields: Field[]; initial?: Record<string, unknown>; onSave: (values: Record<string, string | boolean>) => Promise<void>; testId: string }) {
+export function EntityDialog({ open, onClose, title, description, fields, initial = {}, onSave, testId, submitLabel }: { open: boolean; onClose: () => void; title: string; description?: string; fields: Field[]; initial?: Record<string, unknown>; onSave: (values: Record<string, string | boolean>) => Promise<void>; testId: string; submitLabel?: string }) {
   const form = useForm<Record<string, string | boolean>>({ defaultValues: {} });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -109,7 +109,7 @@ export function EntityDialog({ open, onClose, title, description, fields, initia
         {form.formState.errors[field.key] && <span id={`error-${testId}-${field.key}`} className="text-xs text-rose-700" role="alert">{String(form.formState.errors[field.key]?.message || 'تحقق من القيمة المدخلة')}</span>}
       </label>;
     })}
-  </div>{error && <div className="admin-flash error" role="alert" data-testid={`error-${testId}`}>{error}</div>}<div className="admin-dialog-footer"><button className="admin-action" type="button" onClick={onClose} data-testid={`button-cancel-${testId}`}>تراجع</button><button className="admin-action primary" type="submit" disabled={saving} data-testid={`button-save-${testId}`}>{saving ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}</button></div></form></Form></DialogContent></Dialog>;
+  </div>{error && <div className="admin-flash error" role="alert" data-testid={`error-${testId}`}>{error}</div>}<div className="admin-dialog-footer"><button className="admin-action" type="button" onClick={onClose} data-testid={`button-cancel-${testId}`}>تراجع</button><button className="admin-action primary" type="submit" disabled={saving} data-testid={`button-save-${testId}`}>{saving ? 'جارٍ الحفظ...' : submitLabel || 'حفظ التغييرات'}</button></div></form></Form></DialogContent></Dialog>;
 }
 
 export function ConfirmDialog({ open, onClose, title, description, action, onConfirm, testId }: { open: boolean; onClose: () => void; title: string; description: string; action: string; onConfirm: () => Promise<void>; testId: string }) {
@@ -215,6 +215,12 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
               <span className="text-muted-foreground block">موافقة السائق: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
             </div>
           </div>
+
+          {order.status === 'CANCELLED' && <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs" role="status" data-testid={`section-invoice-cancellation-${order.id}`}>
+            <strong className="block text-destructive">أُلغي الطلب نهائياً</strong>
+            <span className="block mt-1">السبب: {order.cancellationReason || 'لم يُسجّل سبب الإلغاء'}</span>
+            {order.cancelledAt && <time className="block mt-1 text-muted-foreground" dateTime={order.cancelledAt}>تاريخ الإلغاء: {dateLabel(order.cancelledAt)}</time>}
+          </div>}
 
           {order.orderType === 'DELIVERY' && (
             <section className="rounded-xl border p-3 text-xs" aria-label="موقع التوصيل" data-testid={`section-invoice-location-${order.id}`}>

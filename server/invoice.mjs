@@ -90,5 +90,9 @@ export function buildOrderInvoice(order, restaurant, items = [], assignmentStatu
       : Number(order.assignment_driver_id),
     isArchived: Boolean(order.is_archived),
     createdAt: asIsoString(order.created_at),
+    cancelledAt: order.cancelled_at || order.cancellation_at
+      ? asIsoString(order.cancelled_at || order.cancellation_at)
+      : null,
+    cancellationReason: order.cancellation_reason || null,
   };
 }

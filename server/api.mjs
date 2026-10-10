@@ -320,7 +320,9 @@ function mapOrder(row, items = []) {
 async function loadOrder(client, id) {
   const result = await client.query(
     `SELECT o.*, r.name AS restaurant_name,
-            last_attempt.status AS assignment_status
+            last_attempt.status AS assignment_status,
+            cancellation.note AS cancellation_reason,
+            cancellation.created_at AS cancellation_at
        FROM orders o
        JOIN restaurants r ON r.id = o.restaurant_id
        LEFT JOIN LATERAL (
@@ -330,6 +332,13 @@ async function loadOrder(client, id) {
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT 1
        ) last_attempt ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT h.note, h.created_at
+            FROM order_status_history h
+           WHERE h.order_id = o.id AND h.status = 'CANCELLED'
+           ORDER BY h.created_at DESC, h.id DESC
+           LIMIT 1
+        ) cancellation ON o.status = 'CANCELLED'
       WHERE o.id = $1
       LIMIT 1`,
     [id]
@@ -792,6 +801,8 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
   const result = await pool.query(
     `SELECT o.*, r.name AS restaurant_name,
             last_attempt.status AS assignment_status,
+            cancellation.note AS cancellation_reason,
+            cancellation.created_at AS cancellation_at,
             COALESCE(order_lines.items, '[]'::json) AS items
        FROM orders o
        JOIN restaurants r ON r.id = o.restaurant_id
@@ -802,6 +813,13 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT 1
        ) last_attempt ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT h.note, h.created_at
+           FROM order_status_history h
+          WHERE h.order_id = o.id AND h.status = 'CANCELLED'
+          ORDER BY h.created_at DESC, h.id DESC
+          LIMIT 1
+       ) cancellation ON o.status = 'CANCELLED'
        LEFT JOIN LATERAL (
          SELECT JSON_AGG(JSON_BUILD_OBJECT(
            'productId', oi.product_id,
@@ -1131,7 +1149,7 @@ async function completeDriverOrder(driverId, orderId) {
     if (["COMPLETED", "DELIVERED"].includes(order.status)) {
       return { orderId: id, changed: false };
     }
-    if (order.status !== "ACCEPTED") {
+    if (!["CONFIRMED", "ACCEPTED"].includes(order.status)) {
       throw new ApiError(409, "لا يمكن إكمال طلب لم يقبله هذا السائق.");
     }
 
@@ -1156,6 +1174,59 @@ async function completeDriverOrder(driverId, orderId) {
   });
   const order = await loadOrder(pool, result.orderId);
   return { order };
+}
+
+async function cancelAdminOrder(orderId, reason) {
+  const id = positiveInt(orderId, "الطلب");
+  const cancellationReason = requiredText(reason, "سبب الإلغاء", 500, { minLength: 3 });
+  const result = await withTransaction(async (client) => {
+    // Match the dispatcher and driver-response lock order to prevent stale accepts.
+    await client.query(
+      "SELECT order_id FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+      [id]
+    );
+    const order = (await client.query(
+      "SELECT id,status FROM orders WHERE id=$1 FOR UPDATE",
+      [id]
+    )).rows[0];
+    if (!order) throw new ApiError(404, "الطلب غير موجود.");
+    if (order.status === "CANCELLED") {
+      return { changed: false };
+    }
+    if (["COMPLETED", "DELIVERED"].includes(order.status)) {
+      throw new ApiError(409, "لا يمكن إلغاء طلب مكتمل.");
+    }
+
+    await client.query(
+      `UPDATE order_driver_attempts
+          SET status='CANCELLED',responded_at=now(),response_at=now(),cancelled_at=now()
+        WHERE order_id=$1 AND status='PENDING'`,
+      [id]
+    );
+    await client.query(
+      `UPDATE order_email_dispatch_jobs
+          SET state='DONE',updated_at=now()
+        WHERE order_id=$1`,
+      [id]
+    );
+    const cancelled = await client.query(
+      `UPDATE orders
+          SET status='CANCELLED',cancelled_at=now(),updated_at=now()
+        WHERE id=$1 AND status NOT IN ('COMPLETED','DELIVERED','CANCELLED')
+        RETURNING id`,
+      [id]
+    );
+    if (!cancelled.rowCount) {
+      throw new ApiError(409, "تغيّرت حالة الطلب. حدّث البيانات ثم أعد المحاولة.");
+    }
+    await client.query(
+      `INSERT INTO order_status_history (order_id,status,note)
+       VALUES ($1,'CANCELLED',$2)`,
+      [id, cancellationReason]
+    );
+    return { changed: true };
+  });
+  return { ok: true, changed: result.changed, order: await loadOrder(pool, id) };
 }
 
 function methodNotAllowed(res) {
@@ -1356,6 +1427,14 @@ async function routeApi(req, res, url) {
     sendJson(res, 200, { ok: true, count: result.rowCount });
     return true;
   }
+  const cancelOrderMatch = path.match(/^\/api\/admin\/orders\/(\d+)\/cancel$/);
+  if (cancelOrderMatch) {
+    if (method !== "POST") return methodNotAllowed(res);
+    await requireSession(req, "admin");
+    const input = await readJson(req, 2048);
+    sendJson(res, 200, await cancelAdminOrder(cancelOrderMatch[1], input?.reason));
+    return true;
+  }
   const restoreOrderMatch = path.match(/^\/api\/admin\/orders\/(\d+)\/restore$/);
   if (restoreOrderMatch) {
     if (method !== "POST") return methodNotAllowed(res);
@@ -1407,11 +1486,32 @@ async function routeApi(req, res, url) {
     const session = await requireSession(req, "driver");
     const orderId = positiveInt(driverRespondMatch[1], "الطلب");
     const input = await readJson(req, 1024);
-    const decision = input?.decision === "ACCEPTED" ? "ACCEPTED" : "REJECTED";
+    const decision = input?.decision;
+    if (!["ACCEPTED", "REJECTED"].includes(decision)) {
+      throw new ApiError(400, "قرار السائق غير صالح.");
+    }
 
     const outcome = await withTransaction(async (client) => {
+      const job = (await client.query(
+        "SELECT state FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+        [orderId]
+      )).rows[0];
+      if (job && job.state !== "ACTIVE") {
+        throw new ApiError(409, "تمت معالجة الطلب بالفعل.");
+      }
+      const order = (await client.query(
+        `SELECT id,restaurant_id,status,driver_id
+           FROM orders
+          WHERE id=$1
+          FOR UPDATE`,
+        [orderId]
+      )).rows[0];
+      if (!order) throw new ApiError(404, "الطلب غير موجود.");
+      if (order.status !== "ASSIGNED" || order.driver_id != null) {
+        throw new ApiError(409, "لم يعد الطلب بانتظار قرار سائق.");
+      }
       const attempt = (await client.query(
-        `SELECT id, assignment_id, status FROM order_driver_attempts
+        `SELECT id, assignment_id, status, timeout_at FROM order_driver_attempts
           WHERE order_id=$1 AND driver_id=$2 AND status='PENDING'
           ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
         [orderId, session.ownerId]
@@ -1419,27 +1519,93 @@ async function routeApi(req, res, url) {
       if (!attempt) {
         throw new ApiError(404, "لا يوجد طلب قيد الانتظار لهذا السائق.");
       }
-      if (decision === "ACCEPTED") {
+      const driver = (await client.query(
+        `SELECT id FROM drivers
+          WHERE id=$1 AND restaurant_id=$2 AND is_active=true AND status='ACTIVE'
+          FOR UPDATE`,
+        [session.ownerId, order.restaurant_id]
+      )).rows[0];
+      if (!driver) {
+        throw new ApiError(409, "لم يعد السائق مؤهلاً لاستلام هذا الطلب.");
+      }
+      if (attempt.timeout_at && new Date(attempt.timeout_at).getTime() <= Date.now()) {
         await client.query(
           `UPDATE order_driver_attempts
-              SET status='ACCEPTED', responded_at=now(), response_at=now(), accepted_at=now()
-            WHERE id=$1`,
+              SET status='TIMEOUT',responded_at=now(),response_at=now(),timed_out_at=now()
+            WHERE id=$1 AND status='PENDING'`,
           [attempt.id]
         );
         await client.query(
-          `UPDATE orders SET status='ACCEPTED', driver_id=$2, updated_at=now()
-            WHERE id=$1`,
+          `UPDATE orders SET status='TIMEOUT',updated_at=now()
+            WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL`,
+          [orderId]
+        );
+        await client.query(
+          `INSERT INTO order_status_history (order_id,status,note)
+           VALUES ($1,'TIMEOUT',$2)`,
+          [orderId, `انتهت مهلة رد السائق #${session.ownerId}`]
+        );
+        await client.query(
+          `UPDATE order_email_dispatch_jobs
+              SET state='ACTIVE',next_check_at=now(),updated_at=now()
+            WHERE order_id=$1`,
+          [orderId]
+        );
+        return { ok: false, decision, advance: true, reason: "انتهت مهلة الرد." };
+      }
+      if (decision === "ACCEPTED") {
+        const confirmed = await client.query(
+          `UPDATE orders SET status='CONFIRMED',driver_id=$2,updated_at=now()
+            WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL
+            RETURNING id`,
           [orderId, session.ownerId]
+        );
+        if (!confirmed.rowCount) {
+          throw new ApiError(409, "سبق لسائق آخر تأكيد الطلب.");
+        }
+        const acceptedAttempt = await client.query(
+          `UPDATE order_driver_attempts
+              SET status='ACCEPTED',responded_at=now(),response_at=now(),accepted_at=now()
+            WHERE id=$1 AND status='PENDING'
+            RETURNING id`,
+          [attempt.id]
+        );
+        if (!acceptedAttempt.rowCount) {
+          throw new ApiError(409, "تم تسجيل قرار السائق مسبقاً.");
+        }
+        await client.query(
+          `INSERT INTO order_status_history (order_id,status,note)
+           VALUES ($1,'CONFIRMED',$2)`,
+          [orderId, `أكد السائق #${session.ownerId} الطلب`]
         );
         await client.query(
           `UPDATE order_email_dispatch_jobs SET state='DONE', updated_at=now() WHERE order_id=$1`,
           [orderId]
         );
       } else {
-        await client.query(
-          `UPDATE order_driver_attempts SET status='REJECTED', responded_at=now(), response_at=now()
-            WHERE id=$1`,
+        const rejectedAttempt = await client.query(
+          `UPDATE order_driver_attempts
+              SET status='REJECTED',responded_at=now(),response_at=now(),rejected_at=now()
+            WHERE id=$1 AND status='PENDING'
+            RETURNING id`,
           [attempt.id]
+        );
+        if (!rejectedAttempt.rowCount) {
+          throw new ApiError(409, "تم تسجيل قرار السائق مسبقاً.");
+        }
+        const rejected = await client.query(
+          `UPDATE orders SET status='REJECTED',updated_at=now()
+            WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL
+            RETURNING id`,
+          [orderId]
+        );
+        if (!rejected.rowCount) {
+          throw new ApiError(409, "سبق لسائق آخر معالجة الطلب.");
+        }
+        await client.query(
+          `INSERT INTO order_status_history (order_id,status,note)
+           VALUES ($1,'REJECTED',$2)`,
+          [orderId, `رفض السائق #${session.ownerId} الطلب`]
         );
         await client.query(
           `UPDATE order_email_dispatch_jobs
@@ -1448,10 +1614,15 @@ async function routeApi(req, res, url) {
           [orderId]
         );
       }
-      return { ok: true, decision, advance: decision === "REJECTED" };
+      return {
+        ok: true,
+        decision,
+        status: decision === "ACCEPTED" ? "CONFIRMED" : "REJECTED",
+        advance: decision === "REJECTED"
+      };
     });
     if (outcome.advance) kickDispatch();
-    sendJson(res, 200, outcome);
+    sendJson(res, outcome.ok ? 200 : 409, outcome);
     return true;
   }
   if (path === "/api/driver/stats") {

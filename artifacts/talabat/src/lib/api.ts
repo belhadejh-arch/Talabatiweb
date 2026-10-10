@@ -3,7 +3,7 @@ export type Product = { id: number; restaurantId: number; name: string; descript
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
 export type OrderAddon = { addonName: string; price: number };
 export type OrderItem = { productId: number | null; productName?: string; quantity: number; unitPrice?: number; subtotal?: number; totalPrice?: number; selectedSize?: string | null; addons?: OrderAddon[] };
-export type Order = { id: number; orderNumber?: number; invoiceNumber?: string; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; latitude?: number | null; longitude?: number | null; deliveryLocation?: string | null; mapsUrl?: string | null; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverApprovalStatus?: string; driverId?: number | null; createdAt: string; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null; isArchived?: boolean };
+export type Order = { id: number; orderNumber?: number; invoiceNumber?: string; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; latitude?: number | null; longitude?: number | null; deliveryLocation?: string | null; mapsUrl?: string | null; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverApprovalStatus?: string; driverId?: number | null; createdAt: string; cancelledAt?: string | null; cancellationReason?: string | null; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null; isArchived?: boolean };
 export type OrderInput = { restaurantId: number; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: { productId: number; quantity: number }[]; notes?: string; latitude?: number; longitude?: number; reservationDate?: string; reservationTime?: string; partySize?: number };
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
@@ -20,7 +20,7 @@ export type RestaurantPortal = {
     revenue: number;
   };
 };
-export type DriverOrder = Pick<Order, 'id' | 'orderNumber' | 'invoiceNumber' | 'restaurantId' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'latitude' | 'longitude' | 'deliveryLocation' | 'mapsUrl' | 'items' | 'itemsSummary' | 'subtotal' | 'deliveryFee' | 'totalAmount' | 'status' | 'assignmentStatus' | 'driverApprovalStatus' | 'driverId' | 'createdAt' | 'notes'>;
+export type DriverOrder = Pick<Order, 'id' | 'orderNumber' | 'invoiceNumber' | 'restaurantId' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'latitude' | 'longitude' | 'deliveryLocation' | 'mapsUrl' | 'items' | 'itemsSummary' | 'subtotal' | 'deliveryFee' | 'totalAmount' | 'status' | 'assignmentStatus' | 'driverApprovalStatus' | 'driverId' | 'createdAt' | 'cancelledAt' | 'cancellationReason' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
 export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
 
@@ -102,7 +102,9 @@ export const dateLabel = (value: string) => {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 };
 export const statusLabel = (status: string) => ({
-  NEW: 'جديد', PENDING: 'قيد الانتظار', CONFIRMED: 'مؤكد', PREPARING: 'قيد التجهيز', READY: 'جاهز', ON_THE_WAY: 'في الطريق',
-  DELIVERED: 'تم التوصيل', COMPLETED: 'مكتمل', CANCELLED: 'ملغي', ASSIGNED: 'تم التوجيه للسائق',
-  ACCEPTED: 'مقبول', REJECTED: 'مرفوض', TIMEOUT: 'انتهت المهلة', NOT_ASSIGNED: 'لم يُعيّن سائق',
+  NEW: 'جديد', PENDING: 'بانتظار قرار السائق', WAITING_FOR_DRIVER: 'بانتظار قرار السائق',
+  ASSIGNED: 'بانتظار قرار السائق', CONFIRMED: 'مؤكد من السائق', ACCEPTED: 'مقبول',
+  REJECTED: 'مرفوض من السائق', PREPARING: 'قيد التجهيز', READY: 'جاهز', ON_THE_WAY: 'في الطريق',
+  DELIVERED: 'تم التوصيل', COMPLETED: 'مكتمل', CANCELLED: 'ملغى',
+  TIMEOUT: 'انتهت مهلة السائق', NOT_ASSIGNED: 'لم يُعيّن سائق',
 } as Record<string, string>)[status] || status;

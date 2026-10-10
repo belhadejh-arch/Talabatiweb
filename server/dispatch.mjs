@@ -106,7 +106,7 @@ async function processJob(orderId) {
       "SELECT * FROM orders WHERE id=$1 FOR UPDATE",
       [orderId],
     )).rows[0];
-    if (!order || ["ACCEPTED", "COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status)) {
+    if (!order || ["ACCEPTED", "CONFIRMED", "COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status)) {
       await updateJob(client, orderId, "DONE");
       return;
     }
@@ -139,7 +139,7 @@ async function processJob(orderId) {
       const cancelled = await client.query(
         `UPDATE orders SET status='CANCELLED',
                 cancelled_at=COALESCE(cancelled_at,now()),updated_at=now()
-         WHERE id=$1 AND status NOT IN ('ACCEPTED','COMPLETED','DELIVERED','CANCELLED')
+         WHERE id=$1 AND status NOT IN ('ACCEPTED','CONFIRMED','COMPLETED','DELIVERED','CANCELLED')
          RETURNING id`,
         [orderId],
       );
@@ -623,18 +623,26 @@ export async function respondToEmailAction(input, schedule = kickDispatch) {
       return { ok: false, reason: "انتهت مهلة الرد", advance: true };
     }
     if (input.decision === "ACCEPTED") {
-      await client.query(
-        `UPDATE order_driver_attempts
-         SET status='ACCEPTED',responded_at=now(),response_at=now(),accepted_at=now()
-         WHERE id=$1 AND status='PENDING'`,
-        [attempt.id],
-      );
-      await client.query(
-        `UPDATE orders SET status='ACCEPTED',driver_id=$2,updated_at=now()
-         WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL`,
+      const confirmedOrder = await client.query(
+        `UPDATE orders SET status='CONFIRMED',driver_id=$2,updated_at=now()
+         WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL
+         RETURNING id`,
         [order.id, driver.id],
       );
-      await recordStatus(client, order.id, "ACCEPTED", `قبول السائق #${driver.id} من البريد`);
+      if (!confirmedOrder.rowCount) {
+        throw new Error("Order was already accepted or is no longer awaiting a driver.");
+      }
+      const acceptedAttempt = await client.query(
+        `UPDATE order_driver_attempts
+         SET status='ACCEPTED',responded_at=now(),response_at=now(),accepted_at=now()
+         WHERE id=$1 AND status='PENDING'
+         RETURNING id`,
+        [attempt.id],
+      );
+      if (!acceptedAttempt.rowCount) {
+        throw new Error("Driver assignment was already answered.");
+      }
+      await recordStatus(client, order.id, "CONFIRMED", `قبول السائق #${driver.id} من البريد`);
       await updateJob(client, order.id, "DONE");
     } else {
       await markAttempt(client, attempt, "REJECTED");

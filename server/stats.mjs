@@ -4,6 +4,7 @@ import { buildOrderInvoice } from "./invoice.mjs";
 const ORDER_STATUSES = new Set([
   "NEW",
   "ASSIGNED",
+  "CONFIRMED",
   "ACCEPTED",
   "REJECTED",
   "TIMEOUT",
@@ -94,7 +95,7 @@ function appendFilters(clauses, values, filters, { allowDriverFilter = true } = 
   if (allowDriverFilter && filters.driverId) {
     values.push(filters.driverId);
     driverParameter = `$${values.length}`;
-    if (["COMPLETED", "DELIVERED"].includes(filters.status)) {
+    if (["CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)) {
       clauses.push(`o.driver_id = ${driverParameter}`);
     } else {
       clauses.push(
@@ -192,11 +193,11 @@ export function buildStats(
         : [];
     const orderStatus = String(row.order_status || row.status || "").toUpperCase();
     const isCompleted = ["COMPLETED", "DELIVERED"].includes(orderStatus);
-    const isCancelled = orderStatus === "CANCELLED" || statuses.includes("CANCELLED");
+    const isCancelled = orderStatus === "CANCELLED";
     const assignmentCount = (status) =>
       statuses.filter((assignmentStatus) => assignmentStatus === status).length;
     const acceptedAssignments = assignmentCount("ACCEPTED") ||
-      (!driverScoped && !statuses.length && orderStatus === "ACCEPTED" ? 1 : 0);
+      (!driverScoped && !statuses.length && ["ACCEPTED", "CONFIRMED"].includes(orderStatus) ? 1 : 0);
     const rejectedAssignments = assignmentCount("REJECTED") ||
       (!driverScoped && !statuses.length && orderStatus === "REJECTED" ? 1 : 0);
     const timeoutAssignments = assignmentCount("TIMEOUT") ||
@@ -212,7 +213,7 @@ export function buildStats(
     totals.accepted += acceptedAssignments;
     totals.rejected += rejectedAssignments;
     totals.timeout += timeoutAssignments;
-    if (isCancelled || statuses.includes("CANCELLED")) totals.cancelled += 1;
+    if (isCancelled) totals.cancelled += 1;
     if (isCompleted) totals.completed += 1;
     for (const status of statuses) {
       if (["ACCEPTED", "REJECTED", "TIMEOUT"].includes(status)) {
@@ -330,7 +331,7 @@ async function loadAdminDriverGroups(filters) {
   const clauses = ["TRUE"];
   const values = [];
   const earningsExpression = !filters.status ||
-    ["ACCEPTED", "COMPLETED", "DELIVERED"].includes(filters.status)
+    ["ACCEPTED", "CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)
     ? "CASE WHEN o.driver_id = d.id THEN o.driver_payout_amount ELSE NULL END"
     : "NULL::numeric";
   if (filters.from) {
@@ -361,7 +362,7 @@ async function loadAdminDriverGroups(filters) {
       clauses.push(`a.status = ${parameter}`);
     } else {
       clauses.push(`o.status = ${parameter}`);
-      if (["COMPLETED", "DELIVERED"].includes(filters.status)) {
+      if (["CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)) {
         clauses.push("a.driver_id = o.driver_id");
       }
     }
@@ -390,7 +391,7 @@ export async function getAdminStats(filters) {
   const stats = buildStats(rows, filters.period, {
     payoutDriverId: filters.driverId,
     includePayouts: !filters.status ||
-      ["ACCEPTED", "COMPLETED", "DELIVERED"].includes(filters.status)
+      ["ACCEPTED", "CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)
   });
   stats.byDriver = await loadAdminDriverGroups(filters);
   return stats;
@@ -499,7 +500,7 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
       }
     } else {
       clauses.push(`o.status = ${parameter}`);
-      if (["COMPLETED", "DELIVERED"].includes(filters.status)) {
+      if (["CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)) {
         clauses.push("a.driver_id = o.driver_id");
       }
     }
@@ -510,10 +511,19 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
             a.status AS assignment_status,
             a.driver_id AS assignment_driver_id,
             a.driver_email,
+            cancellation.note AS cancellation_reason,
+            cancellation.created_at AS cancellation_at,
             COALESCE(order_lines.items, '[]'::json) AS items
        FROM order_driver_attempts a
        JOIN orders o ON o.id = a.order_id
        LEFT JOIN restaurants r ON r.id = o.restaurant_id
+       LEFT JOIN LATERAL (
+         SELECT h.note, h.created_at
+           FROM order_status_history h
+          WHERE h.order_id = o.id AND h.status = 'CANCELLED'
+          ORDER BY h.created_at DESC, h.id DESC
+          LIMIT 1
+       ) cancellation ON o.status = 'CANCELLED'
        LEFT JOIN LATERAL (
          SELECT JSON_AGG(JSON_BUILD_OBJECT(
            'productId', oi.product_id,
@@ -577,6 +587,6 @@ export async function getDriverStats(driverId, filters) {
     payoutDriverId: driverId,
     driverScoped: true,
     includePayouts: !filters.status ||
-      ["ACCEPTED", "COMPLETED", "DELIVERED"].includes(filters.status)
+      ["ACCEPTED", "CONFIRMED", "COMPLETED", "DELIVERED"].includes(filters.status)
   });
 }
