@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import nodemailer from "nodemailer";
 import { sendGmailIfConnected } from "./gmail-api.mjs";
+import { buildOrderInvoice } from "./invoice.mjs";
 
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -66,27 +67,47 @@ export function buildAssignmentEmail({ order, restaurant, items, assignment, bas
       (order.latitude == null || order.longitude == null)) {
     throw new Error("A delivery email requires real coordinates");
   }
+  const invoice = buildOrderInvoice(order, restaurant, items, assignment.status || "PENDING");
   const acceptUrl = linkFor(baseUrl, assignment, "ACCEPTED");
   const rejectUrl = linkFor(baseUrl, assignment, "REJECTED");
-  const isDelivery = order.order_type === "DELIVERY";
-  const mapUrl = isDelivery
-    ? `https://www.google.com/maps?q=${encodeURIComponent(`${order.latitude},${order.longitude}`)}`
-    : null;
-  const rows = items.map((item) => {
-    const label = `${item.product_name}${item.size_name ? ` (${item.size_name})` : ""}`;
-    const addons = item.addons?.length
-      ? ` — ${item.addons.map((addon) => `${addon.addon_name} (${money(addon.price)})`).join("، ")}`
+  const isDelivery = invoice.orderType === "DELIVERY";
+  const formattedStatus = ({
+    NEW: "جديد",
+    ASSIGNED: "موجّه إلى السائق",
+    ACCEPTED: "مقبول",
+    REJECTED: "مرفوض",
+    TIMEOUT: "انتهت مهلة السائق",
+    COMPLETED: "مكتمل",
+    DELIVERED: "تم التوصيل",
+    CANCELLED: "ملغي",
+  })[invoice.status] || invoice.status;
+  const formattedApproval = ({
+    NOT_ASSIGNED: "لم يُعيّن سائق بعد",
+    PENDING: "بانتظار موافقة السائق",
+    ACCEPTED: "وافق السائق",
+    REJECTED: "رفض السائق",
+    TIMEOUT: "انتهت مهلة رد السائق",
+    CANCELLED: "أُلغي إسناد السائق",
+  })[invoice.driverApprovalStatus] || invoice.driverApprovalStatus;
+  const rows = invoice.items.map((item) => {
+    const label = `${item.productName}${item.selectedSize ? ` (${item.selectedSize})` : ""}`;
+    const addonsText = item.addons.length
+      ? item.addons.map((addon) => `${addon.addonName} (${money(addon.price)})`).join("، ")
+      : "لا توجد";
+    const addonsHtml = item.addons.length
+      ? `<ul>${item.addons.map((addon) => `<li>${escapeHtml(addon.addonName)} — ${escapeHtml(money(addon.price))}</li>`).join("")}</ul>`
       : "";
     return {
-      text: `${label}${addons} ×${item.quantity} — ${money(item.unit_price)} = ${money(item.subtotal)}`,
-      html: `<li>${escapeHtml(label)}${escapeHtml(addons)} ×${item.quantity} — ${escapeHtml(money(item.unit_price))} = ${escapeHtml(money(item.subtotal))}</li>`,
+      text: `${label} ×${item.quantity} — سعر الوحدة ${money(item.unitPrice)}، إجمالي الصنف ${money(item.subtotal)}، الإضافات: ${addonsText}`,
+      html: `<li><strong>${escapeHtml(label)}</strong> ×${item.quantity} — سعر الوحدة ${escapeHtml(money(item.unitPrice))}، إجمالي الصنف ${escapeHtml(money(item.subtotal))}${addonsHtml}</li>`,
     };
   });
   const extra = isDelivery
     ? [
-        `Latitude: ${order.latitude}`,
-        `Longitude: ${order.longitude}`,
-        `Google Maps: ${mapUrl}`,
+        `موقع العميل: ${invoice.deliveryLocation}`,
+        `Latitude: ${invoice.latitude}`,
+        `Longitude: ${invoice.longitude}`,
+        `Google Maps: ${invoice.mapsUrl}`,
       ]
     : [
         `تاريخ الحجز: ${dateOnly(order.reservation_date)}`,
@@ -94,33 +115,43 @@ export function buildAssignmentEmail({ order, restaurant, items, assignment, bas
         `عدد الأشخاص: ${order.party_size ?? "غير محدد"}`,
       ];
   const extraHtml = isDelivery
-    ? `<p>Latitude: ${escapeHtml(order.latitude)}<br>Longitude: ${escapeHtml(order.longitude)}<br><a href="${escapeHtml(mapUrl)}">Google Maps</a></p>`
+    ? `<p>موقع العميل: ${escapeHtml(invoice.deliveryLocation)}<br>Latitude: ${escapeHtml(invoice.latitude)}<br>Longitude: ${escapeHtml(invoice.longitude)}<br><a href="${escapeHtml(invoice.mapsUrl)}">فتح الموقع على Google Maps</a></p>`
     : `<p>تاريخ الحجز: ${escapeHtml(dateOnly(order.reservation_date))}<br>وقت الحجز: ${escapeHtml(timeOnly(order.reservation_time))}<br>عدد الأشخاص: ${escapeHtml(order.party_size ?? "غير محدد")}</p>`;
   const lines = [
-    `طلب #${order.id} — ${isDelivery ? "توصيل" : "حجز"}`,
-    `المطعم: ${restaurant.name}`,
-    `الزبون: ${order.customer_name}`,
-    `الهاتف: ${order.customer_phone}`,
+    `رقم الطلب: #${invoice.orderNumber}`,
+    `رقم الفاتورة: ${invoice.invoiceNumber}`,
+    `المطعم: ${invoice.restaurantName}`,
+    `العميل: ${invoice.customerName}`,
+    `الهاتف: ${invoice.customerPhone}`,
+    `حالة الطلب: ${formattedStatus}`,
+    `موافقة السائق: ${formattedApproval}`,
     ...rows.map((row) => row.text),
-    `الإجمالي: ${money(order.total_amount)}`,
-    `الملاحظات: ${order.notes || "لا توجد"}`,
-    `تاريخ ووقت الطلب: ${formattedDate(order.created_at)}`,
+    `المجموع الفرعي: ${money(invoice.subtotal)}`,
+    `رسوم التوصيل: ${money(invoice.deliveryFee)}`,
+    `المجموع النهائي: ${money(invoice.totalAmount)}`,
+    `ملاحظات العميل: ${invoice.notes || "لا توجد"}`,
+    `تاريخ ووقت الطلب: ${formattedDate(invoice.createdAt)}`,
     ...extra,
     `قبول الطلب: ${acceptUrl}`,
     `رفض الطلب: ${rejectUrl}`,
   ];
   return {
-    subject: `طلب ${isDelivery ? "توصيل" : "حجز"} #${order.id} — ${restaurant.name}`,
+    subject: `فاتورة ${invoice.invoiceNumber} — الطلب #${invoice.orderNumber} — ${invoice.restaurantName}`,
     text: lines.join("\n"),
     html: `<div lang="ar" dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;line-height:1.8">
-      <h2>طلب #${order.id} — ${isDelivery ? "توصيل" : "حجز"}</h2>
-      <p><strong>المطعم:</strong> ${escapeHtml(restaurant.name)}<br>
-      <strong>الزبون:</strong> ${escapeHtml(order.customer_name)}<br>
-      <strong>الهاتف:</strong> ${escapeHtml(order.customer_phone)}</p>
-      <h3>المنتجات</h3><ul>${rows.map((row) => row.html).join("")}</ul>
-      <p><strong>الإجمالي:</strong> ${escapeHtml(money(order.total_amount))}<br>
-      <strong>الملاحظات:</strong> ${escapeHtml(order.notes || "لا توجد")}<br>
-      <strong>تاريخ ووقت الطلب:</strong> ${escapeHtml(formattedDate(order.created_at))}</p>
+      <h2>فاتورة الطلب #${invoice.orderNumber}</h2>
+      <p><strong>رقم الفاتورة:</strong> ${escapeHtml(invoice.invoiceNumber)}<br>
+      <strong>المطعم:</strong> ${escapeHtml(invoice.restaurantName)}<br>
+      <strong>العميل:</strong> ${escapeHtml(invoice.customerName)}<br>
+      <strong>الهاتف:</strong> ${escapeHtml(invoice.customerPhone)}<br>
+      <strong>حالة الطلب:</strong> ${escapeHtml(formattedStatus)}<br>
+      <strong>موافقة السائق:</strong> ${escapeHtml(formattedApproval)}</p>
+      <h3>المنتجات والإضافات</h3><ul>${rows.map((row) => row.html).join("")}</ul>
+      <p><strong>المجموع الفرعي:</strong> ${escapeHtml(money(invoice.subtotal))}<br>
+      <strong>رسوم التوصيل:</strong> ${escapeHtml(money(invoice.deliveryFee))}<br>
+      <strong>المجموع النهائي:</strong> ${escapeHtml(money(invoice.totalAmount))}<br>
+      <strong>ملاحظات العميل:</strong> ${escapeHtml(invoice.notes || "لا توجد")}<br>
+      <strong>تاريخ ووقت الطلب:</strong> ${escapeHtml(formattedDate(invoice.createdAt))}</p>
       ${extraHtml}
       <p><a href="${escapeHtml(acceptUrl)}" style="display:inline-block;padding:10px 16px;background:#166534;color:white;text-decoration:none">قبول الطلب</a>
       &nbsp; <a href="${escapeHtml(rejectUrl)}" style="display:inline-block;padding:10px 16px;background:#991b1b;color:white;text-decoration:none">رفض الطلب</a></p>

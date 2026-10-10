@@ -1,4 +1,5 @@
 import { pool } from "./db.mjs";
+import { buildOrderInvoice } from "./invoice.mjs";
 
 const ORDER_STATUSES = new Set([
   "NEW",
@@ -507,6 +508,7 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
   const result = await pool.query(
     `SELECT o.*, r.name AS restaurant_name,
             a.status AS assignment_status,
+            a.driver_id AS assignment_driver_id,
             a.driver_email,
             COALESCE(order_lines.items, '[]'::json) AS items
        FROM order_driver_attempts a
@@ -519,7 +521,16 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
            'quantity', oi.quantity,
            'unitPrice', oi.unit_price,
            'subtotal', oi.subtotal,
-           'selectedSize', oi.size_name
+            'selectedSize', oi.size_name,
+            'addons', COALESCE(
+              (SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                 'addonName', ia.addon_name,
+                 'price', ia.price
+               ) ORDER BY ia.id)
+                 FROM order_item_addons ia
+                WHERE ia.order_item_id = oi.id),
+              '[]'::json
+            )
          ) ORDER BY oi.id) AS items
            FROM order_items oi
           WHERE oi.order_id = o.id
@@ -534,34 +545,12 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
 }
 
 function mapDriverOrderRow(row) {
-  const items = row.items || [];
-  return {
-    id: Number(row.id),
-    restaurantId: Number(row.restaurant_id),
-    restaurantName: row.restaurant_name || "",
-    customerName: row.customer_name,
-    customerPhone: row.customer_phone,
-    orderType: row.order_type || "DELIVERY",
-    latitude: row.latitude == null ? null : Number(row.latitude),
-    longitude: row.longitude == null ? null : Number(row.longitude),
-    reservationDate: row.reservation_date instanceof Date
-      ? row.reservation_date.toISOString().slice(0, 10)
-      : row.reservation_date || null,
-    reservationTime: row.reservation_time?.slice(0, 5) || null,
-    partySize: row.party_size == null ? null : Number(row.party_size),
-    notes: row.notes || null,
-    items,
-    itemsSummary: items.map((item) =>
-      `${item.quantity} × ${item.productName}${item.selectedSize ? ` (${item.selectedSize})` : ""}`
-    ).join("، "),
-    subtotal: Number(row.subtotal || 0),
-    deliveryFee: Number(row.delivery_fee || 0),
-    totalAmount: Number(row.total_amount || 0),
-    status: row.status,
-    assignmentStatus: row.assignment_status,
-    driverId: Number(row.driver_id || 0) || null,
-    createdAt: row.created_at
-  };
+  return buildOrderInvoice(
+    row,
+    { name: row.restaurant_name || "" },
+    row.items || [],
+    row.assignment_status || null
+  );
 }
 
 export async function getDriverOrders(driverId, filters, { limit = null } = {}) {

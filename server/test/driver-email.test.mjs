@@ -13,24 +13,35 @@ process.env.SESSION_SECRET ||= randomBytes(48).toString("hex");
 test("mail includes saved delivery and reservation details; tokens bind all IDs", () => {
   const assignment = {
     order_id: 4, assignment_id: 8, driver_id: 11, driver_email: "driver@example.test",
-    created_at: new Date(),
+    status: "PENDING", created_at: new Date(),
   };
   const order = {
     id: 4, order_type: "DELIVERY", customer_name: "<Customer>",
     customer_phone: "555", latitude: 32.8872, longitude: 13.1913,
-    total_amount: "30.00", notes: "<script>bad</script>", created_at: new Date(),
+    subtotal: "28.00", delivery_fee: "2.00", total_amount: "30.00",
+    status: "ASSIGNED", notes: "<script>bad</script>", created_at: new Date(),
   };
   const base = {
     order, restaurant: { name: "مطعم الاختبار" }, assignment,
-    items: [{ product_name: "طعام", quantity: 2, unit_price: "15", subtotal: "30", addons: [] }],
+    items: [{
+      product_name: "طعام", quantity: 2, unit_price: "14", subtotal: "28",
+      addons: [{ addon_name: "جبن إضافي", price: "2" }],
+    }],
     baseUrl: "https://example.test",
   };
   const delivery = buildAssignmentEmail(base);
   assert.match(delivery.text, /Latitude: 32\.8872/);
   assert.match(delivery.text, /Longitude: 13\.1913/);
-  assert.match(delivery.text, /Google Maps: https:\/\/www\.google\.com\/maps\?q=32\.8872%2C13\.1913/);
+  assert.match(delivery.text, /Google Maps: https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=32\.8872%2C13\.1913/);
+  assert.match(delivery.subject, /INV-00000004/);
+  assert.match(delivery.text, /حالة الطلب: موجّه إلى السائق/);
+  assert.match(delivery.text, /موافقة السائق: بانتظار موافقة السائق/);
+  assert.match(delivery.text, /جبن إضافي \(2\.00 د\.ل\)/);
+  assert.match(delivery.text, /رسوم التوصيل: 2\.00 د\.ل/);
+  assert.match(delivery.text, /المجموع النهائي: 30\.00 د\.ل/);
   assert.match(delivery.text, /×2/);
   assert.match(delivery.text, /قبول الطلب:/);
+  assert.match(delivery.html, /رقم الفاتورة/);
   assert.match(delivery.html, /&lt;script&gt;bad&lt;\/script&gt;/);
   assert.doesNotMatch(delivery.html, /<script>/);
   const token = actionToken(assignment);
@@ -45,6 +56,7 @@ test("mail includes saved delivery and reservation details; tokens bind all IDs"
   });
   assert.match(reservation.text, /2026-10-10/);
   assert.match(reservation.text, /19:30/);
+  assert.match(reservation.text, /رقم الفاتورة: INV-00000004/);
   assert.doesNotMatch(reservation.text, /Google Maps:/);
   assert.throws(() => buildAssignmentEmail({
     ...base, order: { ...order, latitude: null },

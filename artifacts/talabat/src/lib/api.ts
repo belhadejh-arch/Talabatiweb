@@ -1,8 +1,9 @@
 export type Restaurant = { id: number; name: string; slug: string; phone: string | null; address: string | null; description: string | null; deliveryFee: number; imageUrl: string | null; latitude?: number | null; longitude?: number | null; openingTime?: string; closingTime?: string; isOpen?: boolean; status?: string };
 export type Product = { id: number; restaurantId: number; name: string; description: string | null; price: number; category: string | null; imageUrl: string | null };
 export type Catalog = { restaurants: Restaurant[]; products: Product[]; subscriptions: unknown[] };
-export type OrderItem = { productId: number; productName?: string; quantity: number; unitPrice?: number; totalPrice?: number; selectedSize?: string | null };
-export type Order = { id: number; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverId?: number | null; createdAt: string; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null; isArchived?: boolean };
+export type OrderAddon = { addonName: string; price: number };
+export type OrderItem = { productId: number | null; productName?: string; quantity: number; unitPrice?: number; subtotal?: number; totalPrice?: number; selectedSize?: string | null; addons?: OrderAddon[] };
+export type Order = { id: number; orderNumber?: number; invoiceNumber?: string; restaurantId: number; restaurantName?: string; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; latitude?: number | null; longitude?: number | null; deliveryLocation?: string | null; mapsUrl?: string | null; items: OrderItem[]; itemsSummary?: string; subtotal: number; deliveryFee: number; totalAmount: number; status: string; assignmentStatus?: string | null; driverApprovalStatus?: string; driverId?: number | null; createdAt: string; reservationDate?: string | null; reservationTime?: string | null; partySize?: number | null; notes?: string | null; isArchived?: boolean };
 export type OrderInput = { restaurantId: number; customerName: string; customerPhone: string; orderType: 'DELIVERY' | 'RESERVATION'; items: { productId: number; quantity: number }[]; notes?: string; latitude?: number; longitude?: number; reservationDate?: string; reservationTime?: string; partySize?: number };
 export type StatsData = Record<string, unknown>;
 export type AdminOverview = { orders: Order[]; drivers: Record<string, unknown>[]; subscriptions: Record<string, unknown>[]; restaurants: Restaurant[]; stats: StatsData };
@@ -19,7 +20,7 @@ export type RestaurantPortal = {
     revenue: number;
   };
 };
-export type DriverOrder = Pick<Order, 'id' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'items' | 'itemsSummary' | 'deliveryFee' | 'subtotal' | 'totalAmount' | 'status' | 'assignmentStatus' | 'createdAt' | 'notes'>;
+export type DriverOrder = Pick<Order, 'id' | 'orderNumber' | 'invoiceNumber' | 'restaurantId' | 'restaurantName' | 'customerName' | 'customerPhone' | 'orderType' | 'latitude' | 'longitude' | 'deliveryLocation' | 'mapsUrl' | 'items' | 'itemsSummary' | 'subtotal' | 'deliveryFee' | 'totalAmount' | 'status' | 'assignmentStatus' | 'driverApprovalStatus' | 'driverId' | 'createdAt' | 'notes'>;
 export type DriverStats = { summary: { totalOrders: number; accepted: number; rejected: number; timeout: number; cancelled: number; completed: number; totalOrderValue: number; totalEarnings: number | null; averageOrderValue: number; acceptanceRate: number; rejectionRate: number }; periods: { period: string; orders: number; orderValue: number; earnings: number }[]; byRestaurant: { name: string; orders: number; orderValue: number; earnings: number }[] };
 export type DriverGmailStatus = { configured: boolean; missingConfiguration?: string[]; connected: boolean; email: string | null; registeredEmail: string | null };
 
@@ -103,4 +104,5 @@ export const dateLabel = (value: string) => {
 export const statusLabel = (status: string) => ({
   NEW: 'جديد', PENDING: 'قيد الانتظار', CONFIRMED: 'مؤكد', PREPARING: 'قيد التجهيز', READY: 'جاهز', ON_THE_WAY: 'في الطريق',
   DELIVERED: 'تم التوصيل', COMPLETED: 'مكتمل', CANCELLED: 'ملغي', ASSIGNED: 'تم التوجيه للسائق',
+  ACCEPTED: 'مقبول', REJECTED: 'مرفوض', TIMEOUT: 'انتهت المهلة', NOT_ASSIGNED: 'لم يُعيّن سائق',
 } as Record<string, string>)[status] || status;

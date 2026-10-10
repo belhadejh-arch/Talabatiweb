@@ -46,13 +46,18 @@ export default function RestaurantPortalPage() {
     setSelectedOrder(null);
   };
 
-  const loadPortal = async () => {
+  const loadPortal = async (quiet = false) => {
     if (!session) return;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setPortalError('');
     try {
       const result = await api.restaurantOverview(session.token);
       setPortal(result);
+      setSelectedOrder(current =>
+        current
+          ? result.orders.find(order => order.id === current.id) || current
+          : null
+      );
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         sessionStorage.removeItem(storageKey);
@@ -62,15 +67,20 @@ export default function RestaurantPortalPage() {
         setPortalError(error instanceof Error ? error.message : 'تعذّر تحميل بيانات المطعم.');
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!quiet) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
-    if (session) void loadPortal();
-    // The token is the ownership boundary; refreshes are handled by the explicit button.
+    if (!session) return;
+    void loadPortal();
+    const interval = window.setInterval(() => void loadPortal(true), 15_000);
+    // The token is the ownership boundary; clear polling when the session changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => window.clearInterval(interval);
   }, [session?.token]);
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -176,7 +186,7 @@ export default function RestaurantPortalPage() {
                 <button type="button" className="restaurant-invoice-button" onClick={() => setSelectedOrder(order)} data-testid={`button-restaurant-invoice-${order.id}`}><Receipt size={15}/>عرض الفاتورة</button>
               </div>
             </article>)}
-          </div> : !portalError && <div className="restaurant-orders-empty"><ClipboardList size={26}/><strong>لا توجد طلبات في هذا القسم</strong><span>ستظهر الطلبات الجديدة هنا تلقائياً عند تحديث الصفحة.</span></div>}
+          </div> : !portalError && <div className="restaurant-orders-empty"><ClipboardList size={26}/><strong>لا توجد طلبات في هذا القسم</strong><span>ستظهر الفواتير الجديدة هنا تلقائياً بعد وصول الطلب.</span></div>}
       </section>
     </main>
     <InvoiceDialog open={!!selectedOrder} onClose={() => setSelectedOrder(null)} order={selectedOrder}/>

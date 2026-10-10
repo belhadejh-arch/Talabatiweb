@@ -302,7 +302,8 @@ async function claimEmail(orderId = null) {
 
 async function mailPayload(delivery) {
   const result = await pool.query(
-    `SELECT o.*, r.name AS restaurant_name, a.created_at AS assignment_created_at,
+    `SELECT o.*, r.name AS restaurant_name, a.status AS assignment_status,
+            a.created_at AS assignment_created_at,
             a.assignment_id, a.driver_id, a.driver_email
      FROM orders o
      JOIN restaurants r ON r.id=o.restaurant_id
@@ -333,6 +334,7 @@ async function mailPayload(delivery) {
       assignment_id: row.assignment_id,
       driver_id: row.driver_id,
       driver_email: delivery.driver_email,
+      status: row.assignment_status,
       created_at: row.assignment_created_at,
     },
     items,

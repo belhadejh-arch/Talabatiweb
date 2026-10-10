@@ -266,7 +266,7 @@ test("an exact idempotent retry returns the existing order after normalized vali
     if (sql.includes("SELECT o.*, r.name AS restaurant_name")) {
       return { rows: [fakeExistingOrderRow()] };
     }
-    if (sql.includes("SELECT product_id, product_name")) {
+    if (sql.includes("FROM order_items oi")) {
       return { rows: [] };
     }
     throw new Error(`Unexpected query: ${sql}`);
@@ -374,7 +374,7 @@ test("ON CONFLICT retries persist and compare the normalized request hash", asyn
     if (sql.includes("SELECT o.*, r.name AS restaurant_name")) {
       return { rows: [fakeExistingOrderRow()] };
     }
-    if (sql.includes("SELECT product_id, product_name")) {
+    if (sql.includes("FROM order_items oi")) {
       return { rows: [] };
     }
     throw new Error(`Unexpected query: ${sql}`);

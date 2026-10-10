@@ -463,6 +463,10 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     assert.equal(firstDelivery.status, 201);
     assert.equal(firstDelivery.payload.order.latitude, deliveryBody.latitude);
     assert.equal(firstDelivery.payload.order.longitude, deliveryBody.longitude);
+    assert.equal(firstDelivery.payload.order.orderNumber, firstDelivery.payload.order.id);
+    assert.match(firstDelivery.payload.order.invoiceNumber, /^INV-\d{8,}$/);
+    assert.match(firstDelivery.payload.order.mapsUrl, /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=/);
+    assert.equal(firstDelivery.payload.order.restaurantId, restaurantId);
     fixtures.orders.push(firstDelivery.payload.order.id);
 
     const repeatedDelivery = await request(baseUrl, "/api/orders", {
@@ -512,6 +516,15 @@ test("PostgreSQL API HTTP integration: catalog, orders, drivers and filtered sta
     assert.ok(restaurantOverview.payload.orders.length >= 2);
     assert.ok(restaurantOverview.payload.orders.every((order) => order.restaurantId === restaurantId));
     assert.ok(!restaurantOverview.payload.orders.some((order) => order.id === Number(otherOrder.id)));
+    const restaurantInvoice = restaurantOverview.payload.orders.find(
+      (order) => order.id === firstDelivery.payload.order.id
+    );
+    assert.ok(restaurantInvoice);
+    assert.equal(restaurantInvoice.invoiceNumber, firstDelivery.payload.order.invoiceNumber);
+    assert.equal(restaurantInvoice.orderNumber, firstDelivery.payload.order.orderNumber);
+    assert.equal(restaurantInvoice.mapsUrl, firstDelivery.payload.order.mapsUrl);
+    assert.equal(restaurantInvoice.totalAmount, firstDelivery.payload.order.totalAmount);
+    assert.deepEqual(restaurantInvoice.items, firstDelivery.payload.order.items);
     assert.equal(
       (await request(baseUrl, "/api/restaurant/overview", { token: adminToken })).status,
       403

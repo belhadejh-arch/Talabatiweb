@@ -4,6 +4,7 @@ import { kickDispatch, reconcileEmailDelivery } from "./dispatch.mjs";
 import { handleAdminManagement } from "./admin-management.mjs";
 import { handleGmailOAuthRoutes } from "./gmail-oauth.mjs";
 import { handleDriverGmailRoutes } from "./driver-gmail.mjs";
+import { buildOrderInvoice } from "./invoice.mjs";
 import {
   AuthError,
   createRestaurantAccountSerial,
@@ -180,12 +181,6 @@ function lyD(value) {
   return (Math.round((amount + Number.EPSILON) * 1000) / 1000).toFixed(3);
 }
 
-function numberOrNull(value) {
-  if (value == null) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function isRestaurantOpen(row) {
   if (row.status !== "ACTIVE") return false;
   const now = new Date();
@@ -314,36 +309,12 @@ function mapEmailDelivery(row) {
 }
 
 function mapOrder(row, items = []) {
-  return {
-    id: Number(row.id),
-    restaurantId: Number(row.restaurant_id),
-    restaurantName: row.restaurant_name || "",
-    customerName: row.customer_name,
-    customerPhone: row.customer_phone,
-    orderType: row.order_type || "DELIVERY",
-    latitude: numberOrNull(row.latitude),
-    longitude: numberOrNull(row.longitude),
-    reservationDate: row.reservation_date instanceof Date
-      ? row.reservation_date.toISOString().slice(0, 10)
-      : row.reservation_date || null,
-    reservationTime: row.reservation_time?.slice(0, 5) || null,
-    partySize: row.party_size == null ? null : Number(row.party_size),
-    notes: row.notes || null,
+  return buildOrderInvoice(
+    row,
+    { name: row.restaurant_name || "" },
     items,
-    itemsSummary: items.map((item) =>
-      `${item.quantity} × ${item.productName}${item.selectedSize ? ` (${item.selectedSize})` : ""}`
-    ).join("، "),
-    subtotal: Number(row.subtotal || 0),
-    deliveryFee: Number(row.delivery_fee || 0),
-    totalAmount: Number(row.total_amount || 0),
-    status: row.status,
-    assignmentStatus: row.assignment_status || null,
-    driverId: row.driver_id == null ? null : Number(row.driver_id),
-    isArchived: Boolean(row.is_archived),
-    createdAt: row.created_at instanceof Date
-      ? row.created_at.toISOString()
-      : String(row.created_at)
-  };
+    row.assignment_status || null
+  );
 }
 
 async function loadOrder(client, id) {
@@ -367,10 +338,20 @@ async function loadOrder(client, id) {
   if (!row) return null;
 
   const itemResult = await client.query(
-    `SELECT product_id, product_name, quantity, unit_price, subtotal, size_name
-       FROM order_items
-      WHERE order_id = $1
-      ORDER BY id`,
+    `SELECT oi.product_id, oi.product_name, oi.quantity, oi.unit_price,
+            oi.subtotal, oi.size_name,
+            COALESCE(addon_rows.addons, '[]'::json) AS addons
+       FROM order_items oi
+       LEFT JOIN LATERAL (
+         SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                  'addonName', ia.addon_name,
+                  'price', ia.price
+                ) ORDER BY ia.id) AS addons
+           FROM order_item_addons ia
+          WHERE ia.order_item_id = oi.id
+       ) addon_rows ON TRUE
+      WHERE oi.order_id = $1
+      ORDER BY oi.id`,
     [id]
   );
   const items = itemResult.rows.map((item) => ({
@@ -379,7 +360,8 @@ async function loadOrder(client, id) {
     quantity: Number(item.quantity),
     unitPrice: Number(item.unit_price),
     subtotal: Number(item.subtotal),
-    selectedSize: item.size_name || null
+    selectedSize: item.size_name || null,
+    addons: item.addons || []
   }));
   return mapOrder(row, items);
 }
@@ -827,7 +809,16 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
            'quantity', oi.quantity,
            'unitPrice', oi.unit_price,
            'subtotal', oi.subtotal,
-           'selectedSize', oi.size_name
+            'selectedSize', oi.size_name,
+            'addons', COALESCE(
+              (SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                 'addonName', ia.addon_name,
+                 'price', ia.price
+               ) ORDER BY ia.id)
+                 FROM order_item_addons ia
+                WHERE ia.order_item_id = oi.id),
+              '[]'::json
+            )
          ) ORDER BY oi.id) AS items
            FROM order_items oi
           WHERE oi.order_id = o.id

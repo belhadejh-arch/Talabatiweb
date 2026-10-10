@@ -3,10 +3,23 @@ import { useForm } from 'react-hook-form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form } from '@/components/ui/form';
 import { AlertCircle, Inbox, Upload, Trash2, Printer, Receipt } from 'lucide-react';
-import { CURRENCY, money, dateLabel, type Order } from '../lib/api';
+import { CURRENCY, money, dateLabel, statusLabel, type Order } from '../lib/api';
 
 export type Write = <T>(path: string, method: string, body?: unknown) => Promise<T>;
 export type Field = { key: string; label: string; type?: 'text' | 'number' | 'tel' | 'email' | 'password' | 'date' | 'textarea' | 'select' | 'checkbox' | 'image-upload'; required?: boolean; options?: { value: string; label: string }[]; min?: number; step?: string; minLength?: number };
+
+function driverApprovalLabel(status?: string) {
+  const normalized = (status || 'NOT_ASSIGNED').toUpperCase();
+  return ({
+    NOT_ASSIGNED: 'لم يُعيّن سائق بعد',
+    PENDING: 'بانتظار موافقة السائق',
+    SENT: 'بانتظار موافقة السائق',
+    ACCEPTED: 'وافق السائق',
+    REJECTED: 'رفض السائق',
+    TIMEOUT: 'انتهت مهلة رد السائق',
+    CANCELLED: 'أُلغي إسناد السائق',
+  } as Record<string, string>)[normalized] || statusLabel(normalized);
+}
 
 export function EntityDialog({ open, onClose, title, description, fields, initial = {}, onSave, testId }: { open: boolean; onClose: () => void; title: string; description?: string; fields: Field[]; initial?: Record<string, unknown>; onSave: (values: Record<string, string | boolean>) => Promise<void>; testId: string }) {
   const form = useForm<Record<string, string | boolean>>({ defaultValues: {} });
@@ -116,7 +129,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
       <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
         <DialogTitle className="flex items-center gap-2">
           <Receipt size={20} className="text-primary"/>
-          <span>{restaurantSummary ? `فاتورة مداخيل مطعم: ${restaurantSummary.restaurantName}` : `فاتورة طلب #${order?.id}`}</span>
+            <span>{restaurantSummary ? `فاتورة مداخيل مطعم: ${restaurantSummary.restaurantName}` : `فاتورة طلب #${order?.orderNumber ?? order?.id}`}</span>
         </DialogTitle>
         <button type="button" onClick={handlePrint} className="admin-action primary text-xs flex items-center gap-1.5 px-3 py-1 print:hidden" data-testid="button-print-invoice">
           <Printer size={15}/>
@@ -180,11 +193,12 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
           <div className="flex justify-between items-start border-b pb-4">
             <div>
               <h2 className="text-xl font-extrabold">{order.restaurantName || 'مطعم طلبات'}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">فاتورة ضريبية / إيصال طلب رسمي</p>
+              <p className="text-xs text-muted-foreground mt-0.5">فاتورة الطلب</p>
             </div>
             <div className="text-left" dir="ltr">
-              <span className="font-bold text-base block">#{order.id}</span>
-              <span className="text-xs text-muted-foreground">{dateLabel(order.createdAt)}</span>
+              <span className="font-bold text-base block" data-testid={`text-invoice-order-number-${order.id}`}>الطلب #{order.orderNumber ?? order.id}</span>
+              <strong className="text-sm block" data-testid={`text-invoice-number-${order.id}`}>{order.invoiceNumber || `INV-${String(order.id).padStart(8, '0')}`}</strong>
+              <time className="text-xs text-muted-foreground" dateTime={order.createdAt}>{dateLabel(order.createdAt)}</time>
             </div>
           </div>
 
@@ -195,11 +209,22 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
               <span dir="ltr" className="text-muted-foreground">{order.customerPhone}</span>
             </div>
             <div>
-              <span className="text-muted-foreground block">نوع الطلب والحالة:</span>
+              <span className="text-muted-foreground block">نوع الطلب:</span>
               <strong className="text-sm block">{order.orderType === 'DELIVERY' ? 'توصيل طلب' : 'حجز طاولة'}</strong>
-              <span className="text-primary font-medium">{order.status}</span>
+              <span className="text-muted-foreground mt-1 block">حالة الطلب: <strong className="text-foreground">{statusLabel(order.status)}</strong></span>
+              <span className="text-muted-foreground block">موافقة السائق: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
             </div>
           </div>
+
+          {order.orderType === 'DELIVERY' && (
+            <section className="rounded-xl border p-3 text-xs" aria-label="موقع التوصيل" data-testid={`section-invoice-location-${order.id}`}>
+              <strong className="block mb-1">موقع العميل</strong>
+              {order.latitude != null && order.longitude != null
+                ? <span dir="ltr" className="block">{order.latitude}, {order.longitude}</span>
+                : <span className="block text-muted-foreground">لا توجد إحداثيات محفوظة</span>}
+              {order.mapsUrl && <a href={order.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-primary underline" data-testid={`link-invoice-map-${order.id}`}>فتح الموقع على Google Maps</a>}
+            </section>
+          )}
 
           <div className="mt-4">
             <h4 className="font-bold text-xs mb-2 text-muted-foreground">تفاصيل الأصناف</h4>
@@ -215,10 +240,16 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
               <tbody>
                 {order.items?.length ? order.items.map((item, idx) => (
                   <tr key={idx} className="border-b border-border/50">
-                    <td className="py-2 font-medium">{item.productName || `منتج #${item.productId}`}</td>
+                    <td className="py-2 font-medium">
+                      <span className="block">{item.productName || (item.productId ? `منتج #${item.productId}` : 'منتج')}</span>
+                      {item.selectedSize && <span className="block text-muted-foreground">الحجم: {item.selectedSize}</span>}
+                      {!!item.addons?.length && <span className="block mt-1 space-y-0.5 text-muted-foreground">
+                        {item.addons.map((addon, addonIndex) => <span className="block" key={`${addon.addonName}-${addonIndex}`}>إضافة: {addon.addonName} — {money(addon.price)} {CURRENCY}</span>)}
+                      </span>}
+                    </td>
                     <td className="py-2 text-center">{item.quantity}</td>
                     <td className="py-2 text-center">{money(item.unitPrice)} {CURRENCY}</td>
-                    <td className="py-2 text-left font-bold" dir="ltr">{money((item.unitPrice || 0) * item.quantity)} {CURRENCY}</td>
+                    <td className="py-2 text-left font-bold" dir="ltr">{money(item.subtotal ?? (item.unitPrice || 0) * item.quantity)} {CURRENCY}</td>
                   </tr>
                 )) : (
                   <tr className="border-b border-border/50">
@@ -245,12 +276,10 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             </div>
           </div>
 
-          {order.notes && (
-            <div className="p-2.5 bg-muted/30 rounded-lg text-xs mt-3">
-              <strong className="block mb-0.5">ملاحظات الطلب:</strong>
-              <p className="text-muted-foreground">{order.notes}</p>
-            </div>
-          )}
+          <div className="p-2.5 bg-muted/30 rounded-lg text-xs mt-3">
+            <strong className="block mb-0.5">ملاحظات العميل:</strong>
+            <p className="text-muted-foreground">{order.notes || 'لا توجد ملاحظات.'}</p>
+          </div>
         </div>
       ) : null}
 
