@@ -3,26 +3,31 @@ import { Link } from 'wouter';
 import { useCart } from '../lib/cart';
 import { money, type Catalog } from '../lib/api';
 
-export function Header() {
-  const { count } = useCart();
+export function Header({ standaloneName, standaloneRestaurantId }: { standaloneName?: string; standaloneRestaurantId?: number }) {
+  const cart = useCart();
+  const count = standaloneName && (!standaloneRestaurantId || (cart.restaurantId !== null && cart.restaurantId !== standaloneRestaurantId)) ? 0 : cart.count;
   return <header className="site-header"><div className="shell header-inner">
-    <Link href="/" className="brand" data-testid="link-home"><span className="brand-mark"><UtensilsCrossed size={19} strokeWidth={2.6} /></span><span>طلبات<span style={{ color: 'hsl(var(--primary))' }}>.</span></span></Link>
-    <nav className="nav-actions" aria-label="التنقل الرئيسي">
+    {standaloneName ? <a href="#menu" className="brand" data-testid="link-home"><span className="brand-mark"><UtensilsCrossed size={19} strokeWidth={2.6} /></span><span>{standaloneName}</span></a> : <Link href="/" className="brand" data-testid="link-home"><span className="brand-mark"><UtensilsCrossed size={19} strokeWidth={2.6} /></span><span>طلبات<span style={{ color: 'hsl(var(--primary))' }}>.</span></span></Link>}
+    {standaloneName ? <nav className="nav-actions" aria-label="السلة">
+      <Link href={count ? '/checkout' : '#menu'} aria-disabled={!count} className="btn btn-dark" data-testid="link-cart"><ShoppingBag size={17}/><span>السلة</span><span aria-label={`${count} عناصر`}>({count})</span></Link>
+    </nav> : <nav className="nav-actions" aria-label="التنقل الرئيسي">
       <Link href="/driver" className="btn btn-plain" data-testid="link-driver">دخول السائقين</Link>
       <Link href="/admin" className="btn btn-plain admin-link" data-testid="link-admin">لوحة الإدارة</Link>
       <Link href="/#cart" className="btn btn-dark" data-testid="link-cart"><ShoppingBag size={17}/><span>السلة</span><span aria-label={`${count} عناصر`}>({count})</span></Link>
-    </nav>
+    </nav>}
   </div></header>;
 }
 
-export function CartPanel({ catalog }: { catalog: Catalog }) {
+export function CartPanel({ catalog, restaurantId }: { catalog: Catalog; restaurantId?: number }) {
   const cart = useCart();
+  const cartMatches = restaurantId == null || cart.restaurantId === null || cart.restaurantId === restaurantId;
+  const visibleItems = cartMatches ? cart.items : [];
   const restaurant = catalog.restaurants.find(r => r.id === cart.restaurantId);
-  const rows = cart.items.map(item => ({ ...item, product: catalog.products.find(p => p.id === item.productId) }));
+  const rows = visibleItems.map(item => ({ ...item, product: catalog.products.find(p => p.id === item.productId) }));
   const estimated = rows.reduce((sum, row) => sum + (row.product ? Number(row.product.price) * row.quantity : 0), 0);
   return <aside className="cart-panel" id="cart" aria-label="سلة الطلب">
     <div className="cart-head"><div><span className="eyebrow" style={{ color: 'hsl(var(--primary))' }}>طلبك الآن</span><h2 className="display text-2xl mt-1">سلة الطلب</h2></div><ShoppingBag size={22}/></div>
-    {cart.items.length === 0 ? <div className="text-center py-6"><div className="empty-illustration"><ShoppingBag size={31}/></div><h3 className="font-bold">السلة تنتظر اختيارك</h3><p className="subtle text-sm mt-2">تصفّح القائمة وأضف ما تشتهيه.</p></div> : <>
+    {visibleItems.length === 0 ? <div className="text-center py-6"><div className="empty-illustration"><ShoppingBag size={31}/></div><h3 className="font-bold">السلة تنتظر اختيارك</h3><p className="subtle text-sm mt-2">{cartMatches ? 'تصفّح القائمة وأضف ما تشتهيه.' : 'أضف طبقاً من هذه القائمة لبدء طلب جديد.'}</p></div> : <>
       <p className="subtle text-xs mb-2">من {restaurant?.name || 'مطعم غير متاح'}</p>
       {rows.map(row => <div className="cart-item" key={row.productId} data-testid={`cart-item-${row.productId}`}>
         <div className="min-w-0"><p className="font-bold text-sm">{row.product?.name || `منتج #${row.productId}`}</p><span className="subtle text-xs">{row.product ? `${money(Number(row.product.price) * row.quantity)} ر.س تقريباً` : 'لم يعد متاحاً'}</span></div>

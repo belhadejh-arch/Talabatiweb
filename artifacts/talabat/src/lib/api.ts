@@ -413,6 +413,11 @@ export function formatDistance(km: number): string {
 }
 
 export const CURRENCY = "د.ل";
+const CUSTOMER_PLATFORM_ORIGIN = "https://talabatiweb-talabat-h1pe-lime.vercel.app";
+
+export function restaurantMenuUrl(restaurantId: number) {
+  return `${CUSTOMER_PLATFORM_ORIGIN}/restaurant/${restaurantId}`;
+}
 export const money = (value: number | string | null | undefined) =>
   new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(
     Number(value) || 0,

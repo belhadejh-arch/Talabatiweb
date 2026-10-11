@@ -4,7 +4,7 @@ import { Info, MapPin, Plus, UtensilsCrossed, Share2, Check, Crosshair, Navigati
 import { Header, CartPanel, ErrorState, LoadingState } from '../components/common';
 import { useCatalog } from '../hooks/use-data';
 import { useCart } from '../lib/cart';
-import { catalogImageUrl, money, CURRENCY, calculateDistanceKm, formatDistance } from '../lib/api';
+import { catalogImageUrl, money, CURRENCY, calculateDistanceKm, formatDistance, restaurantMenuUrl } from '../lib/api';
 
 type UserLocation = { latitude: number; longitude: number; label?: string };
 
@@ -24,6 +24,7 @@ export default function Browse() {
   const [matchRest, paramsRest] = useRoute('/restaurant/:id');
   const [matchR, paramsR] = useRoute('/r/:id');
   const routeParam = paramsRest?.id || paramsR?.id;
+  const isStandaloneLink = Boolean(routeParam);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -127,7 +128,12 @@ export default function Browse() {
     });
   }, [data, userLocation]);
 
-  const selected = data?.restaurants.find(r => r.id === selectedId) || restaurants[0];
+  const linkedRestaurant = isStandaloneLink
+    ? restaurants.find(r => String(r.id) === routeParam || r.slug === routeParam)
+    : undefined;
+  const selected = isStandaloneLink
+    ? linkedRestaurant
+    : data?.restaurants.find(r => r.id === selectedId) || restaurants[0];
   const products = data?.products.filter(p => p.restaurantId === selected?.id) || [];
   const categories = [...new Set(products.map(p => p.category || 'القائمة'))];
 
@@ -137,8 +143,7 @@ export default function Browse() {
 
   const copyDirectRestaurantLink = () => {
     if (!selected) return;
-    const origin = window.location.origin;
-    const url = `${origin}/restaurant/${selected.id}`;
+    const url = restaurantMenuUrl(selected.id);
     navigator.clipboard?.writeText(url).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
@@ -146,7 +151,10 @@ export default function Browse() {
   };
 
   return <div dir="rtl" className="storefront min-h-[100dvh]">
-    <Header />
+    <Header standaloneName={isStandaloneLink ? selected?.name || 'قائمة المطعم' : undefined} standaloneRestaurantId={isStandaloneLink ? selected?.id : undefined} />
+    {isStandaloneLink && (isLoading || error || !selected) ? <main className="shell py-16 text-center" data-testid={error ? 'status-restaurant-load-error' : !isLoading ? 'status-restaurant-not-found' : 'status-restaurant-loading'}>
+      {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : <div className="surface py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h1 className="display text-2xl">المطعم غير متاح</h1><p className="subtle mt-2">تأكد من صحة الرابط أو تواصل مع المطعم للحصول على رابط جديد.</p></div>}
+    </main> : <>
     <section className="hero" style={selected?.imageUrl ? { backgroundImage: `url("${catalogImageUrl(selected.imageUrl)}")` } : undefined}><div className="shell hero-inner">
       <div className="restaurant-identity">
         <div className="restaurant-avatar" aria-hidden="true">
@@ -159,7 +167,7 @@ export default function Browse() {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="display hero-title" data-testid="text-selected-restaurant">{selected?.name || 'طلبات'}</h1>
-            {selected && (
+            {selected && !isStandaloneLink && (
               <button
                 type="button"
                 onClick={copyDirectRestaurantLink}
@@ -172,15 +180,15 @@ export default function Browse() {
             )}
           </div>
           <p className="restaurant-location"><MapPin size={14}/>{selected?.address || 'اكتشف المطاعم وقوائم الطعام'}</p>
-          <a href="#restaurants" className="inline-block mt-2 text-xs font-bold text-primary hover:underline" data-testid="link-explore">تصفح جميع المطاعم</a>
+          {!isStandaloneLink && <a href="#restaurants" className="inline-block mt-2 text-xs font-bold text-primary hover:underline" data-testid="link-explore">تصفح جميع المطاعم</a>}
         </div>
       </div>
     </div></section>
-    <main className="shell layout"><div className="min-w-0" id="restaurants">
+    <main className="shell layout"><div className="min-w-0" id={isStandaloneLink ? 'menu' : 'restaurants'}>
       {selected?.description && <div className="restaurant-about"><Info size={16}/><span>{selected.description}</span></div>}
 
       {/* Location determination prompt on first visit or whenever user wants to set it */}
-      {showLocationPrompt && !userLocation && (
+      {!isStandaloneLink && showLocationPrompt && !userLocation && (
         <div className="mb-6 p-4 rounded-2xl border-2 border-primary/20 bg-primary/5 flex items-center justify-between gap-4 flex-wrap" data-testid="banner-location-prompt">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
@@ -223,7 +231,7 @@ export default function Browse() {
         </div>
       )}
 
-      <section className="restaurant-picker" aria-label="اختيار المطعم">
+      {!isStandaloneLink && <section className="restaurant-picker" aria-label="اختيار المطعم">
         <div className="restaurant-picker-title flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span>المطاعم المتاحة</span>
@@ -282,7 +290,7 @@ export default function Browse() {
           </div>
           <p className="subtle text-xs mt-1 line-clamp-2">{restaurant.description || restaurant.address}</p>
         </button>)}</div>}
-      </section>
+      </section>}
 
       {selected && <section id="menu" className="scroll-mt-28">
         {!selected.isOpen && (
@@ -290,7 +298,7 @@ export default function Browse() {
             <span>⚠️ هذا المطعم مغلق حالياً (ساعات العمل: من {selected.openingTime} إلى {selected.closingTime}). لا يمكن إرسال طلبات في الوقت الحالي.</span>
           </div>
         )}
-        <div className="menu-heading flex items-center justify-between gap-3 flex-wrap"><h2 className="section-title">قائمة {selected.name}</h2><button type="button" onClick={copyDirectRestaurantLink} className="text-xs text-primary font-bold hover:underline flex items-center gap-1"><Share2 size={13}/>{copiedLink ? 'تم نسخ الرابط' : 'مشاركة قائمة هذا المطعم'}</button></div>
+        <div className="menu-heading flex items-center justify-between gap-3 flex-wrap"><h2 className="section-title">قائمة {selected.name}</h2>{!isStandaloneLink && <button type="button" onClick={copyDirectRestaurantLink} className="text-xs text-primary font-bold hover:underline flex items-center gap-1"><Share2 size={13}/>{copiedLink ? 'تم نسخ الرابط' : 'مشاركة قائمة هذا المطعم'}</button>}</div>
         {products.length === 0 ? <div className="surface text-center py-9 subtle">لم تُضف أطباق إلى هذه القائمة بعد.</div> : <><nav className="category-nav" aria-label="أقسام القائمة">{categories.map((category, index) => <a href={`#menu-category-${index}`} key={category} data-testid={`link-category-${index}`}>{category}</a>)}</nav>{categories.map((category, index) => <div className="category-block" id={`menu-category-${index}`} key={category}><h3 className="category-title"><span>{category}</span><span className="category-count">{products.filter(p => (p.category || 'القائمة') === category).length}</span></h3><div className="product-list">{products.filter(p => (p.category || 'القائمة') === category).map(product => <div className="product-row" key={product.id} data-testid={`card-product-${product.id}`}>{product.imageUrl ? <img className="product-image" src={catalogImageUrl(product.imageUrl)} alt={product.name} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : <div className="product-placeholder" aria-hidden="true">{product.name.charAt(0)}</div>}<div className="min-w-0 flex-1"><h4>{product.name}</h4>{product.description && <p>{product.description}</p>}</div><div className="product-actions"><span className="price text-sm" data-testid={`text-price-${product.id}`}>{money(product.price)} {CURRENCY}</span><button type="button" className="icon-button" onClick={() => {
           if (!selected.isOpen) {
             alert('عذراً، هذا المطعم مغلق حالياً ولا يمكن إضافة منتجات للسلة أو إنشاء طلبات.');
@@ -299,7 +307,7 @@ export default function Browse() {
           cart.add(product.restaurantId, product.id);
         }} aria-label={`أضف ${product.name} إلى السلة`} data-testid={`button-add-product-${product.id}`}><Plus size={19}/></button></div></div>)}</div></div>)}</>}
       </section>}
-    </div><div>{data ? <CartPanel catalog={data}/> : <div className="cart-panel"><div className="skeleton h-44"/></div>}</div></main>
+    </div><div>{data ? <CartPanel catalog={isStandaloneLink && selected ? { ...data, restaurants: [selected], products } : data} restaurantId={isStandaloneLink ? selected?.id : undefined}/> : <div className="cart-panel"><div className="skeleton h-44"/></div>}</div></main>
 
     {/* Manual Location Selection Modal */}
     {manualModalOpen && (
@@ -369,6 +377,7 @@ export default function Browse() {
       </div>
     )}
 
-    <footer className="border-t border-border py-8"><div className="shell flex flex-wrap items-center justify-between gap-3"><span className="brand text-xl">طلبات<span style={{ color: 'hsl(var(--primary))' }}>.</span></span><span className="subtle text-xs">وجبتك القادمة تبدأ هنا.</span></div></footer>
+    {!isStandaloneLink && <footer className="border-t border-border py-8"><div className="shell flex flex-wrap items-center justify-between gap-3"><span className="brand text-xl">طلبات<span style={{ color: 'hsl(var(--primary))' }}>.</span></span><span className="subtle text-xs">وجبتك القادمة تبدأ هنا.</span></div></footer>}
+    </>}
   </div>;
 }

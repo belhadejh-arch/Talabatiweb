@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pencil, Plus, Archive, RotateCcw, Receipt, Link as LinkIcon, Check, KeyRound, Copy } from 'lucide-react';
-import { api, CURRENCY, money, catalogImageUrl, type Restaurant, type Order } from '../lib/api';
+import { api, CURRENCY, money, catalogImageUrl, restaurantMenuUrl, type Restaurant, type Order } from '../lib/api';
 import { useAdminRestaurantRevenues } from '../hooks/use-admin';
 import { ConfirmDialog, EmptyBlock, EntityDialog, InvoiceDialog, SectionHeading, type Field, type Write, number } from './admin-ui';
 
@@ -44,8 +44,7 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
   };
 
   const copyRestaurantLink = (id: number) => {
-    const origin = window.location.origin;
-    const url = `${origin}/restaurant/${id}`;
+    const url = restaurantMenuUrl(id);
     navigator.clipboard?.writeText(url).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2500);
@@ -172,11 +171,11 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
 
                 <button
                   className="admin-action"
-                  title="نسخ الرابط المستقل للمطعم لمشاركته مع الزبائن"
+                  title="نسخ رابط قائمة هذا المطعم فقط لمشاركته مع الزبائن"
                   onClick={() => copyRestaurantLink(r.id)}
                   data-testid={`button-copy-link-restaurant-${r.id}`}
                 >
-                  {copiedId === r.id ? <><Check size={14} className="text-green-600"/>تم النسخ</> : <><LinkIcon size={14}/>رابط الزبائن</>}
+                  {copiedId === r.id ? <><Check size={14} className="text-green-600"/>تم النسخ</> : <><LinkIcon size={14}/>رابط قائمة المطعم</>}
                 </button>
 
                 <button className="admin-action" onClick={() => setEditing(r)} data-testid={`button-edit-restaurant-${r.id}`}>
