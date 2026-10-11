@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 import {
   CalendarDays,
+  BellRing,
   ClipboardList,
   LogOut,
   RefreshCw,
@@ -31,6 +32,7 @@ type StatusFilter =
   "all" | "waiting" | "accepted" | "rejected" | "cancelled" | "completed";
 type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 const storageKey = "talabat-restaurant-session";
+const orderAlertAudioUrl = `${import.meta.env.BASE_URL}order-alert.mp3`;
 const reportPeriods: { value: ReportPeriod; label: string }[] = [
   { value: "daily", label: "يومي" },
   { value: "weekly", label: "أسبوعي" },
@@ -110,6 +112,18 @@ export default function RestaurantPortalPage() {
   > | null>(null);
   const [portalError, setPortalError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioError, setAudioError] = useState("");
+  const [isConnected, setIsConnected] = useState(true);
+  const portalRequestInFlight = useRef(false);
+  const alertAudio = useRef<HTMLAudioElement | null>(null);
+  const pendingDecisionOrders = (portal?.orders || []).filter(
+    (order) =>
+      order.status === "NEW" ||
+      (order.status === "ASSIGNED" &&
+        order.assignmentStatus?.toUpperCase() === "PENDING"),
+  );
+  const hasPendingDecisionOrders = pendingDecisionOrders.length > 0;
 
   const logout = async () => {
     if (session) {
@@ -133,10 +147,16 @@ export default function RestaurantPortalPage() {
 
   const loadPortal = async (quiet = false) => {
     if (!session) return;
+    if (portalRequestInFlight.current) {
+      if (!quiet) setRefreshing(false);
+      return;
+    }
+    portalRequestInFlight.current = true;
     if (!quiet) setLoading(true);
     setPortalError("");
     try {
       const result = await api.restaurantOverview(session.token);
+      setIsConnected(true);
       setPortal(result);
       setSelectedOrder((current) =>
         current
@@ -144,6 +164,7 @@ export default function RestaurantPortalPage() {
           : null,
       );
     } catch (error) {
+      setIsConnected(false);
       if (error instanceof ApiError && error.status === 401) {
         sessionStorage.removeItem(storageKey);
         setSession(null);
@@ -154,6 +175,7 @@ export default function RestaurantPortalPage() {
         );
       }
     } finally {
+      portalRequestInFlight.current = false;
       if (!quiet) {
         setLoading(false);
         setRefreshing(false);
@@ -164,11 +186,71 @@ export default function RestaurantPortalPage() {
   useEffect(() => {
     if (!session) return;
     void loadPortal();
-    const interval = window.setInterval(() => void loadPortal(true), 5_000);
+    const interval = window.setInterval(() => void loadPortal(true), 2_000);
+    const refreshOnReconnect = () => {
+      void loadPortal(true);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void loadPortal(true);
+      }
+    };
+    const markOffline = () => setIsConnected(false);
+    window.addEventListener("online", refreshOnReconnect);
+    window.addEventListener("offline", markOffline);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     // The token is the ownership boundary; clear polling when the session changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("online", refreshOnReconnect);
+      window.removeEventListener("offline", markOffline);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [session?.token]);
+
+  useEffect(() => {
+    const audio = alertAudio.current;
+    if (!audio) return;
+    if (audioEnabled && isConnected && hasPendingDecisionOrders) {
+      void audio.play().catch(() => {
+        setAudioEnabled(false);
+        setAudioError(
+          "منع المتصفح تشغيل الصوت. اضغط «تفعيل صوت التنبيه» للسماح به.",
+        );
+      });
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, [audioEnabled, hasPendingDecisionOrders, isConnected]);
+
+  useEffect(
+    () => () => {
+      alertAudio.current?.pause();
+    },
+    [],
+  );
+
+  const enableAudio = async () => {
+    const audio = alertAudio.current || new Audio(orderAlertAudioUrl);
+    audio.loop = true;
+    audio.preload = "auto";
+    alertAudio.current = audio;
+    try {
+      await audio.play();
+      setAudioEnabled(true);
+      setAudioError("");
+      if (!hasPendingDecisionOrders) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    } catch {
+      setAudioError(
+        "تعذر تشغيل الصوت تلقائياً. اضغط الزر للسماح بالتنبيه الصوتي.",
+      );
+    }
+  };
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -365,6 +447,71 @@ export default function RestaurantPortalPage() {
             </span>
           </div>
         </section>
+        <section
+          className="restaurant-audio-settings"
+          aria-label="إعدادات التنبيه الصوتي"
+        >
+          <div>
+            <strong>تنبيهات الطلبات الصوتية</strong>
+            <small>
+              فعّل الصوت الآن للسماح بتشغيله تلقائياً عند وصول الطلبات التالية.
+              يلزم إبقاء لوحة المطعم مفتوحة.
+            </small>
+          </div>
+          {audioEnabled ? (
+            <span data-testid="restaurant-alert-audio-enabled">الصوت مفعل</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void enableAudio()}
+              data-testid="button-enable-restaurant-alert-audio"
+            >
+              تفعيل صوت التنبيه
+            </button>
+          )}
+          {audioError && <small role="alert">{audioError}</small>}
+        </section>
+        {pendingDecisionOrders.length > 0 && (
+          <section
+            className="restaurant-pending-alert"
+            role="status"
+            aria-live="polite"
+            data-testid="restaurant-pending-order-alert"
+          >
+            <div className="restaurant-pending-alert-icon">
+              <BellRing size={20} />
+            </div>
+            <div className="restaurant-pending-alert-content">
+              <strong>
+                {pendingDecisionOrders.length === 1
+                  ? "طلب واحد ينتظر قرار السائق"
+                  : `${pendingDecisionOrders.length} طلبات تنتظر قرار السائق`}
+              </strong>
+              <ul>
+                {pendingDecisionOrders.map((order) => (
+                  <li key={order.id}>
+                    طلب #{order.id} · {order.customerName} ·{" "}
+                    {dateLabel(order.createdAt)}
+                  </li>
+                ))}
+              </ul>
+              <small>
+                يبقى التنبيه ما دام أي طلب ينتظر القرار. يجب إبقاء لوحة المطعم
+                مفتوحة لاستقباله.
+              </small>
+            </div>
+          </section>
+        )}
+        {!isConnected && (
+          <div
+            className="restaurant-connection-notice"
+            role="status"
+            data-testid="restaurant-connection-notice"
+          >
+            انقطع الاتصال بالخادم. سيُعاد تحميل حالات الطلبات من PostgreSQL عند
+            عودة الاتصال.
+          </div>
+        )}
         <section className="restaurant-metrics" aria-label="ملخص المطعم">
           <article>
             <span>إجمالي الطلبات</span>

@@ -177,6 +177,101 @@
   text-decoration: underline;
   font-weight: 800;
 }
+.restaurant-pending-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 17px;
+  border: 1px solid #efb4a5;
+  border-radius: 14px;
+  background: #fff1ec;
+  color: #76331f;
+}
+.restaurant-pending-alert-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #ef6034;
+  color: #fff;
+}
+.restaurant-pending-alert-content {
+  flex: 1;
+  min-width: 0;
+}
+.restaurant-pending-alert-content strong {
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+.restaurant-pending-alert-content ul {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0;
+  padding-inline-start: 20px;
+  font-size: 0.83rem;
+}
+.restaurant-pending-alert-content small,
+.restaurant-alert-sound-control small {
+  color: #8b5749;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+.restaurant-audio-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  background: #fff;
+}
+.restaurant-audio-settings > div {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+.restaurant-audio-settings strong {
+  font-size: 0.87rem;
+  font-weight: 850;
+}
+.restaurant-audio-settings small {
+  color: var(--rp-soft);
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+.restaurant-audio-settings button {
+  min-height: 39px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #a83d22;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+.restaurant-audio-settings > span {
+  color: #237244;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+.restaurant-audio-settings > small[role="alert"] {
+  flex-basis: 100%;
+  color: #a53320;
+}
+.restaurant-connection-notice {
+  margin: 14px 0;
+  padding: 12px 15px;
+  border: 1px solid #ead79a;
+  border-radius: 11px;
+  background: #fff9e5;
+  color: #705510;
+  font-size: 0.82rem;
+}
 .restaurant-dashboard-top {
   color: white;
   background: #203542;
@@ -784,6 +879,13 @@
   }
   .restaurant-orders-section {
     padding: 15px;
+  }
+  .restaurant-pending-alert {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+  .restaurant-audio-settings > div {
+    width: 100%;
   }
   .restaurant-reports-section,
   .restaurant-accounting-notice {
