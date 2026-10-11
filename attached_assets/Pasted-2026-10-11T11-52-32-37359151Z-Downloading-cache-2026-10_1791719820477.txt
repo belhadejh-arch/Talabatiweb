@@ -1,0 +1,46 @@
+2026-10-11T11:52:32.37359151Z ==> Downloading cache...
+2026-10-11T11:52:32.400788879Z ==> Cloning from https://github.com/belhadejh-arch/Talabatiweb
+2026-10-11T11:52:38.796249117Z ==> Checking out commit fe41000400a6d8d795a6687d45d340cbaeda6b06 in branch main
+2026-10-11T11:52:42.056312556Z ==> Downloaded 79MB in 7s. Extraction took 3s.
+2026-10-11T11:52:43.132222256Z ==> Using Node.js version 24.21.0 (default)
+2026-10-11T11:52:43.132230141Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-10-11T11:52:43.163544414Z ==> Running build command 'pnpm install --frozen-lockfile'...
+2026-10-11T11:52:45.042215305Z ==> Uploading build...
+2026-10-11T11:52:49.48018909Z ==> Uploaded in 2.9s. Compression took 1.5s
+2026-10-11T11:52:49.481922963Z ==> Build successful 🎉
+2026-10-11T11:52:50.279252518Z ==> Deploying...
+2026-10-11T11:52:50.360186805Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-10-11T11:53:08.587094482Z ==> Running 'pnpm run server:dev'
+2026-10-11T11:53:12.887943781Z 
+2026-10-11T11:53:12.887968093Z > workspace@0.0.0 server:dev /opt/render/project/src
+2026-10-11T11:53:12.887998805Z > node server/index.mjs
+2026-10-11T11:53:12.888002695Z 
+2026-10-11T11:53:14.086541883Z (node:83) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-10-11T11:53:14.086564934Z In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-10-11T11:53:14.086568954Z 
+2026-10-11T11:53:14.086572944Z To prepare for this change:
+2026-10-11T11:53:14.086578685Z - If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-10-11T11:53:14.086582305Z - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-10-11T11:53:14.086585355Z 
+2026-10-11T11:53:14.086588845Z See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-10-11T11:53:14.086592126Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-10-11T11:53:14.637810477Z API listening on port 10000
+2026-10-11T11:53:14.638169119Z [Server Startup] PUBLIC_API_URL present: true, is HTTPS: true, client_id: 1003049932...sercontent.com, client_secret_present: true
+2026-10-11T11:53:21.311591296Z ==> Your service is live 🎉
+2026-10-11T11:53:21.43660889Z ==> 
+2026-10-11T11:53:21.441536557Z ==> ///////////////////////////////////////////////////////////
+2026-10-11T11:53:21.447165889Z ==> 
+2026-10-11T11:53:21.45372983Z ==> Available at your primary URL https://talabatiweb-jw8x.onrender.com
+2026-10-11T11:53:21.464130915Z ==> 
+2026-10-11T11:53:21.46992416Z ==> ///////////////////////////////////////////////////////////
+
+مع انه نجح لكن يكتب لي رسالة في الايميل 
+
+deploy failed for Talabatiweb
+
+We encountered an error during the deploy process for Talabatiweb. This means your deploy didn’t complete successfully and your latest changes may not be live.
+
+Commit: Update admin and portal pages and document vite bundle timeout Replit-Commit-Author: Agent
+
+
+اصلاح المشكل

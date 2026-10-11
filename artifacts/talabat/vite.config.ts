@@ -13,7 +13,7 @@ export default defineConfig(async ({ mode }) => {
     process.env.API_TARGET ||
     (mode === 'development'
       ? 'http://127.0.0.1:8080'
-      : process.env.PUBLIC_API_URL || 'https://talabatiweb-wo8o.onrender.com');
+      : process.env.PUBLIC_API_URL || 'https://talabatiweb-jw8x.onrender.com');
 
   return {
     base: basePath,
