@@ -15,7 +15,7 @@ import {
   readRestaurantAccountSerial,
   regenerateRestaurantAccountSerial,
   revokeSession,
-  requireSession
+  requireSession,
 } from "./auth.mjs";
 import {
   StatsError,
@@ -23,18 +23,19 @@ import {
   getAdminStats,
   getDriverOrders,
   getDriverStats,
-  parseStatsFilters
+  parseStatsFilters,
 } from "./stats.mjs";
 
 const MAX_JSON_BYTES = 256 * 1024;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DRIVER_ATTEMPT_STATUSES = new Set([
   "PENDING",
   "ACCEPTED",
   "REJECTED",
   "TIMEOUT",
-  "CANCELLED"
+  "CANCELLED",
 ]);
 const RECONCILABLE_DELIVERY_STATUSES = new Set(["SENDING", "FAILED"]);
 
@@ -52,7 +53,7 @@ function sendJson(res, status, value) {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload),
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff"
+    "x-content-type-options": "nosniff",
   });
   res.end(payload);
 }
@@ -63,9 +64,11 @@ async function readJson(req, maxBytes = MAX_JSON_BYTES) {
     req.resume();
     throw new ApiError(413, "حجم البيانات أكبر من المسموح.");
   }
-  if (!String(req.headers["content-type"] || "")
-    .toLowerCase()
-    .startsWith("application/json")) {
+  if (
+    !String(req.headers["content-type"] || "")
+      .toLowerCase()
+      .startsWith("application/json")
+  ) {
     req.resume();
     throw new ApiError(415, "يجب إرسال البيانات بصيغة JSON.");
   }
@@ -167,7 +170,10 @@ function parseDate(value, label) {
     throw new ApiError(400, `${label} يجب أن يكون بالتنسيق YYYY-MM-DD.`);
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
     throw new ApiError(400, `${label} غير صالح.`);
   }
   return value;
@@ -186,9 +192,9 @@ function isRestaurantOpen(row) {
   const now = new Date();
   const hours = now.getHours();
   const minutes = now.getMinutes();
-  const currentTimeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-  const open = (row.opening_time || '08:00:00').slice(0, 5);
-  const close = (row.closing_time || '22:00:00').slice(0, 5);
+  const currentTimeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const open = (row.opening_time || "08:00:00").slice(0, 5);
+  const close = (row.closing_time || "22:00:00").slice(0, 5);
   if (open <= close) {
     return currentTimeStr >= open && currentTimeStr < close;
   } else {
@@ -210,10 +216,14 @@ function mapRestaurant(row) {
     imageUrl: row.logo_url || row.cover_url || "",
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
-    openingTime: row.opening_time ? String(row.opening_time).slice(0, 5) : "08:00",
-    closingTime: row.closing_time ? String(row.closing_time).slice(0, 5) : "22:00",
+    openingTime: row.opening_time
+      ? String(row.opening_time).slice(0, 5)
+      : "08:00",
+    closingTime: row.closing_time
+      ? String(row.closing_time).slice(0, 5)
+      : "22:00",
     isOpen: isRestaurantOpen(row),
-    status: row.status || "ACTIVE"
+    status: row.status || "ACTIVE",
   };
 }
 
@@ -228,7 +238,8 @@ function mapProduct(row) {
     imageUrl: row.image_url || "",
     categoryId: row.category_id == null ? null : Number(row.category_id),
     isAvailable: Boolean(row.is_available),
-    stockQuantity: row.stock_quantity == null ? null : Number(row.stock_quantity)
+    stockQuantity:
+      row.stock_quantity == null ? null : Number(row.stock_quantity),
   };
 }
 
@@ -242,9 +253,10 @@ function mapSubscription(row) {
     status: row.status,
     startDate: dateOnly(row.start_date),
     expiryDate: dateOnly(row.expiry_date),
-    renewalDate: row.expiry_date instanceof Date
-      ? row.expiry_date.toISOString().slice(0, 10)
-      : String(row.expiry_date || "").slice(0, 10)
+    renewalDate:
+      row.expiry_date instanceof Date
+        ? row.expiry_date.toISOString().slice(0, 10)
+        : String(row.expiry_date || "").slice(0, 10),
   };
 }
 
@@ -264,9 +276,11 @@ function mapDriver(row) {
     restaurantId: Number(row.restaurant_id),
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
-    locationUpdatedAt: row.location_updated_at ? new Date(row.location_updated_at).toISOString() : null,
+    locationUpdatedAt: row.location_updated_at
+      ? new Date(row.location_updated_at).toISOString()
+      : null,
     isActive: Boolean(row.is_active) && row.status === "ACTIVE",
-    status: row.status || "INACTIVE"
+    status: row.status || "INACTIVE",
   };
 }
 
@@ -278,7 +292,7 @@ function sanitizeDeliveryError(value) {
     "SMTP_USER",
     "DATABASE_URL",
     "EXTERNAL_DATABASE_URL",
-    "SESSION_SECRET"
+    "SESSION_SECRET",
   ]) {
     const secret = process.env[key];
     if (secret) message = message.split(secret).join("[redacted]");
@@ -304,7 +318,7 @@ function mapEmailDelivery(row) {
     error: sanitizeDeliveryError(row.error),
     retryCount: Number(row.retry_count),
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
@@ -313,7 +327,7 @@ function mapOrder(row, items = []) {
     row,
     { name: row.restaurant_name || "" },
     items,
-    row.assignment_status || null
+    row.assignment_status || null,
   );
 }
 
@@ -341,7 +355,7 @@ async function loadOrder(client, id) {
         ) cancellation ON o.status = 'CANCELLED'
       WHERE o.id = $1
       LIMIT 1`,
-    [id]
+    [id],
   );
   const row = result.rows[0];
   if (!row) return null;
@@ -361,7 +375,7 @@ async function loadOrder(client, id) {
        ) addon_rows ON TRUE
       WHERE oi.order_id = $1
       ORDER BY oi.id`,
-    [id]
+    [id],
   );
   const items = itemResult.rows.map((item) => ({
     productId: Number(item.product_id),
@@ -370,7 +384,7 @@ async function loadOrder(client, id) {
     unitPrice: Number(item.unit_price),
     subtotal: Number(item.subtotal),
     selectedSize: item.size_name || null,
-    addons: item.addons || []
+    addons: item.addons || [],
   }));
   return mapOrder(row, items);
 }
@@ -390,7 +404,7 @@ async function getCatalog() {
              AND s.start_date <= CURRENT_DATE
              AND s.expiry_date >= CURRENT_DATE
         )
-      ORDER BY r.name, r.id`
+      ORDER BY r.name, r.id`,
   );
   const restaurantIds = restaurantsResult.rows.map((row) => Number(row.id));
   if (!restaurantIds.length) {
@@ -409,7 +423,7 @@ async function getCatalog() {
           AND p.is_available = TRUE
           AND COALESCE(c.is_available, TRUE) = TRUE
         ORDER BY p.sort_order, p.id`,
-      [restaurantIds]
+      [restaurantIds],
     ),
     pool.query(
       `SELECT s.id, s.restaurant_id, s.plan, s.status, s.start_date, s.expiry_date,
@@ -421,13 +435,13 @@ async function getCatalog() {
           AND s.start_date <= CURRENT_DATE
           AND s.expiry_date >= CURRENT_DATE
         ORDER BY r.name, s.id`,
-      [restaurantIds]
-    )
+      [restaurantIds],
+    ),
   ]);
   return {
     restaurants: restaurantsResult.rows.map(mapRestaurant),
     products: productsResult.rows.map(mapProduct),
-    subscriptions: subscriptionsResult.rows.map(mapSubscription)
+    subscriptions: subscriptionsResult.rows.map(mapSubscription),
   };
 }
 
@@ -435,11 +449,12 @@ function normalizeOrderInput(input) {
   const restaurantId = positiveInt(input.restaurantId, "المطعم");
   const customerName = requiredText(input.customerName, "اسم الزبون", 120);
   const customerPhone = requiredText(input.customerPhone, "رقم الهاتف", 40, {
-    minLength: 3
+    minLength: 3,
   });
-  const orderType = typeof input.orderType === "string"
-    ? input.orderType.trim().toUpperCase()
-    : "";
+  const orderType =
+    typeof input.orderType === "string"
+      ? input.orderType.trim().toUpperCase()
+      : "";
   if (!["DELIVERY", "RESERVATION"].includes(orderType)) {
     throw new ApiError(400, "نوع الطلب غير مدعوم.");
   }
@@ -461,7 +476,10 @@ function normalizeOrderInput(input) {
       input.longitude < -180 ||
       input.longitude > 180
     ) {
-      throw new ApiError(400, "موقع التوصيل مطلوب ويجب أن يحتوي على إحداثيات صحيحة.");
+      throw new ApiError(
+        400,
+        "موقع التوصيل مطلوب ويجب أن يحتوي على إحداثيات صحيحة.",
+      );
     }
     latitude = input.latitude;
     longitude = input.longitude;
@@ -480,7 +498,11 @@ function normalizeOrderInput(input) {
     }
   }
 
-  if (!Array.isArray(input.items) || input.items.length < 1 || input.items.length > 50) {
+  if (
+    !Array.isArray(input.items) ||
+    input.items.length < 1 ||
+    input.items.length > 50
+  ) {
     throw new ApiError(400, "يجب أن يحتوي الطلب على منتجات صالحة.");
   }
   const items = input.items.map((item) => {
@@ -498,7 +520,10 @@ function normalizeOrderInput(input) {
       throw new ApiError(400, "السعر الإضافي غير صالح.");
     }
     if (!selectedSize && extraPrice !== 0) {
-      throw new ApiError(400, "السعر الإضافي غير مدعوم؛ اختر حجماً مسجلاً في قائمة المطعم.");
+      throw new ApiError(
+        400,
+        "السعر الإضافي غير مدعوم؛ اختر حجماً مسجلاً في قائمة المطعم.",
+      );
     }
     return { productId, quantity, selectedSize, extraPrice };
   });
@@ -513,7 +538,7 @@ function normalizeOrderInput(input) {
     reservationTime,
     partySize,
     notes,
-    items
+    items,
   };
 }
 
@@ -537,7 +562,7 @@ async function createOrder(input, idempotencyKey) {
         WHERE source = 'ANDROID_CUSTOMER'
           AND client_request_id = $1::uuid
         LIMIT 1`,
-      [idempotencyKey]
+      [idempotencyKey],
     );
     if (prior.rows[0]) {
       assertMatchingOrderPayload(prior.rows[0], payloadHash);
@@ -556,24 +581,30 @@ async function createOrder(input, idempotencyKey) {
           AND s.expiry_date >= CURRENT_DATE
         LIMIT 1
         FOR SHARE OF r, s`,
-      [data.restaurantId]
+      [data.restaurantId],
     );
     const restaurant = restaurantResult.rows[0];
     if (!restaurant) {
       throw new ApiError(409, "المطعم غير متاح أو لا يملك عضوية نشطة.");
     }
-    const open = (restaurant.opening_time || '08:00:00').slice(0, 5);
-    const close = (restaurant.closing_time || '22:00:00').slice(0, 5);
+    const open = (restaurant.opening_time || "08:00:00").slice(0, 5);
+    const close = (restaurant.closing_time || "22:00:00").slice(0, 5);
     const now = new Date();
-    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const isOpen = open <= close ? (currentTimeStr >= open && currentTimeStr < close) : (currentTimeStr >= open || currentTimeStr < close);
+    const currentTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const isOpen =
+      open <= close
+        ? currentTimeStr >= open && currentTimeStr < close
+        : currentTimeStr >= open || currentTimeStr < close;
     if (!isOpen) {
-      throw new ApiError(409, "المطعم مغلق حالياً ولا يمكن استقبال طلبات في هذا الوقت.");
+      throw new ApiError(
+        409,
+        "المطعم مغلق حالياً ولا يمكن استقبال طلبات في هذا الوقت.",
+      );
     }
     if (data.reservationDate) {
       const validDate = await client.query(
         "SELECT $1::date >= CURRENT_DATE AS valid",
-        [data.reservationDate]
+        [data.reservationDate],
       );
       if (!validDate.rows[0]?.valid) {
         throw new ApiError(400, "تاريخ الحجز لا يمكن أن يكون في الماضي.");
@@ -590,10 +621,10 @@ async function createOrder(input, idempotencyKey) {
           AND p.restaurant_id = $2
           AND p.is_available = TRUE
         FOR SHARE`,
-      [productIds, data.restaurantId]
+      [productIds, data.restaurantId],
     );
     const products = new Map(
-      productsResult.rows.map((product) => [Number(product.id), product])
+      productsResult.rows.map((product) => [Number(product.id), product]),
     );
     if (products.size !== productIds.length) {
       throw new ApiError(409, "يوجد منتج غير متاح أو لا يتبع المطعم المحدد.");
@@ -603,12 +634,15 @@ async function createOrder(input, idempotencyKey) {
     for (const item of data.items) {
       quantityByProduct.set(
         item.productId,
-        (quantityByProduct.get(item.productId) || 0) + item.quantity
+        (quantityByProduct.get(item.productId) || 0) + item.quantity,
       );
     }
     for (const [productId, quantity] of quantityByProduct) {
       const product = products.get(productId);
-      if (product.stock_quantity != null && quantity > Number(product.stock_quantity)) {
+      if (
+        product.stock_quantity != null &&
+        quantity > Number(product.stock_quantity)
+      ) {
         throw new ApiError(409, "كمية أحد المنتجات غير متوفرة حالياً.");
       }
     }
@@ -628,7 +662,7 @@ async function createOrder(input, idempotencyKey) {
               AND is_available = TRUE
               AND (LOWER(name) = LOWER($2) OR LOWER(name_ar) = LOWER($2))
             LIMIT 1`,
-          [item.productId, item.selectedSize]
+          [item.productId, item.selectedSize],
         );
         const size = sizeResult.rows[0];
         if (!size) {
@@ -648,20 +682,18 @@ async function createOrder(input, idempotencyKey) {
         productName: product.name_ar || product.name,
         unitMilli,
         sizeId,
-        sizeName
+        sizeName,
       });
     }
 
     const subtotal = (subtotalMilli / 1000).toFixed(3);
-    const deliveryFee = data.orderType === "DELIVERY"
-      ? lyD(restaurant.delivery_fee)
-      : "0.000";
-    const totalAmount = (
-      subtotalMilli + Math.round(Number(deliveryFee) * 1000)
-    );
-    const mapsUrl = data.orderType === "DELIVERY"
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.latitude},${data.longitude}`)}`
-      : null;
+    const deliveryFee =
+      data.orderType === "DELIVERY" ? lyD(restaurant.delivery_fee) : "0.000";
+    const totalAmount = subtotalMilli + Math.round(Number(deliveryFee) * 1000);
+    const mapsUrl =
+      data.orderType === "DELIVERY"
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${data.latitude},${data.longitude}`)}`
+        : null;
 
     const inserted = await client.query(
       `INSERT INTO orders (
@@ -695,8 +727,8 @@ async function createOrder(input, idempotencyKey) {
         data.reservationTime,
         data.partySize,
         idempotencyKey,
-        payloadHash
-      ]
+        payloadHash,
+      ],
     );
     if (!inserted.rows[0]) {
       const duplicate = await client.query(
@@ -705,7 +737,7 @@ async function createOrder(input, idempotencyKey) {
           WHERE source = 'ANDROID_CUSTOMER'
             AND client_request_id = $1::uuid
           LIMIT 1`,
-        [idempotencyKey]
+        [idempotencyKey],
       );
       if (!duplicate.rows[0]) {
         throw new ApiError(409, "تعذر إتمام الطلب. أعد المحاولة بمفتاح جديد.");
@@ -713,13 +745,13 @@ async function createOrder(input, idempotencyKey) {
       assertMatchingOrderPayload(duplicate.rows[0], payloadHash);
       return {
         order: await loadOrder(client, Number(duplicate.rows[0].id)),
-        created: false
+        created: false,
       };
     }
 
     const orderId = Number(inserted.rows[0].id);
     for (const item of pricedItems) {
-      const itemSubtotal = (item.unitMilli * item.quantity / 1000).toFixed(3);
+      const itemSubtotal = ((item.unitMilli * item.quantity) / 1000).toFixed(3);
       await client.query(
         `INSERT INTO order_items (
            order_id, product_id, product_name, quantity,
@@ -734,19 +766,19 @@ async function createOrder(input, idempotencyKey) {
           (item.unitMilli / 1000).toFixed(3),
           itemSubtotal,
           item.sizeId,
-          item.sizeName
-        ]
+          item.sizeName,
+        ],
       );
     }
     await client.query(
       `INSERT INTO order_status_history (order_id, status, note)
        VALUES ($1, 'NEW', 'Order saved from Android customer app')`,
-      [orderId]
+      [orderId],
     );
     await client.query(
       `INSERT INTO order_email_dispatch_jobs (order_id, state, created_at, updated_at)
        VALUES ($1, 'ACTIVE', NOW(), NOW())`,
-      [orderId]
+      [orderId],
     );
     return { order: await loadOrder(client, orderId), created: true };
   });
@@ -761,16 +793,25 @@ function routeFailureStatus(error) {
 }
 
 function routeFailureMessage(error, status) {
-  if (error instanceof ApiError || error instanceof AuthError || error instanceof StatsError) {
+  if (
+    error instanceof ApiError ||
+    error instanceof AuthError ||
+    error instanceof StatsError
+  ) {
     return error.message;
   }
-  if (Number.isInteger(error?.status) && status < 500 && typeof error.message === "string") {
+  if (
+    Number.isInteger(error?.status) &&
+    status < 500 &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
   if (error?.code === "42P01" || error?.code === "42703") {
     return "تحديث قاعدة البيانات المطلوب غير مطبق بعد. تحقّق من ترحيلات server/migrations.";
   }
-  if (status === 409) return "توجد بيانات متعارضة. تحقق من الطلب وأعد المحاولة.";
+  if (status === 409)
+    return "توجد بيانات متعارضة. تحقق من الطلب وأعد المحاولة.";
   if (status === 400) return "البيانات المرسلة غير صالحة.";
   if (status === 503) return "تحديث قاعدة البيانات المطلوب غير مطبق بعد.";
   return "تعذر إكمال الطلب بسبب خطأ داخلي.";
@@ -780,7 +821,7 @@ function mapDatabaseError(error) {
   const status = routeFailureStatus(error);
   return {
     status,
-    message: routeFailureMessage(error, status)
+    message: routeFailureMessage(error, status),
   };
 }
 
@@ -844,41 +885,116 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
       WHERE ($2::integer IS NULL OR o.restaurant_id = $2)
       ORDER BY o.created_at DESC, o.id DESC
       LIMIT $1`,
-    [limit, restaurantId]
+    [limit, restaurantId],
   );
   return result.rows.map((row) => mapOrder(row, row.items || []));
 }
 
 async function getRestaurantPortal(restaurantId) {
-  const [restaurantResult, orders, totalsResult] = await Promise.all([
-    pool.query(
-      `SELECT id, name, phone, address, status
+  const [restaurantResult, orders, totalsResult, reportRows] =
+    await Promise.all([
+      pool.query(
+        `SELECT id, name, phone, address, status
          FROM restaurants
         WHERE id=$1
         LIMIT 1`,
-      [restaurantId]
-    ),
-    listAdminOrders(null, restaurantId),
-    pool.query(
-      `SELECT COUNT(*)::integer AS total_orders,
+        [restaurantId],
+      ),
+      listAdminOrders(null, restaurantId),
+      pool.query(
+        `SELECT COUNT(*)::integer AS total_orders,
               COUNT(*) FILTER (WHERE is_archived=FALSE)::integer AS active_orders,
               COUNT(*) FILTER (WHERE is_archived=TRUE)::integer AS archived_orders,
               COUNT(*) FILTER (WHERE status<>'CANCELLED')::integer AS payable_orders,
+              COALESCE(SUM(total_amount), 0)::numeric AS total_order_value,
+              COALESCE(SUM(total_amount) FILTER (
+                WHERE status IN ('COMPLETED', 'DELIVERED')
+              ), 0)::numeric AS completed_order_value,
+              COALESCE(SUM(delivery_fee), 0)::numeric AS delivery_fees,
+              COUNT(*) FILTER (
+                WHERE status IN ('CONFIRMED', 'ACCEPTED', 'PREPARING', 'READY', 'ON_THE_WAY')
+              )::integer AS confirmed_orders,
+              COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'DELIVERED'))::integer AS completed_orders,
+              COUNT(*) FILTER (WHERE status='CANCELLED')::integer AS cancelled_orders,
+              COUNT(*) FILTER (WHERE EXISTS (
+                SELECT 1 FROM order_status_history h
+                 WHERE h.order_id=orders.id AND h.status='REJECTED'
+              ))::integer AS rejected_orders,
               COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'), 0)::numeric AS revenue
          FROM orders
         WHERE restaurant_id=$1`,
-      [restaurantId]
-    )
-  ]);
+        [restaurantId],
+      ),
+      pool.query(
+        `WITH restaurant_orders AS (
+         SELECT o.id, o.status, o.total_amount, o.delivery_fee, o.created_at,
+                EXISTS (
+                  SELECT 1 FROM order_status_history h
+                   WHERE h.order_id=o.id AND h.status='REJECTED'
+                ) AS was_rejected
+           FROM orders o
+          WHERE o.restaurant_id=$1
+       ),
+       bucketed AS (
+         SELECT o.*,
+                periods.period_type,
+                periods.period_start
+           FROM restaurant_orders o
+           CROSS JOIN LATERAL (VALUES
+             ('daily', date_trunc('day', o.created_at AT TIME ZONE 'Africa/Algiers')),
+             ('weekly', date_trunc('week', o.created_at AT TIME ZONE 'Africa/Algiers')),
+             ('monthly', date_trunc('month', o.created_at AT TIME ZONE 'Africa/Algiers')),
+             ('yearly', date_trunc('year', o.created_at AT TIME ZONE 'Africa/Algiers'))
+           ) AS periods(period_type, period_start)
+       )
+       SELECT period_type,
+              CASE period_type
+                WHEN 'daily' THEN to_char(period_start, 'YYYY-MM-DD')
+                WHEN 'weekly' THEN to_char(period_start, 'YYYY-MM-DD')
+                WHEN 'monthly' THEN to_char(period_start, 'YYYY-MM')
+                ELSE to_char(period_start, 'YYYY')
+              END AS period,
+              COUNT(*)::integer AS orders,
+              COUNT(*) FILTER (
+                WHERE status IN ('CONFIRMED', 'ACCEPTED', 'PREPARING', 'READY', 'ON_THE_WAY')
+              )::integer AS confirmed_orders,
+              COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'DELIVERED'))::integer AS completed_orders,
+              COUNT(*) FILTER (WHERE status='CANCELLED')::integer AS cancelled_orders,
+              COUNT(*) FILTER (WHERE was_rejected)::integer AS rejected_orders,
+              COALESCE(SUM(total_amount), 0)::numeric AS order_value,
+              COALESCE(SUM(total_amount) FILTER (
+                WHERE status IN ('COMPLETED', 'DELIVERED')
+              ), 0)::numeric AS completed_value,
+              COALESCE(SUM(delivery_fee), 0)::numeric AS delivery_fees
+         FROM bucketed
+        GROUP BY period_type, period_start
+        ORDER BY period_type, period_start DESC`,
+        [restaurantId],
+      ),
+    ]);
   const restaurant = restaurantResult.rows[0];
   if (!restaurant) throw new AuthError(404, "المطعم غير موجود.");
   const totals = totalsResult.rows[0];
+  const reports = { daily: [], weekly: [], monthly: [], yearly: [] };
+  for (const row of reportRows.rows) {
+    reports[row.period_type].push({
+      period: row.period,
+      orders: Number(row.orders),
+      confirmedOrders: Number(row.confirmed_orders),
+      completedOrders: Number(row.completed_orders),
+      cancelledOrders: Number(row.cancelled_orders),
+      rejectedOrders: Number(row.rejected_orders),
+      orderValue: Number(row.order_value),
+      completedValue: Number(row.completed_value),
+      deliveryFees: Number(row.delivery_fees),
+    });
+  }
   return {
     restaurant: {
       id: Number(restaurant.id),
       name: restaurant.name,
       phone: restaurant.phone || "",
-      address: restaurant.address || ""
+      address: restaurant.address || "",
     },
     orders,
     summary: {
@@ -886,8 +1002,22 @@ async function getRestaurantPortal(restaurantId) {
       activeOrders: Number(totals.active_orders),
       archivedOrders: Number(totals.archived_orders),
       payableOrders: Number(totals.payable_orders),
-      revenue: Number(totals.revenue)
-    }
+      revenue: Number(totals.revenue),
+      totalOrderValue: Number(totals.total_order_value),
+      completedOrderValue: Number(totals.completed_order_value),
+      deliveryFees: Number(totals.delivery_fees),
+      confirmedOrders: Number(totals.confirmed_orders),
+      completedOrders: Number(totals.completed_orders),
+      cancelledOrders: Number(totals.cancelled_orders),
+      rejectedOrders: Number(totals.rejected_orders),
+    },
+    accounting: {
+      settlementTrackingAvailable: false,
+      amountDue: null,
+      amountPaid: null,
+      transactions: [],
+    },
+    reports,
   };
 }
 
@@ -896,7 +1026,7 @@ async function listAdminDrivers() {
     `SELECT d.id, d.restaurant_id, d.name, d.phone, d.email, d.status, d.is_active, d.serial_number,
             d.latitude, d.longitude, d.location_updated_at
        FROM drivers d
-      ORDER BY d.created_at DESC, d.id DESC`
+      ORDER BY d.created_at DESC, d.id DESC`,
   );
   return result.rows.map(mapDriver);
 }
@@ -908,7 +1038,7 @@ async function listRestaurants({ activeOnly = false } = {}) {
             r.opening_time, r.closing_time
        FROM restaurants r
       ${activeOnly ? "WHERE r.status = 'ACTIVE'" : ""}
-      ORDER BY r.name, r.id`
+      ORDER BY r.name, r.id`,
   );
   return result.rows.map(mapRestaurant);
 }
@@ -919,7 +1049,7 @@ async function listAdminSubscriptions() {
             r.name AS restaurant_name
        FROM subscriptions s
        JOIN restaurants r ON r.id = s.restaurant_id
-      ORDER BY s.expiry_date DESC, s.id DESC`
+      ORDER BY s.expiry_date DESC, s.id DESC`,
   );
   return result.rows.map(mapSubscription);
 }
@@ -933,7 +1063,7 @@ async function listAdminEmailDeliveries(status) {
       WHERE status = $1
       ORDER BY updated_at DESC, id DESC
       LIMIT 500`,
-    [status]
+    [status],
   );
   return result.rows.map(mapEmailDelivery);
 }
@@ -945,15 +1075,16 @@ async function getAdminOverview() {
     status: null,
     period: "month",
     restaurantId: null,
-    driverId: null
+    driverId: null,
   };
-  const [orders, drivers, subscriptions, restaurants, stats] = await Promise.all([
-    listAdminOrders(),
-    listAdminDrivers(),
-    listAdminSubscriptions(),
-    listRestaurants(),
-    getAdminStats(filters)
-  ]);
+  const [orders, drivers, subscriptions, restaurants, stats] =
+    await Promise.all([
+      listAdminOrders(),
+      listAdminDrivers(),
+      listAdminSubscriptions(),
+      listRestaurants(),
+      getAdminStats(filters),
+    ]);
   return { orders, drivers, subscriptions, restaurants, stats };
 }
 
@@ -968,7 +1099,7 @@ async function ensureUniqueDriverEmail(client, email, ignoredId = null) {
         AND email IS NOT NULL
         ${ignoreClause}
       LIMIT 1`,
-    values
+    values,
   );
   if (found.rows.length) {
     throw new ApiError(409, "هذا البريد الإلكتروني مستخدم لسائق آخر.");
@@ -980,13 +1111,14 @@ async function createDriver(input) {
   const phone = requiredText(input.phone, "رقم الهاتف", 40, { minLength: 3 });
   const email = validEmail(input.email);
   const restaurantId = positiveInt(input.restaurantId, "المطعم");
-  const isActive = input.isActive == null ? true : optionalBoolean(input.isActive, "الحالة");
+  const isActive =
+    input.isActive == null ? true : optionalBoolean(input.isActive, "الحالة");
 
   return withTransaction(async (client) => {
     await client.query("LOCK TABLE drivers IN SHARE ROW EXCLUSIVE MODE");
     const restaurant = await client.query(
       "SELECT id FROM restaurants WHERE id = $1 LIMIT 1",
-      [restaurantId]
+      [restaurantId],
     );
     if (!restaurant.rows[0]) {
       throw new ApiError(404, "المطعم المحدد غير موجود.");
@@ -1009,13 +1141,13 @@ async function createDriver(input) {
           email,
           isActive,
           isActive ? "ACTIVE" : "INACTIVE",
-          serialNumber
-        ]
+          serialNumber,
+        ],
       );
       if (inserted.rows[0]) {
         return {
           driver: mapDriver(inserted.rows[0]),
-          serialNumber
+          serialNumber,
         };
       }
     }
@@ -1025,7 +1157,13 @@ async function createDriver(input) {
 
 async function updateDriver(id, input) {
   const driverId = positiveInt(id, "السائق");
-  const allowed = new Set(["name", "phone", "email", "restaurantId", "isActive"]);
+  const allowed = new Set([
+    "name",
+    "phone",
+    "email",
+    "restaurantId",
+    "isActive",
+  ]);
   const keys = Object.keys(input);
   if (!keys.length || keys.some((key) => !allowed.has(key))) {
     throw new ApiError(400, "حقول تحديث السائق غير صالحة.");
@@ -1037,14 +1175,18 @@ async function updateDriver(id, input) {
     values.push(value);
     updates.push(`${column} = $${values.length}`);
   };
-  if (Object.hasOwn(input, "name")) add("name", requiredText(input.name, "اسم السائق", 120));
+  if (Object.hasOwn(input, "name"))
+    add("name", requiredText(input.name, "اسم السائق", 120));
   if (Object.hasOwn(input, "phone")) {
     add("phone", requiredText(input.phone, "رقم الهاتف", 40, { minLength: 3 }));
   }
   if (Object.hasOwn(input, "email")) add("email", validEmail(input.email));
   if (Object.hasOwn(input, "restaurantId")) {
     const restaurantId = positiveInt(input.restaurantId, "المطعم");
-    const found = await pool.query("SELECT id FROM restaurants WHERE id = $1 LIMIT 1", [restaurantId]);
+    const found = await pool.query(
+      "SELECT id FROM restaurants WHERE id = $1 LIMIT 1",
+      [restaurantId],
+    );
     if (!found.rows[0]) throw new ApiError(404, "المطعم المحدد غير موجود.");
     add("restaurant_id", restaurantId);
   }
@@ -1059,7 +1201,7 @@ async function updateDriver(id, input) {
     await client.query("LOCK TABLE drivers IN SHARE ROW EXCLUSIVE MODE");
     const current = await client.query(
       "SELECT id, email FROM drivers WHERE id = $1 FOR UPDATE",
-      [driverId]
+      [driverId],
     );
     if (!current.rows[0]) throw new ApiError(404, "السائق غير موجود.");
     if (Object.hasOwn(input, "email")) {
@@ -1079,14 +1221,15 @@ async function updateDriver(id, input) {
           SET ${updates.join(", ")}
         WHERE id = $${values.length}
         RETURNING id, restaurant_id, name, phone, email, status, is_active, serial_number`,
-      values
+      values,
     );
     return mapDriver(result.rows[0]);
   });
 }
 
 function slugBase(value) {
-  const normalized = value.toLowerCase()
+  const normalized = value
+    .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
@@ -1100,20 +1243,42 @@ async function createRestaurant(input) {
   const phone = requiredText(input.phone, "رقم الهاتف", 40, { minLength: 3 });
   const address = requiredText(input.address, "العنوان", 300);
   const description = optionalText(input.description, "الوصف", 1500) || "";
-  const imageUrl = input.imageUrl ? String(input.imageUrl).trim() : (input.logoUrl ? String(input.logoUrl).trim() : "");
-  const deliveryFee = input.deliveryFee != null ? Math.max(0, Number(input.deliveryFee) || 0) : 0;
-  const lat = input.latitude == null || input.latitude === "" ? null : Number(input.latitude);
-  const latitude = (lat != null && Number.isFinite(lat) && lat >= -90 && lat <= 90) ? lat : null;
-  const lng = input.longitude == null || input.longitude === "" ? null : Number(input.longitude);
-  const longitude = (lng != null && Number.isFinite(lng) && lng >= -180 && lng <= 180) ? lng : null;
-  const openingTime = input.openingTime ? String(input.openingTime).trim() : '08:00';
-  const closingTime = input.closingTime ? String(input.closingTime).trim() : '22:00';
+  const imageUrl = input.imageUrl
+    ? String(input.imageUrl).trim()
+    : input.logoUrl
+      ? String(input.logoUrl).trim()
+      : "";
+  const deliveryFee =
+    input.deliveryFee != null ? Math.max(0, Number(input.deliveryFee) || 0) : 0;
+  const lat =
+    input.latitude == null || input.latitude === ""
+      ? null
+      : Number(input.latitude);
+  const latitude =
+    lat != null && Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null;
+  const lng =
+    input.longitude == null || input.longitude === ""
+      ? null
+      : Number(input.longitude);
+  const longitude =
+    lng != null && Number.isFinite(lng) && lng >= -180 && lng <= 180
+      ? lng
+      : null;
+  const openingTime = input.openingTime
+    ? String(input.openingTime).trim()
+    : "08:00";
+  const closingTime = input.closingTime
+    ? String(input.closingTime).trim()
+    : "22:00";
   const base = slugBase(name);
 
   return withTransaction(async (client) => {
     let slug = base;
     for (let index = 0; index < 8; index += 1) {
-      const exists = await client.query("SELECT 1 FROM restaurants WHERE slug = $1 LIMIT 1", [slug]);
+      const exists = await client.query(
+        "SELECT 1 FROM restaurants WHERE slug = $1 LIMIT 1",
+        [slug],
+      );
       if (!exists.rows[0]) break;
       slug = `${base}-${randomUUID().slice(0, 6)}`;
     }
@@ -1122,11 +1287,23 @@ async function createRestaurant(input) {
        VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10::time, $11::time, 'ACTIVE')
        RETURNING id, name, slug, phone, address, description,
                  logo_url, cover_url, delivery_fee, latitude, longitude, opening_time, closing_time, status`,
-      [name, slug, phone, address, description, imageUrl, deliveryFee, latitude, longitude, openingTime, closingTime]
+      [
+        name,
+        slug,
+        phone,
+        address,
+        description,
+        imageUrl,
+        deliveryFee,
+        latitude,
+        longitude,
+        openingTime,
+        closingTime,
+      ],
     );
     const accountSerialNumber = await createRestaurantAccountSerial(
       client,
-      Number(inserted.rows[0].id)
+      Number(inserted.rows[0].id),
     );
     return { restaurant: mapRestaurant(inserted.rows[0]), accountSerialNumber };
   });
@@ -1140,7 +1317,7 @@ async function completeDriverOrder(driverId, orderId) {
          FROM orders
         WHERE id = $1
         FOR UPDATE`,
-      [id]
+      [id],
     );
     const order = found.rows[0];
     if (!order || Number(order.driver_id) !== driverId) {
@@ -1159,16 +1336,16 @@ async function completeDriverOrder(driverId, orderId) {
               completed_at = COALESCE(completed_at, NOW()),
               updated_at = NOW()
         WHERE id = $1`,
-      [id]
+      [id],
     );
     await client.query(
       "UPDATE drivers SET total_deliveries = total_deliveries + 1 WHERE id = $1",
-      [driverId]
+      [driverId],
     );
     await client.query(
       `INSERT INTO order_status_history (order_id, status, note)
        VALUES ($1, 'COMPLETED', 'Completed by the assigned driver')`,
-      [id]
+      [id],
     );
     return { orderId: id, changed: true };
   });
@@ -1178,17 +1355,21 @@ async function completeDriverOrder(driverId, orderId) {
 
 async function cancelAdminOrder(orderId, reason) {
   const id = positiveInt(orderId, "الطلب");
-  const cancellationReason = requiredText(reason, "سبب الإلغاء", 500, { minLength: 3 });
+  const cancellationReason = requiredText(reason, "سبب الإلغاء", 500, {
+    minLength: 3,
+  });
   const result = await withTransaction(async (client) => {
     // Match the dispatcher and driver-response lock order to prevent stale accepts.
     await client.query(
       "SELECT order_id FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
-      [id]
+      [id],
     );
-    const order = (await client.query(
-      "SELECT id,status FROM orders WHERE id=$1 FOR UPDATE",
-      [id]
-    )).rows[0];
+    const order = (
+      await client.query(
+        "SELECT id,status FROM orders WHERE id=$1 FOR UPDATE",
+        [id],
+      )
+    ).rows[0];
     if (!order) throw new ApiError(404, "الطلب غير موجود.");
     if (order.status === "CANCELLED") {
       return { changed: false };
@@ -1201,36 +1382,46 @@ async function cancelAdminOrder(orderId, reason) {
       `UPDATE order_driver_attempts
           SET status='CANCELLED',responded_at=now(),response_at=now(),cancelled_at=now()
         WHERE order_id=$1 AND status='PENDING'`,
-      [id]
+      [id],
     );
     await client.query(
       `UPDATE order_email_dispatch_jobs
           SET state='DONE',updated_at=now()
         WHERE order_id=$1`,
-      [id]
+      [id],
     );
     const cancelled = await client.query(
       `UPDATE orders
           SET status='CANCELLED',cancelled_at=now(),updated_at=now()
         WHERE id=$1 AND status NOT IN ('COMPLETED','DELIVERED','CANCELLED')
         RETURNING id`,
-      [id]
+      [id],
     );
     if (!cancelled.rowCount) {
-      throw new ApiError(409, "تغيّرت حالة الطلب. حدّث البيانات ثم أعد المحاولة.");
+      throw new ApiError(
+        409,
+        "تغيّرت حالة الطلب. حدّث البيانات ثم أعد المحاولة.",
+      );
     }
     await client.query(
       `INSERT INTO order_status_history (order_id,status,note)
        VALUES ($1,'CANCELLED',$2)`,
-      [id, cancellationReason]
+      [id, cancellationReason],
     );
     return { changed: true };
   });
-  return { ok: true, changed: result.changed, order: await loadOrder(pool, id) };
+  return {
+    ok: true,
+    changed: result.changed,
+    order: await loadOrder(pool, id),
+  };
 }
 
 function methodNotAllowed(res) {
-  sendJson(res, 405, { error: "METHOD_NOT_ALLOWED", message: "طريقة الطلب غير مدعومة." });
+  sendJson(res, 405, {
+    error: "METHOD_NOT_ALLOWED",
+    message: "طريقة الطلب غير مدعومة.",
+  });
   return true;
 }
 
@@ -1240,7 +1431,8 @@ async function routeApi(req, res, url) {
 
   if (await handleGmailOAuthRoutes(req, res, url, { sendJson })) return true;
   if (await handleDriverGmailRoutes(req, res, url, { sendJson })) return true;
-  if (await handleAdminManagement(req, res, url, { readJson, sendJson })) return true;
+  if (await handleAdminManagement(req, res, url, { readJson, sendJson }))
+    return true;
 
   if (path.startsWith("/api/storage/db-images/")) {
     if (method !== "GET" && method !== "HEAD") return methodNotAllowed(res);
@@ -1264,7 +1456,7 @@ async function routeApi(req, res, url) {
             ))
           )
         LIMIT 1`,
-      [id.toLowerCase(), `/api/storage/db-images/${id.toLowerCase()}`]
+      [id.toLowerCase(), `/api/storage/db-images/${id.toLowerCase()}`],
     );
     const image = result.rows[0];
     if (!image) {
@@ -1275,7 +1467,7 @@ async function routeApi(req, res, url) {
       "content-type": image.content_type,
       "content-length": image.data.length,
       "cache-control": "public, max-age=86400",
-      "x-content-type-options": "nosniff"
+      "x-content-type-options": "nosniff",
     });
     res.end(method === "HEAD" ? undefined : image.data);
     return true;
@@ -1340,7 +1532,11 @@ async function routeApi(req, res, url) {
   if (path === "/api/admin/restaurant-revenues") {
     if (method !== "GET") return methodNotAllowed(res);
     await requireSession(req, "admin");
-    sendJson(res, 200, await getAdminRestaurantRevenues(url.searchParams.get("date")));
+    sendJson(
+      res,
+      200,
+      await getAdminRestaurantRevenues(url.searchParams.get("date")),
+    );
     return true;
   }
   if (path === "/api/admin/email-deliveries") {
@@ -1354,7 +1550,7 @@ async function routeApi(req, res, url) {
     return true;
   }
   const reconcileDeliveryMatch = path.match(
-    /^\/api\/admin\/email-deliveries\/(\d+)\/reconcile$/
+    /^\/api\/admin\/email-deliveries\/(\d+)\/reconcile$/,
   );
   if (reconcileDeliveryMatch) {
     if (method !== "POST") return methodNotAllowed(res);
@@ -1374,7 +1570,7 @@ async function routeApi(req, res, url) {
         error: missing ? "DELIVERY_NOT_FOUND" : "RECONCILIATION_CONFLICT",
         message: missing
           ? "سجل التسليم غير موجود."
-          : "حالة التسليم لا تسمح بإجراء المصالحة الآن."
+          : "حالة التسليم لا تسمح بإجراء المصالحة الآن.",
       });
       return true;
     }
@@ -1384,8 +1580,8 @@ async function routeApi(req, res, url) {
         id,
         status: input.result === "SENT" ? "SENT" : "FAILED",
         result: input.result,
-        dispatchQueued: Boolean(outcome.advance)
-      }
+        dispatchQueued: Boolean(outcome.advance),
+      },
     });
     return true;
   }
@@ -1405,7 +1601,7 @@ async function routeApi(req, res, url) {
     return true;
   }
   const restaurantAccountMatch = path.match(
-    /^\/api\/admin\/restaurants\/(\d+)\/account$/
+    /^\/api\/admin\/restaurants\/(\d+)\/account$/,
   );
   if (restaurantAccountMatch) {
     if (method !== "GET" && method !== "POST") return methodNotAllowed(res);
@@ -1422,7 +1618,7 @@ async function routeApi(req, res, url) {
     if (method !== "POST") return methodNotAllowed(res);
     await requireSession(req, "admin");
     const result = await pool.query(
-      "UPDATE orders SET is_archived = true WHERE is_archived = false RETURNING id"
+      "UPDATE orders SET is_archived = true WHERE is_archived = false RETURNING id",
     );
     sendJson(res, 200, { ok: true, count: result.rowCount });
     return true;
@@ -1432,15 +1628,23 @@ async function routeApi(req, res, url) {
     if (method !== "POST") return methodNotAllowed(res);
     await requireSession(req, "admin");
     const input = await readJson(req, 2048);
-    sendJson(res, 200, await cancelAdminOrder(cancelOrderMatch[1], input?.reason));
+    sendJson(
+      res,
+      200,
+      await cancelAdminOrder(cancelOrderMatch[1], input?.reason),
+    );
     return true;
   }
-  const restoreOrderMatch = path.match(/^\/api\/admin\/orders\/(\d+)\/restore$/);
+  const restoreOrderMatch = path.match(
+    /^\/api\/admin\/orders\/(\d+)\/restore$/,
+  );
   if (restoreOrderMatch) {
     if (method !== "POST") return methodNotAllowed(res);
     await requireSession(req, "admin");
     const orderId = positiveInt(restoreOrderMatch[1], "الطلب");
-    await pool.query("UPDATE orders SET is_archived = false WHERE id = $1", [orderId]);
+    await pool.query("UPDATE orders SET is_archived = false WHERE id = $1", [
+      orderId,
+    ]);
     sendJson(res, 200, { ok: true, id: orderId });
     return true;
   }
@@ -1457,7 +1661,7 @@ async function routeApi(req, res, url) {
     const session = await requireSession(req, "driver");
     const filters = parseStatsFilters(url.searchParams);
     sendJson(res, 200, {
-      orders: await getDriverOrders(session.ownerId, filters)
+      orders: await getDriverOrders(session.ownerId, filters),
     });
     return true;
   }
@@ -1467,20 +1671,28 @@ async function routeApi(req, res, url) {
     const input = await readJson(req, 1024);
     const lat = Number(input?.latitude);
     const lng = Number(input?.longitude);
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
-        !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    if (
+      !Number.isFinite(lat) ||
+      lat < -90 ||
+      lat > 90 ||
+      !Number.isFinite(lng) ||
+      lng < -180 ||
+      lng > 180
+    ) {
       throw new ApiError(400, "إحداثيات الموقع غير صالحة.");
     }
     await pool.query(
       `UPDATE drivers
           SET latitude = $1, longitude = $2, location_updated_at = NOW()
         WHERE id = $3`,
-      [lat, lng, session.ownerId]
+      [lat, lng, session.ownerId],
     );
     sendJson(res, 200, { ok: true, latitude: lat, longitude: lng });
     return true;
   }
-  const driverRespondMatch = path.match(/^\/api\/driver\/orders\/(\d+)\/respond$/);
+  const driverRespondMatch = path.match(
+    /^\/api\/driver\/orders\/(\d+)\/respond$/,
+  );
   if (driverRespondMatch) {
     if (method !== "POST") return methodNotAllowed(res);
     const session = await requireSession(req, "driver");
@@ -1492,73 +1704,89 @@ async function routeApi(req, res, url) {
     }
 
     const outcome = await withTransaction(async (client) => {
-      const job = (await client.query(
-        "SELECT state FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
-        [orderId]
-      )).rows[0];
+      const job = (
+        await client.query(
+          "SELECT state FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+          [orderId],
+        )
+      ).rows[0];
       if (job && job.state !== "ACTIVE") {
         throw new ApiError(409, "تمت معالجة الطلب بالفعل.");
       }
-      const order = (await client.query(
-        `SELECT id,restaurant_id,status,driver_id
+      const order = (
+        await client.query(
+          `SELECT id,restaurant_id,status,driver_id
            FROM orders
           WHERE id=$1
           FOR UPDATE`,
-        [orderId]
-      )).rows[0];
+          [orderId],
+        )
+      ).rows[0];
       if (!order) throw new ApiError(404, "الطلب غير موجود.");
       if (order.status !== "ASSIGNED" || order.driver_id != null) {
         throw new ApiError(409, "لم يعد الطلب بانتظار قرار سائق.");
       }
-      const attempt = (await client.query(
-        `SELECT id, assignment_id, status, timeout_at FROM order_driver_attempts
+      const attempt = (
+        await client.query(
+          `SELECT id, assignment_id, status, timeout_at FROM order_driver_attempts
           WHERE order_id=$1 AND driver_id=$2 AND status='PENDING'
           ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-        [orderId, session.ownerId]
-      )).rows[0];
+          [orderId, session.ownerId],
+        )
+      ).rows[0];
       if (!attempt) {
         throw new ApiError(404, "لا يوجد طلب قيد الانتظار لهذا السائق.");
       }
-      const driver = (await client.query(
-        `SELECT id FROM drivers
+      const driver = (
+        await client.query(
+          `SELECT id FROM drivers
           WHERE id=$1 AND restaurant_id=$2 AND is_active=true AND status='ACTIVE'
           FOR UPDATE`,
-        [session.ownerId, order.restaurant_id]
-      )).rows[0];
+          [session.ownerId, order.restaurant_id],
+        )
+      ).rows[0];
       if (!driver) {
         throw new ApiError(409, "لم يعد السائق مؤهلاً لاستلام هذا الطلب.");
       }
-      if (attempt.timeout_at && new Date(attempt.timeout_at).getTime() <= Date.now()) {
+      if (
+        attempt.timeout_at &&
+        new Date(attempt.timeout_at).getTime() <= Date.now()
+      ) {
         await client.query(
           `UPDATE order_driver_attempts
               SET status='TIMEOUT',responded_at=now(),response_at=now(),timed_out_at=now()
             WHERE id=$1 AND status='PENDING'`,
-          [attempt.id]
+          [attempt.id],
         );
         await client.query(
           `UPDATE orders SET status='TIMEOUT',updated_at=now()
             WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL`,
-          [orderId]
+          [orderId],
         );
         await client.query(
           `INSERT INTO order_status_history (order_id,status,note)
            VALUES ($1,'TIMEOUT',$2)`,
-          [orderId, `انتهت مهلة رد السائق #${session.ownerId}`]
+          [orderId, `انتهت مهلة رد السائق #${session.ownerId}`],
         );
         await client.query(
           `UPDATE order_email_dispatch_jobs
               SET state='ACTIVE',next_check_at=now(),updated_at=now()
             WHERE order_id=$1`,
-          [orderId]
+          [orderId],
         );
-        return { ok: false, decision, advance: true, reason: "انتهت مهلة الرد." };
+        return {
+          ok: false,
+          decision,
+          advance: true,
+          reason: "انتهت مهلة الرد.",
+        };
       }
       if (decision === "ACCEPTED") {
         const confirmed = await client.query(
           `UPDATE orders SET status='CONFIRMED',driver_id=$2,updated_at=now()
             WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL
             RETURNING id`,
-          [orderId, session.ownerId]
+          [orderId, session.ownerId],
         );
         if (!confirmed.rowCount) {
           throw new ApiError(409, "سبق لسائق آخر تأكيد الطلب.");
@@ -1568,7 +1796,7 @@ async function routeApi(req, res, url) {
               SET status='ACCEPTED',responded_at=now(),response_at=now(),accepted_at=now()
             WHERE id=$1 AND status='PENDING'
             RETURNING id`,
-          [attempt.id]
+          [attempt.id],
         );
         if (!acceptedAttempt.rowCount) {
           throw new ApiError(409, "تم تسجيل قرار السائق مسبقاً.");
@@ -1576,11 +1804,11 @@ async function routeApi(req, res, url) {
         await client.query(
           `INSERT INTO order_status_history (order_id,status,note)
            VALUES ($1,'CONFIRMED',$2)`,
-          [orderId, `أكد السائق #${session.ownerId} الطلب`]
+          [orderId, `أكد السائق #${session.ownerId} الطلب`],
         );
         await client.query(
           `UPDATE order_email_dispatch_jobs SET state='DONE', updated_at=now() WHERE order_id=$1`,
-          [orderId]
+          [orderId],
         );
       } else {
         const rejectedAttempt = await client.query(
@@ -1588,7 +1816,7 @@ async function routeApi(req, res, url) {
               SET status='REJECTED',responded_at=now(),response_at=now(),rejected_at=now()
             WHERE id=$1 AND status='PENDING'
             RETURNING id`,
-          [attempt.id]
+          [attempt.id],
         );
         if (!rejectedAttempt.rowCount) {
           throw new ApiError(409, "تم تسجيل قرار السائق مسبقاً.");
@@ -1597,7 +1825,7 @@ async function routeApi(req, res, url) {
           `UPDATE orders SET status='REJECTED',updated_at=now()
             WHERE id=$1 AND status='ASSIGNED' AND driver_id IS NULL
             RETURNING id`,
-          [orderId]
+          [orderId],
         );
         if (!rejected.rowCount) {
           throw new ApiError(409, "سبق لسائق آخر معالجة الطلب.");
@@ -1605,20 +1833,20 @@ async function routeApi(req, res, url) {
         await client.query(
           `INSERT INTO order_status_history (order_id,status,note)
            VALUES ($1,'REJECTED',$2)`,
-          [orderId, `رفض السائق #${session.ownerId} الطلب`]
+          [orderId, `رفض السائق #${session.ownerId} الطلب`],
         );
         await client.query(
           `UPDATE order_email_dispatch_jobs
               SET state='ACTIVE', next_check_at=now(), updated_at=now()
             WHERE order_id=$1`,
-          [orderId]
+          [orderId],
         );
       }
       return {
         ok: true,
         decision,
         status: decision === "ACCEPTED" ? "CONFIRMED" : "REJECTED",
-        advance: decision === "REJECTED"
+        advance: decision === "REJECTED",
       };
     });
     if (outcome.advance) kickDispatch();
@@ -1636,7 +1864,11 @@ async function routeApi(req, res, url) {
   if (completeMatch) {
     if (method !== "POST") return methodNotAllowed(res);
     const session = await requireSession(req, "driver");
-    sendJson(res, 200, await completeDriverOrder(session.ownerId, completeMatch[1]));
+    sendJson(
+      res,
+      200,
+      await completeDriverOrder(session.ownerId, completeMatch[1]),
+    );
     return true;
   }
   return false;
@@ -1647,7 +1879,10 @@ export async function handleApi(req, res) {
   try {
     url = new URL(req.url || "/", "http://localhost");
   } catch {
-    sendJson(res, 400, { error: "BAD_REQUEST", message: "عنوان الطلب غير صالح." });
+    sendJson(res, 400, {
+      error: "BAD_REQUEST",
+      message: "عنوان الطلب غير صالح.",
+    });
     return true;
   }
   if (
@@ -1670,7 +1905,7 @@ export async function handleApi(req, res) {
     sendJson(res, mapped.status, {
       error: mapped.status >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR",
       message: mapped.message,
-      requestId
+      requestId,
     });
     return true;
   }
