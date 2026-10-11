@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
+import { Redirect, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -20,7 +20,7 @@ const meta: Record<string, { title: string; description: string }> = {
   '/order-confirmation': { title: 'تم استلام طلبك | طلبات', description: 'تفاصيل الطلب الذي تم استلامه بنجاح.' },
   '/admin': { title: 'لوحة الإدارة | طلبات', description: 'إدارة الطلبات ومتابعة بيانات التشغيل.' },
   '/driver': { title: 'مساحة السائق | طلبات', description: 'تابع محاولات إسناد طلباتك وحالاتها في مساحة السائق.' },
-  '/restaurant-portal': { title: 'لوحة المطعم | طلبات', description: 'تابع طلبات مطعمك وفواتيره وبيانات حسابك.' },
+  '/restaurant': { title: 'لوحة المطعم | طلبات', description: 'تابع طلبات مطعمك وفواتيره وبيانات حسابك.' },
 };
 function PageMetadata() {
   const [location] = useLocation();
@@ -49,11 +49,12 @@ function App() {
     <Route path="/" component={Browse}/>
     <Route path="/restaurant/:id" component={Browse}/>
     <Route path="/r/:id" component={Browse}/>
+    <Route path="/restaurant" component={RestaurantPortalPage}/>
     <Route path="/checkout" component={Checkout}/>
     <Route path="/order-confirmation" component={Confirmation}/>
     <Route path="/admin" component={Admin}/>
     <Route path="/driver" component={Driver}/>
-    <Route path="/restaurant-portal" component={RestaurantPortalPage}/>
+    <Route path="/restaurant-portal"><Redirect to="/restaurant" replace/></Route>
     <Route component={NotFoundAr}/>
   </Switch></RoutedErrorBoundary></WouterRouter></CartProvider><Toaster/></TooltipProvider></QueryClientProvider>;
 }
