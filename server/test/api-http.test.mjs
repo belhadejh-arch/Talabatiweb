@@ -34,6 +34,7 @@ test(
 
     const { pool } = await import("../db.mjs");
     const { handleApi } = await import("../api.mjs");
+    const { processDispatchForOrder } = await import("../dispatch.mjs");
     const bcrypt = (await import("bcryptjs")).default;
     const fixtures = {
       restaurants: [],

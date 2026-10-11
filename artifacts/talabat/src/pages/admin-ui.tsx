@@ -223,6 +223,24 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             {order.cancelledAt && <time className="block mt-1 text-muted-foreground" dateTime={order.cancelledAt}>تاريخ الإلغاء: {dateLabel(order.cancelledAt)}</time>}
           </div>}
 
+          {order.status === 'NOT_ASSIGNED' && (
+            <section className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs" role="status" data-testid={`section-invoice-driver-fallback-${order.id}`}>
+              <strong className="block">تعذّر إسناد الطلب إلى سائق؛ أُرسل للمطعم</strong>
+              {order.driverAttempts?.length ? (
+                <ul className="mt-2 space-y-1">
+                  {order.driverAttempts.map((attempt, index) => (
+                    <li key={`${attempt.driverId}-${index}`}>
+                      {attempt.driverName || `السائق #${attempt.driverId}`} · {statusLabel(attempt.status)}
+                      {attempt.respondedAt ? ` · ${dateLabel(attempt.respondedAt)}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="block mt-1">لم يتوفر سائق مؤهل لقبول الطلب.</span>
+              )}
+            </section>
+          )}
+
           {order.orderType === 'RESERVATION' && <section className="rounded-xl border p-3 text-xs" aria-label="تفاصيل الحجز" data-testid={`section-invoice-reservation-${order.id}`}>
             <strong className="block mb-2">تفاصيل الحجز</strong>
             <div className="grid grid-cols-3 gap-3">

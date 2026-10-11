@@ -233,6 +233,24 @@ async function processJob(orderId) {
         [order.restaurant_id, orderId, restaurant?.latitude ?? null, restaurant?.longitude ?? null],
       )).rows[0];
       if (!driver) {
+        const escalated = await client.query(
+          `UPDATE orders
+              SET status='NOT_ASSIGNED',driver_id=NULL,updated_at=now()
+            WHERE id=$1
+              AND status NOT IN (
+                'NOT_ASSIGNED','ACCEPTED','CONFIRMED','COMPLETED','DELIVERED','CANCELLED'
+              )
+            RETURNING id`,
+          [orderId],
+        );
+        if (escalated.rowCount) {
+          await recordStatus(
+            client,
+            orderId,
+            "NOT_ASSIGNED",
+            "لم يقبل أي سائق متاح الطلب؛ تم تحويله إلى المطعم مع الفاتورة وموقع العميل",
+          );
+        }
         await updateJob(client, orderId, "DONE");
         return;
       }

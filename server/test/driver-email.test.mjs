@@ -339,6 +339,66 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
       orderId: expiryId, assignmentId: expiryAttempt.assignment_id,
       driverId: first, token: actionToken(expiryAttempt), decision: "ACCEPTED",
     })).ok, false);
+
+    const fallbackId = await createOrder(rest.restaurantId, rest.productId, "DELIVERY");
+    await processDispatchForOrder(fallbackId, fakeMail);
+    rows = await attempts(fallbackId);
+    assert.equal(rows.length, 1);
+    assert.equal(
+      (await respondToEmailAction({
+        orderId: fallbackId,
+        assignmentId: rows[0].assignment_id,
+        driverId: rows[0].driver_id,
+        token: actionToken(rows[0]),
+        decision: "REJECTED",
+      }, () => {})).ok,
+      true,
+    );
+    await processDispatchForOrder(fallbackId, fakeMail);
+    rows = await attempts(fallbackId);
+    assert.equal(rows.length, 2);
+    assert.equal(
+      (await respondToEmailAction({
+        orderId: fallbackId,
+        assignmentId: rows[1].assignment_id,
+        driverId: rows[1].driver_id,
+        token: actionToken(rows[1]),
+        decision: "REJECTED",
+      }, () => {})).ok,
+      true,
+    );
+    await processDispatchForOrder(fallbackId, fakeMail);
+    assert.equal((await attempts(fallbackId)).length, 2);
+    assert.equal(
+      (await pool.query(
+        "SELECT status FROM orders WHERE id=$1",
+        [fallbackId],
+      )).rows[0].status,
+      "NOT_ASSIGNED",
+    );
+    assert.deepEqual(
+      (await pool.query(
+        "SELECT status FROM order_status_history WHERE order_id=$1 ORDER BY id",
+        [fallbackId],
+      )).rows.map((row) => row.status),
+      ["ASSIGNED", "REJECTED", "ASSIGNED", "REJECTED", "NOT_ASSIGNED"],
+    );
+
+    const noDriverRest = await createRestaurant();
+    const noDriverOrder = await createOrder(
+      noDriverRest.restaurantId,
+      noDriverRest.productId,
+      "DELIVERY",
+    );
+    await processDispatchForOrder(noDriverOrder, fakeMail);
+    assert.equal((await attempts(noDriverOrder)).length, 0);
+    assert.equal(
+      (await pool.query(
+        "SELECT status FROM orders WHERE id=$1",
+        [noDriverOrder],
+      )).rows[0].status,
+      "NOT_ASSIGNED",
+    );
   } finally {
     if (originalTimeout != null) {
       await pool.query(

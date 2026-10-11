@@ -60,6 +60,13 @@ export type Order = {
   status: string;
   assignmentStatus?: string | null;
   driverApprovalStatus?: string;
+  driverAttempts?: {
+    driverId: number;
+    driverName?: string | null;
+    status: string;
+    createdAt?: string | null;
+    respondedAt?: string | null;
+  }[];
   driverId?: number | null;
   createdAt: string;
   cancelledAt?: string | null;

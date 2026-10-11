@@ -213,6 +213,27 @@
   padding-inline-start: 20px;
   font-size: 0.83rem;
 }
+.restaurant-pending-alert-content li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.restaurant-pending-alert-content li span {
+  min-width: 0;
+}
+.restaurant-pending-alert-content li small {
+  display: block;
+  margin-top: 3px;
+}
+.restaurant-fallback-ack {
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
 .restaurant-pending-alert-content small,
 .restaurant-alert-sound-control small {
   color: #8b5749;

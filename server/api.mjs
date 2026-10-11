@@ -323,12 +323,16 @@ function mapEmailDelivery(row) {
 }
 
 function mapOrder(row, items = []) {
-  return buildOrderInvoice(
+  const invoice = buildOrderInvoice(
     row,
     { name: row.restaurant_name || "" },
     items,
     row.assignment_status || null,
   );
+  return {
+    ...invoice,
+    driverAttempts: Array.isArray(row.driver_attempts) ? row.driver_attempts : [],
+  };
 }
 
 async function loadOrder(client, id) {
@@ -844,6 +848,7 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
             last_attempt.status AS assignment_status,
             cancellation.note AS cancellation_reason,
             cancellation.created_at AS cancellation_at,
+            COALESCE(driver_attempts.history, '[]'::json) AS driver_attempts,
             COALESCE(order_lines.items, '[]'::json) AS items
        FROM orders o
        JOIN restaurants r ON r.id = o.restaurant_id
@@ -861,6 +866,18 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
           ORDER BY h.created_at DESC, h.id DESC
           LIMIT 1
        ) cancellation ON o.status = 'CANCELLED'
+        LEFT JOIN LATERAL (
+          SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                   'driverId', a.driver_id,
+                   'driverName', d.name,
+                   'status', a.status,
+                   'createdAt', a.created_at,
+                   'respondedAt', a.responded_at
+                 ) ORDER BY a.id) AS history
+            FROM order_driver_attempts a
+            LEFT JOIN drivers d ON d.id = a.driver_id
+           WHERE a.order_id = o.id
+        ) driver_attempts ON TRUE
        LEFT JOIN LATERAL (
          SELECT JSON_AGG(JSON_BUILD_OBJECT(
            'productId', oi.product_id,
@@ -996,7 +1013,10 @@ async function getRestaurantPortal(restaurantId) {
       phone: restaurant.phone || "",
       address: restaurant.address || "",
     },
-    orders,
+      orders: orders.filter((order) =>
+        ["NOT_ASSIGNED", "REJECTED", "TIMEOUT", "COMPLETED", "DELIVERED", "CANCELLED"]
+          .includes(order.status.toUpperCase()),
+      ),
     summary: {
       totalOrders: Number(totals.total_orders),
       activeOrders: Number(totals.active_orders),

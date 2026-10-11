@@ -32,6 +32,8 @@ type StatusFilter =
   "all" | "waiting" | "accepted" | "rejected" | "cancelled" | "completed";
 type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 const storageKey = "talabat-restaurant-session";
+const fallbackAckKey = (restaurantId: number) =>
+  `${storageKey}:fallback-ack:${restaurantId}`;
 const orderAlertAudioUrl = `${import.meta.env.BASE_URL}order-alert.mp3`;
 const reportPeriods: { value: ReportPeriod; label: string }[] = [
   { value: "daily", label: "يومي" },
@@ -94,6 +96,22 @@ function readSession(): RestaurantSession | null {
   }
 }
 
+function readAcknowledgedFallbackOrders(restaurantId?: number) {
+  if (!restaurantId) return new Set<number>();
+  try {
+    const saved = JSON.parse(
+      sessionStorage.getItem(fallbackAckKey(restaurantId)) || "[]",
+    );
+    return new Set<number>(
+      Array.isArray(saved)
+        ? saved.filter((id): id is number => Number.isSafeInteger(id))
+        : [],
+    );
+  } catch {
+    return new Set<number>();
+  }
+}
+
 export default function RestaurantPortalPage() {
   const [session, setSession] = useState<RestaurantSession | null>(readSession);
   const [serialNumber, setSerialNumber] = useState("");
@@ -115,15 +133,20 @@ export default function RestaurantPortalPage() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioError, setAudioError] = useState("");
   const [isConnected, setIsConnected] = useState(true);
+  const [acknowledgedFallbackOrderIds, setAcknowledgedFallbackOrderIds] =
+    useState<Set<number>>(() =>
+      readAcknowledgedFallbackOrders(readSession()?.restaurant.id),
+    );
   const portalRequestInFlight = useRef(false);
   const alertAudio = useRef<HTMLAudioElement | null>(null);
-  const pendingDecisionOrders = (portal?.orders || []).filter(
-    (order) =>
-      order.status === "NEW" ||
-      (order.status === "ASSIGNED" &&
-        order.assignmentStatus?.toUpperCase() === "PENDING"),
+  const fallbackOrders = (portal?.orders || []).filter(
+    (order) => order.status.toUpperCase() === "NOT_ASSIGNED",
   );
-  const hasPendingDecisionOrders = pendingDecisionOrders.length > 0;
+  const unacknowledgedFallbackOrders = fallbackOrders.filter(
+    (order) => !acknowledgedFallbackOrderIds.has(order.id),
+  );
+  const hasUnacknowledgedFallbackOrders =
+    unacknowledgedFallbackOrders.length > 0;
 
   const logout = async () => {
     if (session) {
@@ -212,7 +235,7 @@ export default function RestaurantPortalPage() {
   useEffect(() => {
     const audio = alertAudio.current;
     if (!audio) return;
-    if (audioEnabled && isConnected && hasPendingDecisionOrders) {
+    if (audioEnabled && isConnected && hasUnacknowledgedFallbackOrders) {
       void audio.play().catch(() => {
         setAudioEnabled(false);
         setAudioError(
@@ -223,7 +246,7 @@ export default function RestaurantPortalPage() {
       audio.pause();
       audio.currentTime = 0;
     }
-  }, [audioEnabled, hasPendingDecisionOrders, isConnected]);
+  }, [audioEnabled, hasUnacknowledgedFallbackOrders, isConnected]);
 
   useEffect(
     () => () => {
@@ -241,13 +264,25 @@ export default function RestaurantPortalPage() {
       await audio.play();
       setAudioEnabled(true);
       setAudioError("");
-      if (!hasPendingDecisionOrders) {
+      if (!hasUnacknowledgedFallbackOrders) {
         audio.pause();
         audio.currentTime = 0;
       }
     } catch {
       setAudioError(
         "تعذر تشغيل الصوت تلقائياً. اضغط الزر للسماح بالتنبيه الصوتي.",
+      );
+    }
+  };
+
+  const acknowledgeFallbackOrder = (orderId: number) => {
+    const next = new Set(acknowledgedFallbackOrderIds);
+    next.add(orderId);
+    setAcknowledgedFallbackOrderIds(next);
+    if (session) {
+      sessionStorage.setItem(
+        fallbackAckKey(session.restaurant.id),
+        JSON.stringify([...next]),
       );
     }
   };
@@ -262,6 +297,9 @@ export default function RestaurantPortalPage() {
       );
       const next = { token: result.token, restaurant: result.restaurant };
       sessionStorage.setItem(storageKey, JSON.stringify(next));
+      setAcknowledgedFallbackOrderIds(
+        readAcknowledgedFallbackOrders(result.restaurant.id),
+      );
       setSession(next);
       setSerialNumber("");
     } catch (error) {
@@ -471,7 +509,7 @@ export default function RestaurantPortalPage() {
           )}
           {audioError && <small role="alert">{audioError}</small>}
         </section>
-        {pendingDecisionOrders.length > 0 && (
+        {unacknowledgedFallbackOrders.length > 0 && (
           <section
             className="restaurant-pending-alert"
             role="status"
@@ -483,21 +521,42 @@ export default function RestaurantPortalPage() {
             </div>
             <div className="restaurant-pending-alert-content">
               <strong>
-                {pendingDecisionOrders.length === 1
-                  ? "طلب واحد ينتظر قرار السائق"
-                  : `${pendingDecisionOrders.length} طلبات تنتظر قرار السائق`}
+                {unacknowledgedFallbackOrders.length === 1
+                  ? "طلب واحد تعذّر إسناده إلى سائق"
+                  : `${unacknowledgedFallbackOrders.length} طلبات تعذّر إسنادها إلى سائق`}
               </strong>
               <ul>
-                {pendingDecisionOrders.map((order) => (
+                {unacknowledgedFallbackOrders.map((order) => (
                   <li key={order.id}>
-                    طلب #{order.id} · {order.customerName} ·{" "}
-                    {dateLabel(order.createdAt)}
+                    <span>
+                      طلب #{order.id} · {order.customerName} ·{" "}
+                      {dateLabel(order.createdAt)}
+                      <small>
+                        {order.driverAttempts?.length
+                          ? order.driverAttempts
+                              .map(
+                                (attempt) =>
+                                  `${attempt.driverName || `السائق #${attempt.driverId}`} — ${driverApprovalLabel(attempt.status)}`,
+                              )
+                              .join("، ")
+                          : "لم يتوفر سائق مؤهل للطلب"}
+                      </small>
+                    </span>
+                    <button
+                      type="button"
+                      className="restaurant-fallback-ack"
+                      onClick={() => acknowledgeFallbackOrder(order.id)}
+                      aria-label={`تأكيد الاطلاع على الطلب ${order.id}`}
+                      data-testid={`button-acknowledge-fallback-${order.id}`}
+                    >
+                      تم الاطلاع
+                    </button>
                   </li>
                 ))}
               </ul>
               <small>
-                يبقى التنبيه ما دام أي طلب ينتظر القرار. يجب إبقاء لوحة المطعم
-                مفتوحة لاستقباله.
+                وصل الطلب للمطعم بعد رفض السائقين أو انتهاء مهلة ردهم وعدم توفر
+                سائق آخر. افتح الفاتورة لمراجعة الأصناف وموقع العميل.
               </small>
             </div>
           </section>
@@ -855,6 +914,15 @@ export default function RestaurantPortalPage() {
                             undefined,
                         )}
                       </small>
+                      {order.status === "NOT_ASSIGNED" && (
+                        <small
+                          className="restaurant-rejection-note"
+                          data-testid={`text-restaurant-driver-fallback-${order.id}`}
+                        >
+                          تعذّر إسناد الطلب إلى سائق آخر؛ وصل إلى المطعم بعد
+                          مراجعة محاولات السائقين.
+                        </small>
+                      )}
                       {order.status === "REJECTED" && (
                         <small
                           className="restaurant-rejection-note"
