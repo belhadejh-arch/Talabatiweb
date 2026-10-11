@@ -574,6 +574,45 @@ test(
       fixtures.products.push(Number(product.id));
       const productId = Number(product.id);
 
+      const restaurantPriceEdit = await request(
+        baseUrl,
+        `/api/admin/products/${productId}`,
+        {
+          method: "PATCH",
+          token: restaurantToken,
+          body: { price: 0.001 },
+        },
+      );
+      assert.equal(restaurantPriceEdit.status, 403);
+      const unchangedProduct = await pool.query(
+        "SELECT restaurant_id,price FROM products WHERE id=$1",
+        [productId],
+      );
+      assert.equal(
+        Number(unchangedProduct.rows[0].restaurant_id),
+        restaurantId,
+      );
+      assert.equal(Number(unchangedProduct.rows[0].price), 12.5);
+
+      const restaurantAdminEdit = await request(
+        baseUrl,
+        `/api/admin/restaurants/${otherRestaurantId}`,
+        {
+          method: "PATCH",
+          token: restaurantToken,
+          body: { status: "FROZEN" },
+        },
+      );
+      assert.equal(restaurantAdminEdit.status, 403);
+      assert.equal(
+        (
+          await pool.query("SELECT status FROM restaurants WHERE id=$1", [
+            otherRestaurantId,
+          ])
+        ).rows[0].status,
+        "ACTIVE",
+      );
+
       const subscription = (
         await pool.query(
           `INSERT INTO subscriptions
@@ -767,7 +806,7 @@ test(
 
       const restaurantOverview = await request(
         baseUrl,
-        "/api/restaurant/overview",
+        `/api/restaurant/overview?restaurantId=${otherRestaurantId}`,
         {
           token: restaurantToken,
         },
@@ -783,6 +822,50 @@ test(
       assert.ok(
         !restaurantOverview.payload.orders.some(
           (order) => order.id === Number(otherOrder.id),
+        ),
+      );
+      const otherRestaurantLogin = await request(
+        baseUrl,
+        "/api/restaurant/login",
+        {
+          method: "POST",
+          body: {
+            serialNumber: otherRestaurant.payload.accountSerialNumber,
+          },
+        },
+      );
+      assert.equal(otherRestaurantLogin.status, 200);
+      const otherRestaurantToken = otherRestaurantLogin.payload.token;
+      fixtures.sessionHashes.push(
+        createHash("sha256").update(otherRestaurantToken).digest("hex"),
+      );
+      assert.equal(
+        otherRestaurantLogin.payload.restaurant.id,
+        otherRestaurantId,
+      );
+      const otherRestaurantOverview = await request(
+        baseUrl,
+        `/api/restaurant/overview?restaurantId=${restaurantId}`,
+        { token: otherRestaurantToken },
+      );
+      assert.equal(otherRestaurantOverview.status, 200);
+      assert.equal(
+        otherRestaurantOverview.payload.restaurant.id,
+        otherRestaurantId,
+      );
+      assert.ok(
+        otherRestaurantOverview.payload.orders.every(
+          (order) => order.restaurantId === otherRestaurantId,
+        ),
+      );
+      assert.ok(
+        otherRestaurantOverview.payload.orders.some(
+          (order) => order.id === Number(otherOrder.id),
+        ),
+      );
+      assert.ok(
+        !otherRestaurantOverview.payload.orders.some(
+          (order) => order.restaurantId === restaurantId,
         ),
       );
       const restaurantSummary = restaurantOverview.payload.summary;
@@ -1688,6 +1771,76 @@ test(
       assert.equal(
         restaurantCancelledOrder.cancelledAt,
         cancelled.payload.order.cancelledAt,
+      );
+
+      const frozenRestaurant = await request(
+        baseUrl,
+        `/api/admin/restaurants/${restaurantId}`,
+        {
+          method: "PATCH",
+          token: adminToken,
+          body: { status: "FROZEN" },
+        },
+      );
+      assert.equal(frozenRestaurant.status, 200);
+      assert.equal(frozenRestaurant.payload.restaurant.status, "FROZEN");
+      assert.equal(
+        (
+          await request(baseUrl, "/api/restaurant/overview", {
+            token: currentRestaurantToken,
+          })
+        ).status,
+        401,
+      );
+      assert.equal(
+        (
+          await request(baseUrl, "/api/restaurant/login", {
+            method: "POST",
+            body: { serialNumber: changedAccount.payload.serialNumber },
+          })
+        ).status,
+        401,
+      );
+      const frozenOrderAttempt = await request(baseUrl, "/api/orders", {
+        method: "POST",
+        body: deliveryBody,
+        headers: { "Idempotency-Key": randomUUID() },
+      });
+      assert.equal(frozenOrderAttempt.status, 409);
+      const retainedInvoices = await pool.query(
+        `SELECT id,total_amount FROM orders
+          WHERE id = ANY($1::integer[])
+          ORDER BY id`,
+        [[firstDelivery.payload.order.id, reservation.payload.order.id]],
+      );
+      assert.equal(retainedInvoices.rows.length, 2);
+      assert.deepEqual(
+        retainedInvoices.rows.map((row) => ({
+          id: Number(row.id),
+          totalAmount: Number(row.total_amount),
+        })),
+        [
+          {
+            id: firstDelivery.payload.order.id,
+            totalAmount: firstDelivery.payload.order.totalAmount,
+          },
+          {
+            id: reservation.payload.order.id,
+            totalAmount: reservation.payload.order.totalAmount,
+          },
+        ],
+      );
+      const frozenRestaurantAdminView = await request(
+        baseUrl,
+        "/api/admin/overview",
+        { token: adminToken },
+      );
+      assert.equal(frozenRestaurantAdminView.status, 200);
+      assert.equal(
+        frozenRestaurantAdminView.payload.orders.find(
+          (order) => order.id === firstDelivery.payload.order.id,
+        )?.invoiceNumber,
+        firstDelivery.payload.order.invoiceNumber,
       );
 
       if (legacyBefore) {
