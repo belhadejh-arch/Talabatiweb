@@ -114,6 +114,19 @@ function readAcknowledgedFallbackOrders(restaurantId?: number) {
   }
 }
 
+function driverAttemptOutcomeLabel(status: string) {
+  switch (status.toUpperCase()) {
+    case "REJECTED":
+      return "رفض الطلب";
+    case "TIMEOUT":
+      return "انتهت مهلة الرد";
+    case "CANCELLED":
+      return "أُلغي إسناده";
+    default:
+      return driverApprovalLabel(status);
+  }
+}
+
 export default function RestaurantPortalPage() {
   const [session, setSession] = useState<RestaurantSession | null>(readSession);
   const [serialNumber, setSerialNumber] = useState("");
@@ -917,13 +930,43 @@ export default function RestaurantPortalPage() {
                         )}
                       </small>
                       {order.status === "NOT_ASSIGNED" && (
-                        <small
-                          className="restaurant-rejection-note"
+                        <div
+                          className="restaurant-fallback-card-alert"
+                          role="alert"
                           data-testid={`text-restaurant-driver-fallback-${order.id}`}
                         >
-                          تعذّر إسناد الطلب إلى سائق آخر؛ وصل إلى المطعم بعد
-                          مراجعة محاولات السائقين.
-                        </small>
+                          <BellRing size={16} aria-hidden="true" />
+                          <div>
+                            <strong>وصل الطلب إلى المطعم</strong>
+                            <span>
+                              {order.driverAttempts?.length
+                                ? "تعذّر الإسناد بعد مراجعة محاولات السائقين:"
+                                : "لم يتوفر سائق مؤهل لقبول الطلب."}
+                            </span>
+                            {!!order.driverAttempts?.length && (
+                              <ul>
+                                {order.driverAttempts.map((attempt, index) => (
+                                  <li key={`${attempt.driverId}-${index}`}>
+                                    {attempt.driverName ||
+                                      `السائق #${attempt.driverId}`}
+                                    {" — "}
+                                    {driverAttemptOutcomeLabel(attempt.status)}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {order.mapsUrl && (
+                              <a
+                                href={order.mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                data-testid={`link-fallback-order-map-${order.id}`}
+                              >
+                                فتح موقع العميل على الخريطة
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       )}
                       {order.status === "CANCELLED" && (
                         <small
