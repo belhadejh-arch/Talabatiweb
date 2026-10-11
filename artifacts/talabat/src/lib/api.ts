@@ -380,6 +380,11 @@ export const api = {
         body: JSON.stringify({ decision }),
       },
     ),
+  driverCancelAcceptedOrder: (token: string, orderId: number) =>
+    request<{ order: Order }>(`/api/driver/orders/${orderId}/cancel`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }),
   archiveAllOrders: (token: string) =>
     request<{ ok: boolean; count: number }>("/api/admin/orders/archive-all", {
       method: "POST",

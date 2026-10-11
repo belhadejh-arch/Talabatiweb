@@ -29,7 +29,7 @@ import "./restaurant-portal.css";
 type RestaurantSession = { token: string; restaurant: RestaurantIdentity };
 type ViewFilter = "all" | "active" | "archived";
 type StatusFilter =
-  "all" | "waiting" | "accepted" | "rejected" | "cancelled" | "completed";
+  "all" | "waiting" | "accepted" | "fallback" | "cancelled" | "completed";
 type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 const storageKey = "talabat-restaurant-session";
 const fallbackAckKey = (restaurantId: number) =>
@@ -67,8 +67,6 @@ const statusGroups: {
       "PENDING",
       "WAITING_FOR_DRIVER",
       "ASSIGNED",
-      "NOT_ASSIGNED",
-      "TIMEOUT",
     ],
   },
   {
@@ -76,7 +74,11 @@ const statusGroups: {
     label: "مقبولة / مؤكدة",
     statuses: ["ACCEPTED", "CONFIRMED", "PREPARING", "READY", "ON_THE_WAY"],
   },
-  { value: "rejected", label: "مرفوضة", statuses: ["REJECTED"] },
+  {
+    value: "fallback",
+    label: "تعذّر إسنادها",
+    statuses: ["NOT_ASSIGNED"],
+  },
   { value: "cancelled", label: "ملغاة", statuses: ["CANCELLED"] },
   { value: "completed", label: "مكتملة", statuses: ["COMPLETED", "DELIVERED"] },
 ];
@@ -921,15 +923,6 @@ export default function RestaurantPortalPage() {
                         >
                           تعذّر إسناد الطلب إلى سائق آخر؛ وصل إلى المطعم بعد
                           مراجعة محاولات السائقين.
-                        </small>
-                      )}
-                      {order.status === "REJECTED" && (
-                        <small
-                          className="restaurant-rejection-note"
-                          data-testid={`text-restaurant-rejection-not-cancellation-${order.id}`}
-                        >
-                          رفض السائق لا يلغي الطلب؛ يُعاد توجيهه عند توفر سائق
-                          آخر.
                         </small>
                       )}
                       {order.status === "CANCELLED" && (

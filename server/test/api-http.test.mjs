@@ -317,6 +317,19 @@ test(
       return { status: response.status, payload };
     }
 
+    async function waitForOrderStatus(orderId, expectedStatus) {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        const result = await pool.query(
+          "SELECT status FROM orders WHERE id=$1",
+          [orderId],
+        );
+        if (result.rows[0]?.status === expectedStatus) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assert.fail(`Order ${orderId} did not reach ${expectedStatus} in time.`);
+    }
+
     async function startHttpServer() {
       server = createServer((req, res) => {
         Promise.resolve(handleApi(req, res))
@@ -556,7 +569,7 @@ test(
         await pool.query(
           `INSERT INTO orders
          (restaurant_id, customer_name, customer_phone, total_amount, status)
-       VALUES ($1, $2, $3, 99.000, 'NEW')
+       VALUES ($1, $2, $3, 99.000, 'NOT_ASSIGNED')
        RETURNING id`,
           [otherRestaurantId, `Foreign customer ${suffix}`, "000-foreign"],
         )
@@ -812,6 +825,7 @@ test(
       assert.equal(reservation.payload.order.reservationTime, "19:30");
       fixtures.orders.push(reservation.payload.order.id);
 
+      await waitForOrderStatus(firstDelivery.payload.order.id, "NOT_ASSIGNED");
       const restaurantOverview = await request(
         baseUrl,
         `/api/restaurant/overview?restaurantId=${otherRestaurantId}`,
@@ -1080,7 +1094,7 @@ test(
       const today = new Date().toISOString().slice(0, 10);
       const filteredStats = await request(
         baseUrl,
-        `/api/admin/stats?from=${today}&to=${today}&restaurantId=${restaurantId}&status=NEW&period=daily`,
+        `/api/admin/stats?from=${today}&to=${today}&restaurantId=${restaurantId}&period=daily`,
         { token: adminToken },
       );
       assert.equal(filteredStats.status, 200);
@@ -1676,11 +1690,7 @@ test(
         restaurantOverviewAfterAccept.payload.orders.find(
           (order) => order.id === acceptanceOrder.id,
         );
-      assert.equal(restaurantAcceptedOrder.status, "CONFIRMED");
-      assert.equal(
-        restaurantAcceptedOrder.invoiceNumber,
-        acceptanceOrder.invoiceNumber,
-      );
+      assert.equal(restaurantAcceptedOrder, undefined);
 
       const rejectionOrder = await createLifecycleOrder(
         "HTTP rejection customer",
@@ -1738,6 +1748,76 @@ test(
           )
         ).rows[0].count,
         0,
+      );
+
+      const cancelledByDriverOrder = await createLifecycleOrder(
+        "HTTP driver cancellation customer",
+      );
+      const acceptingDriverId = await waitForPendingAssignment(
+        cancelledByDriverOrder.id,
+      );
+      const acceptBeforeCancel = await request(
+        baseUrl,
+        `/api/driver/orders/${cancelledByDriverOrder.id}/respond`,
+        {
+          method: "POST",
+          token: driverTokens.get(acceptingDriverId),
+          body: { decision: "ACCEPTED" },
+        },
+      );
+      assert.equal(acceptBeforeCancel.status, 200);
+      assert.equal(acceptBeforeCancel.payload.status, "CONFIRMED");
+
+      const driverCancellation = await request(
+        baseUrl,
+        `/api/driver/orders/${cancelledByDriverOrder.id}/cancel`,
+        {
+          method: "POST",
+          token: driverTokens.get(acceptingDriverId),
+        },
+      );
+      assert.equal(driverCancellation.status, 200);
+      assert.equal(driverCancellation.payload.order.status, "ASSIGNED");
+      assert.equal(driverCancellation.payload.order.driverId, null);
+
+      const replacementDriverId = await waitForPendingAssignment(
+        cancelledByDriverOrder.id,
+        acceptingDriverId,
+      );
+      assert.notEqual(replacementDriverId, acceptingDriverId);
+      const replacementRejection = await request(
+        baseUrl,
+        `/api/driver/orders/${cancelledByDriverOrder.id}/respond`,
+        {
+          method: "POST",
+          token: driverTokens.get(replacementDriverId),
+          body: { decision: "REJECTED" },
+        },
+      );
+      assert.equal(replacementRejection.status, 200);
+      await waitForOrderStatus(cancelledByDriverOrder.id, "NOT_ASSIGNED");
+
+      const restaurantFallbackOverview = await request(
+        baseUrl,
+        "/api/restaurant/overview",
+        { token: currentRestaurantToken },
+      );
+      const restaurantFallbackOrder =
+        restaurantFallbackOverview.payload.orders.find(
+          (order) => order.id === cancelledByDriverOrder.id,
+        );
+      assert.equal(restaurantFallbackOrder.status, "NOT_ASSIGNED");
+      assert.equal(restaurantFallbackOrder.invoiceNumber, cancelledByDriverOrder.invoiceNumber);
+      assert.equal(restaurantFallbackOrder.latitude, 32.8872);
+      assert.equal(restaurantFallbackOrder.longitude, 13.1913);
+      assert.equal(restaurantFallbackOrder.items.length, 1);
+      assert.equal(
+        restaurantFallbackOrder.items[0].productName,
+        `Lifecycle product ${suffix}`,
+      );
+      assert.deepEqual(
+        restaurantFallbackOrder.driverAttempts.map((attempt) => attempt.status),
+        ["CANCELLED", "REJECTED"],
       );
 
       const cancellationOrder = await createLifecycleOrder(

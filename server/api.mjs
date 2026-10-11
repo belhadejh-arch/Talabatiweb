@@ -30,6 +30,24 @@ const MAX_JSON_BYTES = 256 * 1024;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESTAURANT_PORTAL_ORDER_STATUSES = new Set([
+  "NOT_ASSIGNED",
+  "COMPLETED",
+  "DELIVERED",
+  "CANCELLED",
+]);
+
+export function filterRestaurantPortalOrders(orders) {
+  return orders.filter((order) => {
+    if (String(order.orderType || "DELIVERY").toUpperCase() !== "DELIVERY") {
+      return true;
+    }
+    return RESTAURANT_PORTAL_ORDER_STATUSES.has(
+      String(order.status || "").toUpperCase(),
+    );
+  });
+}
+
 const DRIVER_ATTEMPT_STATUSES = new Set([
   "PENDING",
   "ACCEPTED",
@@ -939,7 +957,8 @@ async function getRestaurantPortal(restaurantId) {
               ))::integer AS rejected_orders,
               COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'), 0)::numeric AS revenue
          FROM orders
-        WHERE restaurant_id=$1`,
+         WHERE restaurant_id=$1
+           AND (order_type<>'DELIVERY' OR status IN ('NOT_ASSIGNED','COMPLETED','DELIVERED','CANCELLED'))`,
         [restaurantId],
       ),
       pool.query(
@@ -950,7 +969,8 @@ async function getRestaurantPortal(restaurantId) {
                    WHERE h.order_id=o.id AND h.status='REJECTED'
                 ) AS was_rejected
            FROM orders o
-          WHERE o.restaurant_id=$1
+           WHERE o.restaurant_id=$1
+             AND (o.order_type<>'DELIVERY' OR o.status IN ('NOT_ASSIGNED','COMPLETED','DELIVERED','CANCELLED'))
        ),
        bucketed AS (
          SELECT o.*,
@@ -1013,10 +1033,7 @@ async function getRestaurantPortal(restaurantId) {
       phone: restaurant.phone || "",
       address: restaurant.address || "",
     },
-      orders: orders.filter((order) =>
-        ["NOT_ASSIGNED", "REJECTED", "TIMEOUT", "COMPLETED", "DELIVERED", "CANCELLED"]
-          .includes(order.status.toUpperCase()),
-      ),
+      orders: filterRestaurantPortalOrders(orders),
     summary: {
       totalOrders: Number(totals.total_orders),
       activeOrders: Number(totals.active_orders),
@@ -1371,6 +1388,78 @@ async function completeDriverOrder(driverId, orderId) {
   });
   const order = await loadOrder(pool, result.orderId);
   return { order };
+}
+
+async function cancelAcceptedDriverOrder(driverId, orderId) {
+  const id = positiveInt(orderId, "الطلب");
+  const result = await withTransaction(async (client) => {
+    const dispatch = (
+      await client.query(
+        "SELECT state FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+        [id],
+      )
+    ).rows[0];
+    const order = (
+      await client.query(
+        "SELECT id, status, driver_id FROM orders WHERE id=$1 FOR UPDATE",
+        [id],
+      )
+    ).rows[0];
+    if (!order || Number(order.driver_id) !== driverId) {
+      throw new ApiError(404, "الطلب غير موجود في سجل هذا السائق.");
+    }
+    if (!["CONFIRMED", "ACCEPTED"].includes(order.status)) {
+      throw new ApiError(409, "لا يمكن إلغاء طلب لم يعد قيد التوصيل.");
+    }
+    if (!dispatch || dispatch.state !== "DONE") {
+      throw new ApiError(409, "تعذر إعادة إسناد الطلب. حدّث البيانات ثم أعد المحاولة.");
+    }
+    const attempt = (
+      await client.query(
+        `SELECT id FROM order_driver_attempts
+          WHERE order_id=$1 AND driver_id=$2 AND status='ACCEPTED'
+          ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+        [id, driverId],
+      )
+    ).rows[0];
+    if (!attempt) {
+      throw new ApiError(409, "لم يعد هذا الطلب مقبولاً من حسابك.");
+    }
+    const cancelledAttempt = await client.query(
+      `UPDATE order_driver_attempts
+          SET status='CANCELLED',responded_at=now(),response_at=now(),cancelled_at=now()
+        WHERE id=$1 AND status='ACCEPTED'
+        RETURNING id`,
+      [attempt.id],
+    );
+    if (!cancelledAttempt.rowCount) {
+      throw new ApiError(409, "سبق معالجة إلغاء هذا الطلب.");
+    }
+    const releasedOrder = await client.query(
+      `UPDATE orders
+          SET status='ASSIGNED',driver_id=NULL,updated_at=now()
+        WHERE id=$1 AND driver_id=$2 AND status IN ('CONFIRMED','ACCEPTED')
+        RETURNING id`,
+      [id, driverId],
+    );
+    if (!releasedOrder.rowCount) {
+      throw new ApiError(409, "تغيّرت حالة الطلب. حدّث البيانات ثم أعد المحاولة.");
+    }
+    await client.query(
+      `UPDATE order_email_dispatch_jobs
+          SET state='ACTIVE',next_check_at=now(),updated_at=now()
+        WHERE order_id=$1`,
+      [id],
+    );
+    await client.query(
+      `INSERT INTO order_status_history (order_id,status,note)
+       VALUES ($1,'CANCELLED',$2)`,
+      [id, `ألغى السائق #${driverId} الطلب بعد قبوله؛ أُعيد إسناده إلى سائق آخر`],
+    );
+    return { orderId: id };
+  });
+  kickDispatch();
+  return { order: await loadOrder(pool, result.orderId) };
 }
 
 async function cancelAdminOrder(orderId, reason) {
@@ -1878,6 +1967,19 @@ async function routeApi(req, res, url) {
     const session = await requireSession(req, "driver");
     const filters = parseStatsFilters(url.searchParams);
     sendJson(res, 200, await getDriverStats(session.ownerId, filters));
+    return true;
+  }
+  const driverCancelMatch = path.match(
+    /^\/api\/driver\/orders\/(\d+)\/cancel$/,
+  );
+  if (driverCancelMatch) {
+    if (method !== "POST") return methodNotAllowed(res);
+    const session = await requireSession(req, "driver");
+    sendJson(
+      res,
+      200,
+      await cancelAcceptedDriverOrder(session.ownerId, driverCancelMatch[1]),
+    );
     return true;
   }
   const completeMatch = path.match(/^\/api\/driver\/orders\/(\d+)\/complete$/);

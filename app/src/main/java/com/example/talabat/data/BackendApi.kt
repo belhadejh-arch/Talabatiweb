@@ -54,6 +54,9 @@ object BackendApi {
     suspend fun completeOrder(token: String, orderId: Int): OrderResponse =
         request("/api/driver/orders/$orderId/complete", "POST", token, null)
 
+    suspend fun cancelAcceptedOrder(token: String, orderId: Int): OrderResponse =
+        request("/api/driver/orders/$orderId/cancel", "POST", token, null)
+
     private suspend inline fun <reified T> get(path: String, token: String? = null): T =
         request(path, "GET", token, null)
 

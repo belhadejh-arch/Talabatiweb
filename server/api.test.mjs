@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { pool } from "./db.mjs";
-import { handleApi } from "./api.mjs";
+import { filterRestaurantPortalOrders, handleApi } from "./api.mjs";
 import { buildStats, parseStatsFilters } from "./stats.mjs";
 
 function responseRecorder() {
@@ -34,6 +34,23 @@ function jsonRequest(path, value) {
   };
   return req;
 }
+
+test("restaurant portal hides interim driver rejections and timeouts", () => {
+  const orders = [
+    { id: 1, status: "REJECTED" },
+    { id: 2, status: "TIMEOUT" },
+    { id: 3, status: "ASSIGNED" },
+    { id: 4, status: "NOT_ASSIGNED" },
+    { id: 5, status: "CONFIRMED" },
+    { id: 6, status: "COMPLETED" },
+    { id: 7, orderType: "RESERVATION", status: "NEW" },
+  ];
+
+  assert.deepEqual(
+    filterRestaurantPortalOrders(orders).map((order) => order.id),
+    [4, 6, 7],
+  );
+});
 
 const ORDER_IDEMPOTENCY_KEY = "d3f803b9-8f64-43a2-8d8a-1452ef5b3281";
 

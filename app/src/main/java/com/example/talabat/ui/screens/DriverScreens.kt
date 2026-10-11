@@ -249,6 +249,30 @@ fun DriverPortalScreen(onBack: () -> Unit) {
                                 busy = false
                             }
                         }
+                    },
+                    onCancel = { orderId ->
+                        scope.launch {
+                            busy = true
+                            error = null
+                            success = null
+                            try {
+                                val reassigned = TalabatRepository.cancelAcceptedOrder(orderId)
+                                success = "أُلغي استلامك للطلب #${reassigned.id} وأُعيد إسناده لسائق آخر."
+                                TalabatRepository.loadDriverData(
+                                    StatsFilters(
+                                        from = from,
+                                        to = to,
+                                        status = selectedStatus,
+                                        restaurantId = selectedRestaurant,
+                                        period = appliedPeriod
+                                    )
+                                )
+                            } catch (exception: Exception) {
+                                error = exception.message ?: "تعذرت إعادة إسناد الطلب."
+                            } finally {
+                                busy = false
+                            }
+                        }
                     }
                 )
                 "stats" -> DriverStatisticsTab(stats)
@@ -326,7 +350,8 @@ private fun DriverOrdersTab(
     onApplyDates: () -> Unit,
     onStatusChange: (String) -> Unit,
     onRestaurantChange: (Int?) -> Unit,
-    onComplete: (Int) -> Unit
+    onComplete: (Int) -> Unit,
+    onCancel: (Int) -> Unit
 ) {
     val periodOptions = listOf("اليوم", "أمس", "هذا الأسبوع", "هذا الشهر", "هذه السنة", "فترة مخصصة")
     val statuses = listOf("", "NEW", "ASSIGNED", "ACCEPTED", "REJECTED", "TIMEOUT", "CANCELLED", "COMPLETED")
@@ -389,14 +414,41 @@ private fun DriverOrdersTab(
             item { Text("لا توجد طلبات مطابقة للفلاتر.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             items(orders, key = { it.id }) { order ->
-                DriverOrderCard(order, busy, onComplete)
+                DriverOrderCard(order, busy, onComplete, onCancel)
             }
         }
     }
 }
 
 @Composable
-private fun DriverOrderCard(order: Order, busy: Boolean, onComplete: (Int) -> Unit) {
+private fun DriverOrderCard(
+    order: Order,
+    busy: Boolean,
+    onComplete: (Int) -> Unit,
+    onCancel: (Int) -> Unit
+) {
+    var showCancelConfirmation by remember(order.id) { mutableStateOf(false) }
+    if (showCancelConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirmation = false },
+            title = { Text("إلغاء استلام الطلب؟") },
+            text = { Text("سيُعاد الطلب إلى السائقين الآخرين، ولن يظهر للمطعم إلا إذا لم يقبله أي سائق آخر.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCancelConfirmation = false
+                        onCancel(order.id)
+                    },
+                    enabled = !busy
+                ) { Text("إلغاء وتسليم لسائق آخر") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirmation = false }, enabled = !busy) {
+                    Text("متابعة التوصيل")
+                }
+            }
+        )
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -423,7 +475,16 @@ private fun DriverOrderCard(order: Order, busy: Boolean, onComplete: (Int) -> Un
             if (!order.notes.isNullOrBlank()) Text("ملاحظات: ${order.notes}")
             Text("الإجمالي: ${money(order.totalAmount)}", fontWeight = FontWeight.Bold)
             Text("التاريخ: ${order.createdAt}", style = MaterialTheme.typography.bodySmall)
-            if (order.status.equals("ACCEPTED", ignoreCase = true)) {
+            if (order.status.equals("ACCEPTED", ignoreCase = true) ||
+                order.status.equals("CONFIRMED", ignoreCase = true)
+            ) {
+                OutlinedButton(
+                    onClick = { showCancelConfirmation = true },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("إلغاء وتسليم لسائق آخر")
+                }
                 Button(onClick = { onComplete(order.id) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                     Text("إكمال الطلب")
                 }

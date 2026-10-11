@@ -45,17 +45,20 @@ function OrderCard({
   order,
   index,
   onInvoice,
-  onRespond
+  onRespond,
+  onCancel
 }: {
   order: DriverOrder;
   index: number;
   onInvoice: (order: DriverOrder) => void;
   onRespond?: (orderId: number, decision: 'ACCEPTED' | 'REJECTED') => Promise<void>;
+  onCancel?: (orderId: number) => Promise<void>;
 }) {
   const cancelled = order.status?.toUpperCase() === 'CANCELLED';
   const assignmentStatus = order.assignmentStatus?.toUpperCase();
   const isAccepted = assignmentStatus === 'ACCEPTED';
   const isPending = assignmentStatus === 'PENDING' || assignmentStatus === 'SENT';
+  const canCancel = isAccepted && ['CONFIRMED', 'ACCEPTED'].includes(order.status.toUpperCase());
   const canViewInvoice = !cancelled && ['PENDING', 'SENT', 'ACCEPTED'].includes(assignmentStatus || '');
   const [responding, setResponding] = useState(false);
 
@@ -64,6 +67,16 @@ function OrderCard({
     setResponding(true);
     try {
       await onRespond(order.id, decision);
+    } finally {
+      setResponding(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!onCancel || !window.confirm('سيُعاد الطلب إلى السائقين الآخرين. لن يظهر للمطعم إلا إذا لم يقبله أي سائق آخر. هل تريد المتابعة؟')) return;
+    setResponding(true);
+    try {
+      await onCancel(order.id);
     } finally {
       setResponding(false);
     }
@@ -122,6 +135,18 @@ function OrderCard({
           >
             <Receipt size={13}/>
             <span>{isAccepted ? 'استخراج فاتورة' : 'عرض الفاتورة'}</span>
+          </button>
+        )}
+        {canCancel && onCancel && (
+          <button
+            type="button"
+            disabled={responding}
+            onClick={() => void handleCancel()}
+            className="btn btn-outline text-xs px-2.5 py-1 flex items-center gap-1 border-rose-300 text-rose-600 hover:bg-rose-50 rounded-lg"
+            data-testid={`button-driver-cancel-accepted-${order.id}`}
+          >
+            <XCircle size={13}/>
+            <span>إلغاء وتسليم لسائق آخر</span>
           </button>
         )}
       </div>
@@ -215,6 +240,16 @@ export default function Driver() {
       await Promise.all([ordersQuery.refetch(), statsQuery.refetch()]);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'تعذّر إرسال الرد.');
+    }
+  }
+
+  async function cancelAcceptedOrder(orderId: number) {
+    if (!token) return;
+    try {
+      await api.driverCancelAcceptedOrder(token, orderId);
+      await Promise.all([ordersQuery.refetch(), statsQuery.refetch()]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'تعذّر إعادة إسناد الطلب.');
     }
   }
 
@@ -322,7 +357,7 @@ export default function Driver() {
           <div className="driver-section-heading"><div><h2 id="driver-orders-title">{tab === 'invoices' ? 'فواتير الطلبات المسندة إليك' : 'سجل الطلبات'}</h2><p>{tab === 'invoices' ? 'تظهر الفاتورة الموحدة من لحظة إسناد الطلب، ويمكنك طباعتها بعد القبول.' : 'يعرض قائمة الطلبات الموجهة لحسابك فقط.'}</p></div>{ordersQuery.dataUpdatedAt > 0 && <span className="driver-updated" data-testid="text-driver-updated">آخر تحديث {new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(ordersQuery.dataUpdatedAt)}</span>}</div>
           <div className="driver-tabs" role="tablist" aria-label="تصفية الطلبات">{tabs.map(item => <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} aria-controls="driver-order-list" className="driver-tab" onClick={() => setTab(item.key)} data-testid={`button-driver-tab-${item.key}`}>{item.label} <span>{arabicNumber(counts[item.key])}</span></button>)}</div>
           <div id="driver-order-list" role="tabpanel" aria-live="polite">
-            {ordersQuery.isLoading ? <LoadingCards/> : ordersQuery.error ? <div className="driver-error" role="alert" data-testid="status-driver-orders-error">تعذّر تحميل طلباتك: {(ordersQuery.error as Error).message}<br/><button type="button" className="driver-retry" onClick={() => void ordersQuery.refetch()} data-testid="button-driver-orders-retry"><RefreshCw size={15}/> إعادة المحاولة</button></div> : filtered.length ? <div className="driver-list">{filtered.map((order, index) => <OrderCard key={`${order.id}-${order.assignmentStatus}-${index}`} order={order} index={index} onInvoice={o => setSelectedInvoice(o)} onRespond={respondOrder}/>)}</div> : <div className="driver-empty" data-testid="status-driver-orders-empty"><ClipboardList size={30}/><h3>{tab === 'invoices' ? 'لا توجد فواتير بعد' : tab === 'all' ? 'لا توجد طلبات في سجلك بعد' : 'لا توجد طلبات في هذا القسم'}</h3><p>{tab === 'invoices' ? 'تظهر الفواتير فور قبولك لأي طلب توصيل جديد.' : tab === 'all' ? 'ستظهر هنا طلبات التوصيل الخاصة بك عند وصولها.' : 'جرّب قسمًا آخر، أو حدّث البيانات للتحقق من الجديد.'}</p></div>}
+              {ordersQuery.isLoading ? <LoadingCards/> : ordersQuery.error ? <div className="driver-error" role="alert" data-testid="status-driver-orders-error">تعذّر تحميل طلباتك: {(ordersQuery.error as Error).message}<br/><button type="button" className="driver-retry" onClick={() => void ordersQuery.refetch()} data-testid="button-driver-orders-retry"><RefreshCw size={15}/> إعادة المحاولة</button></div> : filtered.length ? <div className="driver-list">{filtered.map((order, index) => <OrderCard key={`${order.id}-${order.assignmentStatus}-${index}`} order={order} index={index} onInvoice={o => setSelectedInvoice(o)} onRespond={respondOrder} onCancel={cancelAcceptedOrder}/>)}</div> : <div className="driver-empty" data-testid="status-driver-orders-empty"><ClipboardList size={30}/><h3>{tab === 'invoices' ? 'لا توجد فواتير بعد' : tab === 'all' ? 'لا توجد طلبات في سجلك بعد' : 'لا توجد طلبات في هذا القسم'}</h3><p>{tab === 'invoices' ? 'تظهر الفواتير فور قبولك لأي طلب توصيل جديد.' : tab === 'all' ? 'ستظهر هنا طلبات التوصيل الخاصة بك عند وصولها.' : 'جرّب قسمًا آخر، أو حدّث البيانات للتحقق من الجديد.'}</p></div>}
           </div>
         </section>
         <aside className="driver-side" aria-label="إعدادات السائق ومعلومات الحالات">

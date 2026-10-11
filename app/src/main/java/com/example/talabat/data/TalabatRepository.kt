@@ -166,6 +166,16 @@ object TalabatRepository {
         return completed
     }
 
+    suspend fun cancelAcceptedOrder(orderId: Int): Order {
+        val token = _driverToken.value
+            ?: throw BackendException("انتهت جلسة السائق. يرجى تسجيل الدخول مجدداً.")
+        val order = BackendApi.cancelAcceptedOrder(token, orderId).order
+        if (_driverToken.value == token) {
+            _driverOrders.value = _driverOrders.value.map { if (it.id == orderId) order else it }
+        }
+        return order
+    }
+
     fun driverLogout() {
         _driverToken.value = null
         _driver.value = null
