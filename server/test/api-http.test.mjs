@@ -31,6 +31,8 @@ test(
 
     const previousDatabaseUrl = process.env.DATABASE_URL;
     process.env.DATABASE_URL = testDatabaseUrl;
+    const previousDispatchWorkerEnabled = process.env.DISPATCH_WORKER_ENABLED;
+    process.env.DISPATCH_WORKER_ENABLED = "false";
 
     const { pool } = await import("../db.mjs");
     const { handleApi } = await import("../api.mjs");
@@ -318,6 +320,7 @@ test(
     }
 
     async function waitForOrderStatus(orderId, expectedStatus) {
+      await processDispatchForOrder(orderId, async () => {});
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline) {
         const result = await pool.query(
@@ -379,6 +382,7 @@ test(
             `HTTP reservation ${fixtures.suffix}`,
             `HTTP acceptance customer ${fixtures.suffix}`,
             `HTTP rejection customer ${fixtures.suffix}`,
+            `HTTP driver cancellation customer ${fixtures.suffix}`,
             `HTTP cancellation customer ${fixtures.suffix}`,
             `Foreign customer ${fixtures.suffix}`,
           ].includes(row.customer_name)
@@ -824,6 +828,7 @@ test(
       assert.equal(reservation.payload.order.orderType, "RESERVATION");
       assert.equal(reservation.payload.order.reservationTime, "19:30");
       fixtures.orders.push(reservation.payload.order.id);
+      await processDispatchForOrder(reservation.payload.order.id, async () => {});
 
       await waitForOrderStatus(firstDelivery.payload.order.id, "NOT_ASSIGNED");
       const restaurantOverview = await request(
@@ -1589,6 +1594,7 @@ test(
       }
 
       async function waitForPendingAssignment(orderId, differentFrom = null) {
+        await processDispatchForOrder(orderId, async () => {});
         const deadline = Date.now() + 5000;
         while (Date.now() < deadline) {
           const result = await pool.query(
@@ -2004,6 +2010,11 @@ test(
       }
       if (previousDatabaseUrl == null) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = previousDatabaseUrl;
+      if (previousDispatchWorkerEnabled == null) {
+        delete process.env.DISPATCH_WORKER_ENABLED;
+      } else {
+        process.env.DISPATCH_WORKER_ENABLED = previousDispatchWorkerEnabled;
+      }
       if (cleanupErrors.length) {
         throw new AggregateError(
           cleanupErrors,

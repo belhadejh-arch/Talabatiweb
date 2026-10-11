@@ -42,5 +42,5 @@ SQL
 # Explicitly target the temporary socket; never pass the workspace DATABASE_URL.
 env -u EXTERNAL_DATABASE_URL DATABASE_URL="$database_url" node server/migrate.mjs
 env -u EXTERNAL_DATABASE_URL TEST_DATABASE_URL="$database_url" DATABASE_URL="$database_url" \
-  DISPATCH_WORKER_ENABLED=true PUBLIC_API_URL=http://localhost:8080 \
+  DISPATCH_WORKER_ENABLED=false PUBLIC_API_URL=http://localhost:8080 \
   node --test --test-concurrency=1 server/*.test.mjs server/test/*.test.mjs

@@ -339,6 +339,10 @@ test("PostgreSQL dispatch: one driver, reject, accept, timeout, retry and no rep
       orderId: expiryId, assignmentId: expiryAttempt.assignment_id,
       driverId: first, token: actionToken(expiryAttempt), decision: "ACCEPTED",
     })).ok, false);
+    await pool.query(
+      "UPDATE subscriptions SET expiry_date=CURRENT_DATE+10 WHERE restaurant_id=$1",
+      [rest.restaurantId],
+    );
 
     const fallbackId = await createOrder(rest.restaurantId, rest.productId, "DELIVERY");
     await processDispatchForOrder(fallbackId, fakeMail);
