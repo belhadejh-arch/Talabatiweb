@@ -122,7 +122,7 @@ CREATE TABLE order_status_history (
   order_id integer NOT NULL REFERENCES orders(id),
   status text NOT NULL,
   note text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  changed_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE order_driver_attempts (

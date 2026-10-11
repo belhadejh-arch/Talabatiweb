@@ -142,7 +142,14 @@ test(
         "size_id",
         "size_name",
       ],
-      order_status_history: ["id", "order_id", "status", "note"],
+      order_status_history: [
+        "id",
+        "order_id",
+        "status",
+        "note",
+        "changed_at",
+        "created_at",
+      ],
       order_email_dispatch_jobs: [
         "order_id",
         "state",
