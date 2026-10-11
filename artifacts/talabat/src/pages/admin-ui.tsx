@@ -212,7 +212,8 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
               <span className="text-muted-foreground block">نوع الطلب:</span>
               <strong className="text-sm block">{order.orderType === 'DELIVERY' ? 'توصيل طلب' : 'حجز طاولة'}</strong>
               <span className="text-muted-foreground mt-1 block">حالة الطلب: <strong className="text-foreground">{statusLabel(order.status)}</strong></span>
-              <span className="text-muted-foreground block">موافقة السائق: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
+              <span className="text-muted-foreground block">حالة السائق المرتبط: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
+              <span className="text-muted-foreground block">السائق: <strong className="text-foreground">{order.driverId ? `#${order.driverId}` : 'لم يُعيّن بعد'}</strong></span>
             </div>
           </div>
 
@@ -222,11 +223,20 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             {order.cancelledAt && <time className="block mt-1 text-muted-foreground" dateTime={order.cancelledAt}>تاريخ الإلغاء: {dateLabel(order.cancelledAt)}</time>}
           </div>}
 
+          {order.orderType === 'RESERVATION' && <section className="rounded-xl border p-3 text-xs" aria-label="تفاصيل الحجز" data-testid={`section-invoice-reservation-${order.id}`}>
+            <strong className="block mb-2">تفاصيل الحجز</strong>
+            <div className="grid grid-cols-3 gap-3">
+              <div><span className="block text-muted-foreground">تاريخ الحجز</span><strong>{order.reservationDate || 'غير محدد'}</strong></div>
+              <div><span className="block text-muted-foreground">الوقت</span><strong>{order.reservationTime || 'غير محدد'}</strong></div>
+              <div><span className="block text-muted-foreground">عدد الأشخاص</span><strong>{order.partySize ?? 'غير محدد'}</strong></div>
+            </div>
+          </section>}
+
           {order.orderType === 'DELIVERY' && (
             <section className="rounded-xl border p-3 text-xs" aria-label="موقع التوصيل" data-testid={`section-invoice-location-${order.id}`}>
               <strong className="block mb-1">موقع العميل</strong>
               {order.latitude != null && order.longitude != null
-                ? <span dir="ltr" className="block">{order.latitude}, {order.longitude}</span>
+                ? <span dir="ltr" className="block">{order.deliveryLocation || `${order.latitude}, ${order.longitude}`}</span>
                 : <span className="block text-muted-foreground">لا توجد إحداثيات محفوظة</span>}
               {order.mapsUrl && <a href={order.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-primary underline" data-testid={`link-invoice-map-${order.id}`}>فتح الموقع على Google Maps</a>}
             </section>

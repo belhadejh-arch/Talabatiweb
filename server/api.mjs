@@ -858,7 +858,7 @@ async function getRestaurantPortal(restaurantId) {
         LIMIT 1`,
       [restaurantId]
     ),
-    listAdminOrders(500, restaurantId),
+    listAdminOrders(null, restaurantId),
     pool.query(
       `SELECT COUNT(*)::integer AS total_orders,
               COUNT(*) FILTER (WHERE is_archived=FALSE)::integer AS active_orders,

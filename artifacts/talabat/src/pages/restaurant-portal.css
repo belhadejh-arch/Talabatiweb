@@ -86,6 +86,38 @@
 .restaurant-invoice-button { min-height: 36px; border-radius: 9px; padding: 7px 11px; font-size: .78rem; }
 .restaurant-orders-empty { display: grid; justify-items: center; gap: 10px; padding: 45px 18px; color: var(--rp-soft); text-align: center; }
 .restaurant-orders-empty strong { color: var(--rp-ink); }
+.restaurant-archive-tabs { display: flex; gap: 5px; margin-top: 20px; padding: 4px; width: fit-content; border: 1px solid var(--rp-line); border-radius: 11px; background: #f5f8f7; }
+.restaurant-archive-tabs button { border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: var(--rp-soft); font-size: .8rem; font-weight: 800; transition: background .16s ease, color .16s ease; }
+.restaurant-archive-tabs button.is-active { background: #fff; color: var(--rp-ink); box-shadow: 0 1px 4px #20313d14; }
+.restaurant-order-tools { display: flex; align-items: center; gap: 10px; margin: 13px 0; }
+.restaurant-search-field { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 190px; min-height: 43px; padding: 0 12px; border: 1px solid var(--rp-line); border-radius: 10px; background: #fbfcfb; color: var(--rp-soft); }
+.restaurant-search-field:focus-within,.restaurant-date-filters label:focus-within { border-color: var(--rp-orange); box-shadow: 0 0 0 3px #ef60341a; }
+.restaurant-search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--rp-ink); font-size: .84rem; }
+.restaurant-search-field input::placeholder { color: #98a3a6; }
+.restaurant-date-filters { display: flex; align-items: center; gap: 7px; }
+.restaurant-date-filters label { display: flex; align-items: center; gap: 6px; min-height: 43px; padding: 0 9px; border: 1px solid var(--rp-line); border-radius: 10px; background: #fbfcfb; color: var(--rp-soft); font-size: .75rem; font-weight: 750; }
+.restaurant-date-filters input { width: 126px; border: 0; outline: 0; background: transparent; color: var(--rp-ink); font: inherit; font-size: .76rem; }
+.restaurant-clear-filters { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 38px; border: 0; background: transparent; color: #a94c32; font-size: .76rem; font-weight: 800; white-space: nowrap; }
+.restaurant-status-tabs { display: flex; gap: 7px; overflow-x: auto; padding: 2px 1px 12px; border-bottom: 1px solid var(--rp-line); scrollbar-width: thin; }
+.restaurant-status-tabs button { display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 39px; padding: 7px 11px; border: 1px solid transparent; border-radius: 9px; background: #f5f7f6; color: #63727a; font-size: .78rem; font-weight: 800; transition: background .16s ease, border-color .16s ease, color .16s ease; }
+.restaurant-status-tabs button.is-active { border-color: #f4c7b8; background: #fff2ed; color: #b94b2b; }
+.restaurant-status-tabs button small { display: grid; place-items: center; min-width: 22px; height: 21px; padding: 0 5px; border-radius: 99px; background: #e8edeb; color: #61716f; font-size: .68rem; font-variant-numeric: tabular-nums; }
+.restaurant-status-tabs button.is-active small { background: #f7d9cf; color: #a23f23; }
+.restaurant-order-list { padding-top: 14px; }
+.restaurant-order-card { transition: border-color .16s ease, box-shadow .16s ease; }
+.restaurant-order-card:hover { border-color: #cbd8d8; box-shadow: 0 5px 17px #20313d0a; }
+.restaurant-order-card-head>div:first-child { flex-wrap: wrap; }
+.restaurant-order-card-head>div:first-child strong { font-size: .98rem; }
+.restaurant-order-card-head time { white-space: nowrap; }
+.restaurant-invoice-button { transition: transform .16s ease, background .16s ease; }
+.restaurant-invoice-button:hover { transform: translateY(-1px); background: #d9502a; }
+@media(max-width: 760px) {
+  .restaurant-order-tools { align-items: stretch; flex-direction: column; }
+  .restaurant-date-filters { display: grid; grid-template-columns: 1fr 1fr; }
+  .restaurant-date-filters label { min-width: 0; }
+  .restaurant-date-filters input { width: 100%; min-width: 0; }
+  .restaurant-clear-filters { align-self: flex-start; }
+}
 @media(max-width: 760px) {
   .restaurant-login-layout { grid-template-columns: 1fr; gap: 27px; align-content: center; }
   .restaurant-login-intro h1 { font-size: 2.35rem; }
