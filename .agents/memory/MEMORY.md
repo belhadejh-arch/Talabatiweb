@@ -9,3 +9,4 @@
 - [External production verification](external-production-verification.md) — GitHub deployment URLs can be Vercel-login protected even while the production alias is public; verify the alias separately.
 - [Render SMTP egress](render-smtp-egress.md) — Render Free blocks Gmail SMTP on port 465; a healthy API and correct recipient do not imply email delivery.
 - [Restaurant access credentials](restaurant-account-credentials.md) — restaurant serials are encrypted and keyed by the stable SESSION_SECRET; rotate them before changing that secret.
+- [Vite production bundle timeouts](vite-bundle-timeout.md) — production builds can exceed five minutes during dependency transformation even when typechecking and the dev preview work.

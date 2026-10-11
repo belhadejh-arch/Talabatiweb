@@ -8,14 +8,14 @@ import { CURRENCY, money, dateLabel, statusLabel, type Order } from '../lib/api'
 export type Write = <T>(path: string, method: string, body?: unknown) => Promise<T>;
 export type Field = { key: string; label: string; type?: 'text' | 'number' | 'tel' | 'email' | 'password' | 'date' | 'textarea' | 'select' | 'checkbox' | 'image-upload'; required?: boolean; options?: { value: string; label: string }[]; min?: number; step?: string; minLength?: number };
 
-function driverApprovalLabel(status?: string) {
+export function driverApprovalLabel(status?: string) {
   const normalized = (status || 'NOT_ASSIGNED').toUpperCase();
   return ({
     NOT_ASSIGNED: 'لم يُعيّن سائق بعد',
     PENDING: 'بانتظار موافقة السائق',
     SENT: 'بانتظار موافقة السائق',
-    ACCEPTED: 'وافق السائق',
-    REJECTED: 'رفض السائق',
+    ACCEPTED: 'مقبول من السائق',
+    REJECTED: 'مرفوض من السائق',
     TIMEOUT: 'انتهت مهلة رد السائق',
     CANCELLED: 'أُلغي إسناد السائق',
   } as Record<string, string>)[normalized] || statusLabel(normalized);

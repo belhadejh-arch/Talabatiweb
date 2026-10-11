@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'wouter';
 import { ClipboardList, LogOut, RefreshCw, Receipt, Store } from 'lucide-react';
-import { InvoiceDialog } from './admin-ui';
+import { driverApprovalLabel, InvoiceDialog } from './admin-ui';
 import { api, ApiError, CURRENCY, dateLabel, money, statusLabel, type Order, type RestaurantIdentity } from '../lib/api';
 import './restaurant-portal.css';
 
@@ -180,7 +180,7 @@ export default function RestaurantPortalPage() {
         {loading && !portal ? <div className="restaurant-orders-empty" role="status">جارٍ تحميل الطلبات...</div>
           : displayedOrders.length ? <div className="restaurant-order-list">
             {displayedOrders.map(order => <article className="restaurant-order-card" key={order.id} data-testid={`card-restaurant-order-${order.id}`}>
-              <div className="restaurant-order-card-head"><div><strong>طلب <span dir="ltr">#{order.id}</span></strong><small dir="ltr" style={{ display: 'block', marginTop: 4, color: 'var(--rp-soft)', fontWeight: 700 }}>{order.invoiceNumber}</small><time>{dateLabel(order.createdAt)}</time></div><div className="restaurant-order-status-group"><span className={`restaurant-order-status status-${order.status.toLowerCase()}`}>{statusLabel(order.status)}</span>{order.status === 'CANCELLED' && <small className="restaurant-cancellation-details" data-testid={`text-restaurant-cancellation-${order.id}`}>{order.cancellationReason ? `السبب: ${order.cancellationReason}` : 'لم يُسجّل سبب الإلغاء'}{order.cancelledAt ? ` · ${dateLabel(order.cancelledAt)}` : ''}</small>}</div></div>
+              <div className="restaurant-order-card-head"><div><strong>طلب <span dir="ltr">#{order.id}</span></strong><small dir="ltr" style={{ display: 'block', marginTop: 4, color: 'var(--rp-soft)', fontWeight: 700 }}>{order.invoiceNumber}</small><time>{dateLabel(order.createdAt)}</time></div><div className="restaurant-order-status-group"><span className={`restaurant-order-status status-${order.status.toLowerCase()}`}>{statusLabel(order.status)}</span><small className="restaurant-driver-decision" data-testid={`text-restaurant-driver-decision-${order.id}`}>قرار السائق: {driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</small>{order.status === 'REJECTED' && <small className="restaurant-rejection-note" data-testid={`text-restaurant-rejection-not-cancellation-${order.id}`}>رفض السائق لا يلغي الطلب؛ يُعاد توجيهه عند توفر سائق آخر.</small>}{order.status === 'CANCELLED' && <small className="restaurant-cancellation-details" data-testid={`text-restaurant-cancellation-${order.id}`}>{order.cancellationReason ? `السبب: ${order.cancellationReason}` : 'لم يُسجّل سبب الإلغاء'}{order.cancelledAt ? ` · ${dateLabel(order.cancelledAt)}` : ''}</small>}</div></div>
               <p className="restaurant-order-items">{order.orderType === 'RESERVATION' ? 'حجز' : 'توصيل'} · {order.itemsSummary || order.items.map(item => `${item.quantity} × ${item.productName || 'صنف'}`).join('، ') || 'لا توجد أصناف'}</p>
               <div className="restaurant-order-card-foot"><div><span>العميل: {order.customerName}</span><span dir="ltr">{order.customerPhone}</span></div><strong>{money(order.totalAmount)} {CURRENCY}</strong>
                 <button type="button" className="restaurant-invoice-button" onClick={() => setSelectedOrder(order)} data-testid={`button-restaurant-invoice-${order.id}`}><Receipt size={15}/>عرض الفاتورة</button>
