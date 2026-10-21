@@ -511,6 +511,8 @@ test(
             phone: "000-test",
             address: "Integration fixture",
             description: "Temporary HTTP API fixture",
+            openingTime: "00:00",
+            closingTime: "23:59",
           },
         },
       );
@@ -841,6 +843,12 @@ test(
       assert.equal(restaurantOverview.status, 200);
       assert.equal(restaurantOverview.payload.restaurant.id, restaurantId);
       assert.ok(restaurantOverview.payload.orders.length >= 2);
+      const restaurantDelivery = restaurantOverview.payload.orders.find(
+        (order) => order.id === firstDelivery.payload.order.id,
+      );
+      assert.equal(restaurantDelivery.restaurantDecisionStatus, "PENDING");
+      assert.equal(restaurantDelivery.mapsUrl, firstDelivery.payload.order.mapsUrl);
+      assert.equal(restaurantDelivery.items[0].productName, `Fixture product ${suffix}`);
       assert.ok(
         restaurantOverview.payload.orders.every(
           (order) => order.restaurantId === restaurantId,
@@ -1696,7 +1704,8 @@ test(
         restaurantOverviewAfterAccept.payload.orders.find(
           (order) => order.id === acceptanceOrder.id,
         );
-      assert.equal(restaurantAcceptedOrder, undefined);
+      assert.equal(restaurantAcceptedOrder.status, "CONFIRMED");
+      assert.equal(restaurantAcceptedOrder.driverApprovalStatus, "ACCEPTED");
 
       const rejectionOrder = await createLifecycleOrder(
         "HTTP rejection customer",
@@ -1867,6 +1876,87 @@ test(
         cancelled.payload.order.cancelledAt,
       );
 
+      const wrongRestaurantForward = await request(
+        baseUrl,
+        `/api/restaurant/orders/${firstDelivery.payload.order.id}/forward`,
+        { method: "POST", token: otherRestaurantToken, body: {} },
+      );
+      assert.equal(wrongRestaurantForward.status, 404);
+
+      const forwarded = await request(
+        baseUrl,
+        `/api/restaurant/orders/${firstDelivery.payload.order.id}/forward`,
+        { method: "POST", token: currentRestaurantToken, body: {} },
+      );
+      assert.deepEqual(forwarded.payload, { ok: true, queued: true });
+      const queuedOrder = await request(
+        baseUrl,
+        "/api/restaurant/overview",
+        { token: currentRestaurantToken },
+      );
+      const forwardedOrder = queuedOrder.payload.orders.find(
+        (order) => order.id === firstDelivery.payload.order.id,
+      );
+      assert.ok(forwardedOrder.lastForwardedAt);
+      assert.equal(forwardedOrder.status, "NEW");
+
+      const deferred = await request(
+        baseUrl,
+        `/api/restaurant/orders/${firstDelivery.payload.order.id}/respond`,
+        {
+          method: "POST",
+          token: currentRestaurantToken,
+          body: { decision: "DEFERRED" },
+        },
+      );
+      assert.equal(deferred.status, 200);
+      const deferredOrder = (
+        await pool.query(
+          "SELECT restaurant_decision_status,restaurant_deferred_until FROM orders WHERE id=$1",
+          [firstDelivery.payload.order.id],
+        )
+      ).rows[0];
+      assert.equal(deferredOrder.restaurant_decision_status, "DEFERRED");
+      assert.ok(
+        new Date(deferredOrder.restaurant_deferred_until).getTime() > Date.now(),
+      );
+
+      const acceptedByRestaurant = await request(
+        baseUrl,
+        `/api/restaurant/orders/${firstDelivery.payload.order.id}/respond`,
+        {
+          method: "POST",
+          token: currentRestaurantToken,
+          body: { decision: "ACCEPTED" },
+        },
+      );
+      assert.equal(acceptedByRestaurant.status, 200);
+      const rejectedByRestaurant = await request(
+        baseUrl,
+        `/api/restaurant/orders/${firstDelivery.payload.order.id}/respond`,
+        {
+          method: "POST",
+          token: currentRestaurantToken,
+          body: {
+            decision: "REJECTED",
+            note: "المطعم غير قادر على التجهيز",
+          },
+        },
+      );
+      assert.equal(rejectedByRestaurant.status, 200);
+      const rejectedOrder = (
+        await pool.query(
+          "SELECT status,restaurant_decision_status,restaurant_decision_note FROM orders WHERE id=$1",
+          [firstDelivery.payload.order.id],
+        )
+      ).rows[0];
+      assert.equal(rejectedOrder.status, "CANCELLED");
+      assert.equal(rejectedOrder.restaurant_decision_status, "REJECTED");
+      assert.equal(
+        rejectedOrder.restaurant_decision_note,
+        "المطعم غير قادر على التجهيز",
+      );
+
       const frozenRestaurant = await request(
         baseUrl,
         `/api/admin/restaurants/${restaurantId}`,
@@ -1955,6 +2045,7 @@ test(
           "Pre-migration order, item, timeline or dispatch state changed.",
         );
       }
+
     } finally {
       if (server) {
         await new Promise((resolve) => server.close(resolve));

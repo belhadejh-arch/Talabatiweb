@@ -1011,8 +1011,11 @@ export default function RestaurantPortalPage() {
                         className="restaurant-driver-decision"
                         data-testid={`text-restaurant-forward-status-${order.id}`}
                       >
-                        التوجيه: {order.lastForwardedAt
-                          ? `تم توجيهه لسائق آخر · ${dateLabel(order.lastForwardedAt)}`
+                        التوجيه: {order.lastForwardedAt &&
+                        (!order.currentDriverAssignedAt ||
+                          new Date(order.currentDriverAssignedAt).getTime() <=
+                            new Date(order.lastForwardedAt).getTime())
+                          ? `طُلب توجيهه إلى سائق آخر · بانتظار التأكيد (${dateLabel(order.lastForwardedAt)})`
                           : order.currentDriverName
                             ? `تم توجيهه إلى ${order.currentDriverName}`
                             : order.status === "NOT_ASSIGNED"
