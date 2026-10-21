@@ -30,22 +30,8 @@ const MAX_JSON_BYTES = 256 * 1024;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const RESTAURANT_PORTAL_ORDER_STATUSES = new Set([
-  "NOT_ASSIGNED",
-  "COMPLETED",
-  "DELIVERED",
-  "CANCELLED",
-]);
-
 export function filterRestaurantPortalOrders(orders) {
-  return orders.filter((order) => {
-    if (String(order.orderType || "DELIVERY").toUpperCase() !== "DELIVERY") {
-      return true;
-    }
-    return RESTAURANT_PORTAL_ORDER_STATUSES.has(
-      String(order.status || "").toUpperCase(),
-    );
-  });
+  return orders;
 }
 
 const DRIVER_ATTEMPT_STATUSES = new Set([
@@ -349,7 +335,16 @@ function mapOrder(row, items = []) {
   );
   return {
     ...invoice,
+    cancellationReason: invoice.cancellationReason || row.restaurant_decision_note || null,
     driverAttempts: Array.isArray(row.driver_attempts) ? row.driver_attempts : [],
+    restaurantDecisionStatus: row.restaurant_decision_status || "PENDING",
+    restaurantDecidedAt: row.restaurant_decided_at || null,
+    restaurantDeferredUntil: row.restaurant_deferred_until || null,
+    restaurantDecisionNote: row.restaurant_decision_note || null,
+    currentDriverName: row.current_driver_name || null,
+    currentDriverAssignedAt: row.current_driver_assigned_at || null,
+    lastForwardedAt: row.last_forwarded_at || null,
+    currentDriverEmailStatus: row.current_driver_email_status || null,
   };
 }
 
@@ -357,17 +352,30 @@ async function loadOrder(client, id) {
   const result = await client.query(
     `SELECT o.*, r.name AS restaurant_name,
             last_attempt.status AS assignment_status,
+            last_attempt.driver_name AS current_driver_name,
+            last_attempt.created_at AS current_driver_assigned_at,
+            last_attempt.email_status AS current_driver_email_status,
+            last_forwarded.created_at AS last_forwarded_at,
             cancellation.note AS cancellation_reason,
             cancellation.created_at AS cancellation_at
        FROM orders o
        JOIN restaurants r ON r.id = o.restaurant_id
        LEFT JOIN LATERAL (
-         SELECT a.status
+          SELECT a.status, a.created_at, d.name AS driver_name, e.status AS email_status
            FROM order_driver_attempts a
+            LEFT JOIN drivers d ON d.id=a.driver_id
+            LEFT JOIN order_email_deliveries e ON e.assignment_id=a.assignment_id
           WHERE a.order_id = o.id
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT 1
        ) last_attempt ON TRUE
+        LEFT JOIN LATERAL (
+         SELECT h.created_at
+           FROM order_status_history h
+          WHERE h.order_id=o.id AND h.status='RESTAURANT_FORWARDED'
+          ORDER BY h.created_at DESC,h.id DESC
+          LIMIT 1
+       ) last_forwarded ON TRUE
         LEFT JOIN LATERAL (
           SELECT h.note, h.created_at
             FROM order_status_history h
@@ -864,6 +872,10 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
   const result = await pool.query(
     `SELECT o.*, r.name AS restaurant_name,
             last_attempt.status AS assignment_status,
+            last_attempt.driver_name AS current_driver_name,
+            last_attempt.created_at AS current_driver_assigned_at,
+            last_attempt.email_status AS current_driver_email_status,
+            last_forwarded.created_at AS last_forwarded_at,
             cancellation.note AS cancellation_reason,
             cancellation.created_at AS cancellation_at,
             COALESCE(driver_attempts.history, '[]'::json) AS driver_attempts,
@@ -871,12 +883,21 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
        FROM orders o
        JOIN restaurants r ON r.id = o.restaurant_id
        LEFT JOIN LATERAL (
-         SELECT a.status
+         SELECT a.status, a.created_at, d.name AS driver_name, e.status AS email_status
            FROM order_driver_attempts a
+           LEFT JOIN drivers d ON d.id=a.driver_id
+           LEFT JOIN order_email_deliveries e ON e.assignment_id=a.assignment_id
           WHERE a.order_id = o.id
           ORDER BY a.created_at DESC, a.id DESC
           LIMIT 1
        ) last_attempt ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT h.created_at
+           FROM order_status_history h
+          WHERE h.order_id=o.id AND h.status='RESTAURANT_FORWARDED'
+          ORDER BY h.created_at DESC,h.id DESC
+          LIMIT 1
+       ) last_forwarded ON TRUE
        LEFT JOIN LATERAL (
          SELECT h.note, h.created_at
            FROM order_status_history h
@@ -889,11 +910,13 @@ async function listAdminOrders(limit = 250, restaurantId = null) {
                    'driverId', a.driver_id,
                    'driverName', d.name,
                    'status', a.status,
+                   'emailStatus', e.status,
                    'createdAt', a.created_at,
                    'respondedAt', a.responded_at
                  ) ORDER BY a.id) AS history
             FROM order_driver_attempts a
             LEFT JOIN drivers d ON d.id = a.driver_id
+            LEFT JOIN order_email_deliveries e ON e.assignment_id=a.assignment_id
            WHERE a.order_id = o.id
         ) driver_attempts ON TRUE
        LEFT JOIN LATERAL (
@@ -957,8 +980,7 @@ async function getRestaurantPortal(restaurantId) {
               ))::integer AS rejected_orders,
               COALESCE(SUM(total_amount) FILTER (WHERE status<>'CANCELLED'), 0)::numeric AS revenue
          FROM orders
-         WHERE restaurant_id=$1
-           AND (order_type<>'DELIVERY' OR status IN ('NOT_ASSIGNED','COMPLETED','DELIVERED','CANCELLED'))`,
+         WHERE restaurant_id=$1`,
         [restaurantId],
       ),
       pool.query(
@@ -970,7 +992,6 @@ async function getRestaurantPortal(restaurantId) {
                 ) AS was_rejected
            FROM orders o
            WHERE o.restaurant_id=$1
-             AND (o.order_type<>'DELIVERY' OR o.status IN ('NOT_ASSIGNED','COMPLETED','DELIVERED','CANCELLED'))
        ),
        bucketed AS (
          SELECT o.*,
@@ -1056,6 +1077,158 @@ async function getRestaurantPortal(restaurantId) {
     },
     reports,
   };
+}
+
+async function respondRestaurantOrder(restaurantId, orderId, input) {
+  if (
+    !input ||
+    Object.keys(input).some((key) => !["decision", "note"].includes(key)) ||
+    !["ACCEPTED", "REJECTED", "DEFERRED"].includes(input.decision) ||
+    (input.note != null && (typeof input.note !== "string" || input.note.length > 500))
+  ) {
+    throw new ApiError(400, "قرار المطعم أو الملاحظة غير صالحة.");
+  }
+  const note = typeof input.note === "string" ? input.note.trim() : "";
+  const result = await withTransaction(async (client) => {
+    await client.query(
+      "SELECT order_id FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+      [orderId],
+    );
+    const order = (await client.query(
+      "SELECT id, restaurant_id, status, restaurant_decision_status FROM orders WHERE id=$1 FOR UPDATE",
+      [orderId],
+    )).rows[0];
+    if (!order || Number(order.restaurant_id) !== restaurantId) {
+      throw new ApiError(404, "الطلب غير موجود في سجل هذا المطعم.");
+    }
+    if (["COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status)) {
+      throw new ApiError(409, "لا يمكن تغيير قرار طلب مكتمل أو ملغى.");
+    }
+    if (order.restaurant_decision_status === "REJECTED") {
+      throw new ApiError(409, "سبق أن رفض المطعم هذا الطلب.");
+    }
+    if (input.decision === "ACCEPTED" &&
+        order.restaurant_decision_status === "ACCEPTED") {
+      return { changed: false };
+    }
+
+    if (input.decision === "REJECTED") {
+      await client.query(
+        `UPDATE order_driver_attempts
+            SET status='CANCELLED',responded_at=now(),response_at=now(),cancelled_at=now()
+          WHERE order_id=$1 AND status='PENDING'`,
+        [orderId],
+      );
+      await client.query(
+        `UPDATE order_email_dispatch_jobs
+            SET state='DONE',updated_at=now()
+          WHERE order_id=$1`,
+        [orderId],
+      );
+      await client.query(
+        `UPDATE orders
+            SET restaurant_decision_status='REJECTED',
+                restaurant_decided_at=now(),restaurant_deferred_until=NULL,
+                restaurant_decision_note=$2,status='CANCELLED',
+                cancelled_at=COALESCE(cancelled_at,now()),updated_at=now()
+          WHERE id=$1`,
+        [orderId, note || null],
+      );
+      await client.query(
+        `INSERT INTO order_status_history (order_id,status,note)
+         VALUES ($1,'RESTAURANT_REJECTED',$2)`,
+        [orderId, note || "رفض المطعم الطلب وأوقف إسناده إلى السائقين"],
+      );
+      return { changed: true };
+    }
+
+    if (input.decision === "DEFERRED") {
+      await client.query(
+        `UPDATE orders
+            SET restaurant_decision_status='DEFERRED',
+                restaurant_decided_at=now(),
+                restaurant_deferred_until=now()+interval '15 minutes',
+                restaurant_decision_note=$2,updated_at=now()
+          WHERE id=$1`,
+        [orderId, note || null],
+      );
+      await client.query(
+        `INSERT INTO order_status_history (order_id,status,note)
+         VALUES ($1,'RESTAURANT_DEFERRED',$2)`,
+        [orderId, note || "أجّل المطعم مراجعة الطلب 15 دقيقة"],
+      );
+      return { changed: true };
+    }
+
+    await client.query(
+      `UPDATE orders
+          SET restaurant_decision_status='ACCEPTED',
+              restaurant_decided_at=now(),restaurant_deferred_until=NULL,
+              restaurant_decision_note=$2,updated_at=now()
+        WHERE id=$1`,
+      [orderId, note || null],
+    );
+    await client.query(
+      `INSERT INTO order_status_history (order_id,status,note)
+       VALUES ($1,'RESTAURANT_ACCEPTED',$2)`,
+      [orderId, note || "وافق المطعم على تجهيز الطلب"],
+    );
+    return { changed: true };
+  });
+  return { ok: true, changed: result.changed };
+}
+
+async function forwardRestaurantOrder(restaurantId, orderId) {
+  await withTransaction(async (client) => {
+    await client.query(
+      "SELECT order_id FROM order_email_dispatch_jobs WHERE order_id=$1 FOR UPDATE",
+      [orderId],
+    );
+    const order = (await client.query(
+      "SELECT id,restaurant_id,status,driver_id,order_type FROM orders WHERE id=$1 FOR UPDATE",
+      [orderId],
+    )).rows[0];
+    if (!order || Number(order.restaurant_id) !== restaurantId) {
+      throw new ApiError(404, "الطلب غير موجود في سجل هذا المطعم.");
+    }
+    if (order.order_type !== "DELIVERY") {
+      throw new ApiError(409, "إعادة الإسناد متاحة لطلبات التوصيل فقط.");
+    }
+    if (["CONFIRMED", "ACCEPTED", "COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status) ||
+        order.driver_id != null) {
+      throw new ApiError(409, "لا يمكن توجيه طلب قبله سائق أو انتهى.");
+    }
+    const cancelled = await client.query(
+      `UPDATE order_driver_attempts
+          SET status='CANCELLED',responded_at=now(),response_at=now(),cancelled_at=now()
+        WHERE order_id=$1 AND status='PENDING'
+        RETURNING assignment_id`,
+      [orderId],
+    );
+    if (order.status === "ASSIGNED" && !cancelled.rowCount) {
+      throw new ApiError(409, "لا توجد محاولة سائق نشطة لإعادة توجيهها.");
+    }
+    await client.query(
+      `INSERT INTO order_email_dispatch_jobs (order_id,state,next_check_at,created_at,updated_at)
+       VALUES ($1,'ACTIVE',now(),now(),now())
+       ON CONFLICT (order_id) DO UPDATE
+         SET state='ACTIVE',next_check_at=now(),updated_at=now()`,
+      [orderId],
+    );
+    if (order.status === "NOT_ASSIGNED") {
+      await client.query(
+        "UPDATE orders SET status='NEW',updated_at=now() WHERE id=$1",
+        [orderId],
+      );
+    }
+    await client.query(
+      `INSERT INTO order_status_history (order_id,status,note)
+       VALUES ($1,'RESTAURANT_FORWARDED',$2)`,
+      [orderId, "طلب المطعم توجيه الطلب إلى السائق التالي دون انتظار المهلة"],
+    );
+  });
+  kickDispatch();
+  return { ok: true, queued: true };
 }
 
 async function listAdminDrivers() {
@@ -1615,6 +1788,33 @@ async function routeApi(req, res, url) {
     if (method !== "GET") return methodNotAllowed(res);
     const session = await requireSession(req, "restaurant");
     sendJson(res, 200, await getRestaurantPortal(session.restaurantId));
+    return true;
+  }
+  const restaurantOrderMatch = path.match(
+    /^\/api\/restaurant\/orders\/(\d+)\/(respond|forward)$/,
+  );
+  if (restaurantOrderMatch) {
+    if (method !== "POST") return methodNotAllowed(res);
+    const session = await requireSession(req, "restaurant");
+    const orderId = positiveInt(restaurantOrderMatch[1], "الطلب");
+    if (restaurantOrderMatch[2] === "respond") {
+      const input = await readJson(req, 32 * 1024);
+      sendJson(
+        res,
+        200,
+        await respondRestaurantOrder(session.restaurantId, orderId, input),
+      );
+    } else {
+      const input = await readJson(req, 1024);
+      if (Object.keys(input).length) {
+        throw new ApiError(400, "لا تقبل عملية التوجيه بيانات إضافية.");
+      }
+      sendJson(
+        res,
+        200,
+        await forwardRestaurantOrder(session.restaurantId, orderId),
+      );
+    }
     return true;
   }
   if (path === "/api/restaurant/logout") {

@@ -214,6 +214,9 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
               <span className="text-muted-foreground mt-1 block">حالة الطلب: <strong className="text-foreground">{statusLabel(order.status)}</strong></span>
               <span className="text-muted-foreground block">حالة السائق المرتبط: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
               <span className="text-muted-foreground block">السائق: <strong className="text-foreground">{order.driverId ? `#${order.driverId}` : 'لم يُعيّن بعد'}</strong></span>
+              <span className="text-muted-foreground block">قرار المطعم: <strong className="text-foreground">{order.restaurantDecisionStatus === 'ACCEPTED' ? 'وافق المطعم' : order.restaurantDecisionStatus === 'REJECTED' ? 'رفض المطعم' : order.restaurantDecisionStatus === 'DEFERRED' ? 'مؤجل' : 'بانتظار القرار'}</strong></span>
+              <span className="text-muted-foreground block">بريد السائق: <strong className="text-foreground">{order.currentDriverEmailStatus === 'SENT' ? 'تم تأكيد الإرسال' : order.currentDriverEmailStatus === 'SENDING' ? 'جارٍ الإرسال' : order.currentDriverEmailStatus === 'FAILED' ? 'فشل مؤقت؛ ستتم إعادة المحاولة' : order.currentDriverEmailStatus === 'PENDING' ? 'بانتظار الإرسال' : 'بانتظار تعيين سائق'}</strong></span>
+              <span className="text-muted-foreground block">حالة التوجيه: <strong className="text-foreground">{order.lastForwardedAt ? `وُجّه إلى سائق آخر · ${dateLabel(order.lastForwardedAt)}` : order.currentDriverName ? `وُجّه إلى ${order.currentDriverName}` : 'بانتظار تعيين سائق'}</strong></span>
             </div>
           </div>
 

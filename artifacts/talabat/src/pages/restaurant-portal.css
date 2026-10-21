@@ -650,6 +650,58 @@
 .restaurant-order-items {
   margin: 14px 0;
 }
+.restaurant-order-note {
+  margin: 8px 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fff8e8;
+  color: #6c531b;
+  font-size: 0.79rem;
+  line-height: 1.6;
+}
+.restaurant-order-map-link {
+  display: inline-flex;
+  margin: 0 0 12px;
+  color: #166b74;
+  font-size: 0.8rem;
+  font-weight: 850;
+  text-decoration: underline;
+}
+.restaurant-order-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f0;
+}
+.restaurant-order-action {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 0.78rem !important;
+  font-weight: 850;
+}
+.restaurant-order-action.accept {
+  background: #e8f6ed;
+  color: #216b3e;
+}
+.restaurant-order-action.defer {
+  border-color: #e4d8b4;
+  background: #fff8e8;
+  color: #765813;
+}
+.restaurant-order-action.reject {
+  background: #fff0ed;
+  color: #a93625;
+}
+.restaurant-order-action.forward {
+  border-color: #b7dce0;
+  background: #eaf7f8;
+  color: #155e66;
+}
 .restaurant-order-card-foot {
   justify-content: flex-start;
   flex-wrap: wrap;

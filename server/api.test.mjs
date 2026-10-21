@@ -35,7 +35,7 @@ function jsonRequest(path, value) {
   return req;
 }
 
-test("restaurant portal hides interim driver rejections and timeouts", () => {
+test("restaurant portal includes current delivery orders and the complete history", () => {
   const orders = [
     { id: 1, status: "REJECTED" },
     { id: 2, status: "TIMEOUT" },
@@ -48,7 +48,7 @@ test("restaurant portal hides interim driver rejections and timeouts", () => {
 
   assert.deepEqual(
     filterRestaurantPortalOrders(orders).map((order) => order.id),
-    [4, 6, 7],
+    [1, 2, 3, 4, 5, 6, 7],
   );
 });
 

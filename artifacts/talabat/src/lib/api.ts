@@ -60,10 +60,19 @@ export type Order = {
   status: string;
   assignmentStatus?: string | null;
   driverApprovalStatus?: string;
+  restaurantDecisionStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | "DEFERRED";
+  restaurantDecidedAt?: string | null;
+  restaurantDeferredUntil?: string | null;
+  restaurantDecisionNote?: string | null;
+  currentDriverName?: string | null;
+  currentDriverAssignedAt?: string | null;
+  lastForwardedAt?: string | null;
+  currentDriverEmailStatus?: "PENDING" | "SENDING" | "SENT" | "FAILED" | null;
   driverAttempts?: {
     driverId: number;
     driverName?: string | null;
     status: string;
+    emailStatus?: "PENDING" | "SENDING" | "SENT" | "FAILED" | null;
     createdAt?: string | null;
     respondedAt?: string | null;
   }[];
@@ -341,6 +350,28 @@ export const api = {
     request<RestaurantPortal>("/api/restaurant/overview", {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  restaurantOrderDecision: (
+    token: string,
+    orderId: number,
+    decision: "ACCEPTED" | "REJECTED" | "DEFERRED",
+  ) =>
+    request<{ ok: boolean; changed: boolean }>(
+      `/api/restaurant/orders/${orderId}/respond`,
+      {
+        method: "POST",
+        headers: { ...jsonHeaders, Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ decision }),
+      },
+    ),
+  restaurantForwardOrder: (token: string, orderId: number) =>
+    request<{ ok: boolean; queued: boolean }>(
+      `/api/restaurant/orders/${orderId}/forward`,
+      {
+        method: "POST",
+        headers: { ...jsonHeaders, Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      },
+    ),
   driverOrders: (token: string) =>
     request<{ orders: DriverOrder[] }>("/api/driver/orders", {
       headers: { Authorization: `Bearer ${token}` },

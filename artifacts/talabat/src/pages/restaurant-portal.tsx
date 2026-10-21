@@ -127,6 +127,39 @@ function driverAttemptOutcomeLabel(status: string) {
   }
 }
 
+function canRestaurantDecide(order: Order) {
+  if (["CANCELLED", "COMPLETED", "DELIVERED"].includes(order.status.toUpperCase())) {
+    return false;
+  }
+  if (order.restaurantDecisionStatus === "DEFERRED") {
+    return !order.restaurantDeferredUntil ||
+      new Date(order.restaurantDeferredUntil).getTime() <= Date.now();
+  }
+  return !order.restaurantDecisionStatus ||
+    order.restaurantDecisionStatus === "PENDING";
+}
+
+function restaurantDecisionLabel(order: Order) {
+  if (order.restaurantDecisionStatus === "ACCEPTED") return "وافق المطعم";
+  if (order.restaurantDecisionStatus === "REJECTED") return "رفض المطعم";
+  if (order.restaurantDecisionStatus === "DEFERRED" &&
+      order.restaurantDeferredUntil &&
+      new Date(order.restaurantDeferredUntil).getTime() > Date.now()) {
+    return `مؤجّل حتى ${dateLabel(order.restaurantDeferredUntil)}`;
+  }
+  return "بانتظار قرار المطعم";
+}
+
+function driverEmailLabel(status?: string | null) {
+  switch (status) {
+    case "SENT": return "أُرسل بريد السائق";
+    case "SENDING": return "جارٍ إرسال بريد السائق";
+    case "FAILED": return "تعذّر الإرسال؛ إعادة المحاولة مستمرة";
+    case "PENDING": return "البريد محفوظ في قائمة الإرسال";
+    default: return "بانتظار تعيين سائق لإرسال البريد";
+  }
+}
+
 export default function RestaurantPortalPage() {
   const [session, setSession] = useState<RestaurantSession | null>(readSession);
   const [serialNumber, setSerialNumber] = useState("");
@@ -148,6 +181,7 @@ export default function RestaurantPortalPage() {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioError, setAudioError] = useState("");
   const [isConnected, setIsConnected] = useState(true);
+  const [busyOrderIds, setBusyOrderIds] = useState<Set<number>>(() => new Set());
   const [acknowledgedFallbackOrderIds, setAcknowledgedFallbackOrderIds] =
     useState<Set<number>>(() =>
       readAcknowledgedFallbackOrders(readSession()?.restaurant.id),
@@ -162,6 +196,8 @@ export default function RestaurantPortalPage() {
   );
   const hasUnacknowledgedFallbackOrders =
     unacknowledgedFallbackOrders.length > 0;
+  const actionableOrders = (portal?.orders || []).filter(canRestaurantDecide);
+  const hasActionableOrders = actionableOrders.length > 0;
 
   const logout = async () => {
     if (session) {
@@ -250,7 +286,7 @@ export default function RestaurantPortalPage() {
   useEffect(() => {
     const audio = alertAudio.current;
     if (!audio) return;
-    if (audioEnabled && isConnected && hasUnacknowledgedFallbackOrders) {
+    if (audioEnabled && isConnected && hasActionableOrders) {
       void audio.play().catch(() => {
         setAudioEnabled(false);
         setAudioError(
@@ -261,7 +297,7 @@ export default function RestaurantPortalPage() {
       audio.pause();
       audio.currentTime = 0;
     }
-  }, [audioEnabled, hasUnacknowledgedFallbackOrders, isConnected]);
+  }, [audioEnabled, hasActionableOrders, isConnected]);
 
   useEffect(
     () => () => {
@@ -279,7 +315,7 @@ export default function RestaurantPortalPage() {
       await audio.play();
       setAudioEnabled(true);
       setAudioError("");
-      if (!hasUnacknowledgedFallbackOrders) {
+      if (!hasActionableOrders) {
         audio.pause();
         audio.currentTime = 0;
       }
@@ -287,6 +323,41 @@ export default function RestaurantPortalPage() {
       setAudioError(
         "تعذر تشغيل الصوت تلقائياً. اضغط الزر للسماح بالتنبيه الصوتي.",
       );
+    }
+  };
+
+  const runOrderAction = async (
+    order: Order,
+    action: "ACCEPTED" | "REJECTED" | "DEFERRED" | "FORWARD",
+  ) => {
+    if (!session || busyOrderIds.has(order.id)) return;
+    if (action === "REJECTED" &&
+        !window.confirm(`هل تريد رفض الطلب #${order.id} وإيقاف إرساله للسائقين؟`)) {
+      return;
+    }
+    if (action === "FORWARD" &&
+        !window.confirm(`توجيه الطلب #${order.id} الآن إلى السائق التالي؟`)) {
+      return;
+    }
+    setBusyOrderIds((current) => new Set(current).add(order.id));
+    setPortalError("");
+    try {
+      if (action === "FORWARD") {
+        await api.restaurantForwardOrder(session.token, order.id);
+      } else {
+        await api.restaurantOrderDecision(session.token, order.id, action);
+      }
+      await loadPortal(true);
+    } catch (error) {
+      setPortalError(
+        error instanceof Error ? error.message : "تعذّر تحديث حالة الطلب.",
+      );
+    } finally {
+      setBusyOrderIds((current) => {
+        const next = new Set(current);
+        next.delete(order.id);
+        return next;
+      });
     }
   };
 
@@ -507,7 +578,7 @@ export default function RestaurantPortalPage() {
           <div>
             <strong>تنبيهات الطلبات الصوتية</strong>
             <small>
-              فعّل الصوت الآن للسماح بتشغيله تلقائياً عند وصول الطلبات التالية.
+              فعّل الصوت الآن للسماح برنين الطلبات التي تنتظر قرار المطعم.
               يلزم إبقاء لوحة المطعم مفتوحة.
             </small>
           </div>
@@ -524,7 +595,7 @@ export default function RestaurantPortalPage() {
           )}
           {audioError && <small role="alert">{audioError}</small>}
         </section>
-        {unacknowledgedFallbackOrders.length > 0 && (
+        {hasActionableOrders && (
           <section
             className="restaurant-pending-alert"
             role="status"
@@ -536,42 +607,37 @@ export default function RestaurantPortalPage() {
             </div>
             <div className="restaurant-pending-alert-content">
               <strong>
-                {unacknowledgedFallbackOrders.length === 1
-                  ? "طلب واحد تعذّر إسناده إلى سائق"
-                  : `${unacknowledgedFallbackOrders.length} طلبات تعذّر إسنادها إلى سائق`}
+                {actionableOrders.length === 1
+                  ? "طلب واحد ينتظر قرار المطعم"
+                  : `${actionableOrders.length} طلبات تنتظر قرار المطعم`}
               </strong>
               <ul>
-                {unacknowledgedFallbackOrders.map((order) => (
+                {actionableOrders.map((order) => (
                   <li key={order.id}>
                     <span>
                       طلب #{order.id} · {order.customerName} ·{" "}
                       {dateLabel(order.createdAt)}
                       <small>
-                        {order.driverAttempts?.length
-                          ? order.driverAttempts
-                              .map(
-                                (attempt) =>
-                                  `${attempt.driverName || `السائق #${attempt.driverId}`} — ${driverApprovalLabel(attempt.status)}`,
-                              )
-                              .join("، ")
-                          : "لم يتوفر سائق مؤهل للطلب"}
+                        قرار السائق: {driverApprovalLabel(
+                          order.driverApprovalStatus || order.assignmentStatus || undefined,
+                        )} · {driverEmailLabel(order.currentDriverEmailStatus)}
                       </small>
                     </span>
                     <button
                       type="button"
                       className="restaurant-fallback-ack"
-                      onClick={() => acknowledgeFallbackOrder(order.id)}
-                      aria-label={`تأكيد الاطلاع على الطلب ${order.id}`}
-                      data-testid={`button-acknowledge-fallback-${order.id}`}
+                      onClick={() => setSelectedOrder(order)}
+                      aria-label={`فتح فاتورة الطلب ${order.id}`}
+                      data-testid={`button-open-pending-order-${order.id}`}
                     >
-                      تم الاطلاع
+                      فتح الفاتورة
                     </button>
                   </li>
                 ))}
               </ul>
               <small>
-                وصل الطلب للمطعم بعد رفض السائقين أو انتهاء مهلة ردهم وعدم توفر
-                سائق آخر. افتح الفاتورة لمراجعة الأصناف وموقع العميل.
+                اقبل الطلب أو أجّله أو ارفضه. ستظهر تفاصيل الأصناف والموقع
+                والفاتورة في كل طلب.
               </small>
             </div>
           </section>
@@ -929,6 +995,35 @@ export default function RestaurantPortalPage() {
                             undefined,
                         )}
                       </small>
+                      <small
+                        className="restaurant-driver-decision"
+                        data-testid={`text-restaurant-order-decision-${order.id}`}
+                      >
+                        قرار المطعم: {restaurantDecisionLabel(order)}
+                      </small>
+                      <small
+                        className="restaurant-driver-decision"
+                        data-testid={`text-restaurant-email-status-${order.id}`}
+                      >
+                        البريد: {driverEmailLabel(order.currentDriverEmailStatus)}
+                      </small>
+                      <small
+                        className="restaurant-driver-decision"
+                        data-testid={`text-restaurant-forward-status-${order.id}`}
+                      >
+                        التوجيه: {order.lastForwardedAt
+                          ? `تم توجيهه لسائق آخر · ${dateLabel(order.lastForwardedAt)}`
+                          : order.currentDriverName
+                            ? `تم توجيهه إلى ${order.currentDriverName}`
+                            : order.status === "NOT_ASSIGNED"
+                              ? "لم يُعيّن سائق بعد"
+                              : "بانتظار تعيين سائق"}
+                      </small>
+                      {order.currentDriverName && (
+                        <small className="restaurant-driver-decision">
+                          السائق الحالي: {order.currentDriverName}
+                        </small>
+                      )}
                       {order.status === "NOT_ASSIGNED" && (
                         <div
                           className="restaurant-fallback-card-alert"
@@ -951,6 +1046,9 @@ export default function RestaurantPortalPage() {
                                       `السائق #${attempt.driverId}`}
                                     {" — "}
                                     {driverAttemptOutcomeLabel(attempt.status)}
+                                    {attempt.emailStatus
+                                      ? ` · ${driverEmailLabel(attempt.emailStatus)}`
+                                      : ""}
                                   </li>
                                 ))}
                               </ul>
@@ -994,6 +1092,22 @@ export default function RestaurantPortalPage() {
                         .join("، ") ||
                       "لا توجد أصناف"}
                   </p>
+                  {order.notes && (
+                    <p className="restaurant-order-note">
+                      <strong>ملاحظة العميل:</strong> {order.notes}
+                    </p>
+                  )}
+                  {order.mapsUrl && (
+                    <a
+                      className="restaurant-order-map-link"
+                      href={order.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`link-restaurant-order-map-${order.id}`}
+                    >
+                      فتح موقع العميل على الخريطة
+                    </a>
+                  )}
                   <div className="restaurant-order-card-foot">
                     <div>
                       <span>العميل: {order.customerName}</span>
@@ -1011,6 +1125,55 @@ export default function RestaurantPortalPage() {
                       <Receipt size={15} />
                       عرض الفاتورة
                     </button>
+                  </div>
+                  <div className="restaurant-order-actions">
+                    {canRestaurantDecide(order) && (
+                      <>
+                        <button
+                          type="button"
+                          className="restaurant-order-action accept"
+                          onClick={() => void runOrderAction(order, "ACCEPTED")}
+                          disabled={busyOrderIds.has(order.id)}
+                          data-testid={`button-restaurant-accept-${order.id}`}
+                        >
+                          قبول الطلب
+                        </button>
+                        <button
+                          type="button"
+                          className="restaurant-order-action defer"
+                          onClick={() => void runOrderAction(order, "DEFERRED")}
+                          disabled={busyOrderIds.has(order.id)}
+                          data-testid={`button-restaurant-defer-${order.id}`}
+                        >
+                          تأجيل 15 دقيقة
+                        </button>
+                        <button
+                          type="button"
+                          className="restaurant-order-action reject"
+                          onClick={() => void runOrderAction(order, "REJECTED")}
+                          disabled={busyOrderIds.has(order.id)}
+                          data-testid={`button-restaurant-reject-${order.id}`}
+                        >
+                          رفض الطلب
+                        </button>
+                      </>
+                    )}
+                    {order.orderType === "DELIVERY" &&
+                      !["CONFIRMED", "ACCEPTED", "COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status.toUpperCase()) &&
+                      order.driverId == null && (
+                        <button
+                          type="button"
+                          className="restaurant-order-action forward"
+                          onClick={() => void runOrderAction(order, "FORWARD")}
+                          disabled={busyOrderIds.has(order.id)}
+                          data-testid={`button-restaurant-forward-${order.id}`}
+                        >
+                          توجيه لسائق آخر الآن
+                        </button>
+                      )}
+                    {busyOrderIds.has(order.id) && (
+                      <span role="status">جارٍ تحديث الطلب...</span>
+                    )}
                   </div>
                 </article>
               ))}
