@@ -52,7 +52,7 @@ const DRIVER_ATTEMPT_STATUSES = new Set([
   "TIMEOUT",
   "CANCELLED",
 ]);
-const RECONCILABLE_DELIVERY_STATUSES = new Set(["SENDING", "FAILED"]);
+const DELIVERY_LIST_STATUSES = new Set(["ALL", "PENDING", "SENDING", "SENT", "FAILED"]);
 
 class ApiError extends Error {
   constructor(status, message) {
@@ -1279,15 +1279,17 @@ async function listAdminSubscriptions() {
 }
 
 async function listAdminEmailDeliveries(status) {
+  const where = status === "ALL" ? "" : "WHERE status = $1";
+  const values = status === "ALL" ? [] : [status];
   const result = await pool.query(
     `SELECT id, order_id, assignment_id, driver_id, driver_email, status,
             sent_at, last_attempt_at, next_retry_at, error, retry_count,
             created_at, updated_at
        FROM order_email_deliveries
-      WHERE status = $1
+       ${where}
       ORDER BY updated_at DESC, id DESC
-      LIMIT 500`,
-    [status],
+       LIMIT 100`,
+    values,
   );
   return result.rows.map(mapEmailDelivery);
 }
@@ -1865,9 +1867,9 @@ async function routeApi(req, res, url) {
   if (path === "/api/admin/email-deliveries") {
     if (method !== "GET") return methodNotAllowed(res);
     await requireSession(req, "admin");
-    const status = (url.searchParams.get("status") || "").trim().toUpperCase();
-    if (!RECONCILABLE_DELIVERY_STATUSES.has(status)) {
-      throw new ApiError(400, "حالة التسليم يجب أن تكون SENDING أو FAILED.");
+    const status = (url.searchParams.get("status") || "ALL").trim().toUpperCase();
+    if (!DELIVERY_LIST_STATUSES.has(status)) {
+      throw new ApiError(400, "حالة التسليم يجب أن تكون ALL أو PENDING أو SENDING أو SENT أو FAILED.");
     }
     sendJson(res, 200, { deliveries: await listAdminEmailDeliveries(status) });
     return true;

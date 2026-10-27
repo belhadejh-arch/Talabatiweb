@@ -533,6 +533,58 @@ test("admin delivery listing exposes sanitized metadata and no action tokens", a
   }
 });
 
+test("admin can inspect recent email deliveries across all states", async () => {
+  const originalQuery = pool.query;
+  const calls = [];
+  pool.query = async (sql, values) => {
+    calls.push({ sql, values });
+    if (sql.includes("FROM api_sessions")) {
+      return { rows: [{ role: "ADMIN", owner_id: 1 }] };
+    }
+    if (sql.includes("FROM admins")) return { rows: [{ id: 1 }] };
+    if (sql.includes("FROM order_email_deliveries")) {
+      return {
+        rows: ["PENDING", "SENDING", "SENT", "FAILED"].map((status, index) => ({
+          id: index + 1,
+          order_id: 90 + index,
+          assignment_id: 24 + index,
+          driver_id: 6,
+          driver_email: "driver@example.com",
+          status,
+          sent_at: null,
+          last_attempt_at: null,
+          next_retry_at: null,
+          error: null,
+          retry_count: 0,
+          created_at: new Date("2026-04-04T09:00:00Z"),
+          updated_at: new Date("2026-04-04T10:00:00Z"),
+        })),
+      };
+    }
+    throw new Error(`Unexpected query: ${sql}`);
+  };
+
+  try {
+    const res = responseRecorder();
+    const handled = await handleApi({
+      url: "/api/admin/email-deliveries?status=ALL",
+      method: "GET",
+      headers: { authorization: `Bearer ${"A".repeat(43)}` },
+    }, res);
+    assert.equal(handled, true);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(calls.at(-1).values, []);
+    assert.doesNotMatch(calls.at(-1).sql, /WHERE status/);
+    assert.match(calls.at(-1).sql, /LIMIT 100/);
+    assert.deepEqual(
+      JSON.parse(res.body).deliveries.map((delivery) => delivery.status),
+      ["PENDING", "SENDING", "SENT", "FAILED"],
+    );
+  } finally {
+    pool.query = originalQuery;
+  }
+});
+
 test("invalid reconciliation state returns HTTP 409 without exposing secrets", async () => {
   const originalQuery = pool.query;
   const originalConnect = pool.connect;
