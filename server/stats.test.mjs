@@ -64,12 +64,11 @@ test("driver order history is scoped to that driver's unique attempt rows", asyn
   );
   assert.match(captured.sql, /o\.source = 'ANDROID_CUSTOMER'/);
   assert.match(captured.sql, /a\.status IN \('PENDING','ACCEPTED'\)/);
-  assert.match(captured.sql, /\(a\.status <> 'PENDING' OR delivery\.status = 'SENT'\)/);
   assert.match(captured.sql, /o\.status <> 'CANCELLED'/);
   assert.match(captured.sql, /ORDER BY o\.created_at DESC, o\.id DESC\s*$/);
 });
 
-test("driver invoice feed excludes unconfirmed, non-customer, rejected and cancelled orders", async () => {
+test("driver invoice feed shows pending invoices before email confirmation", async () => {
   const originalQuery = pool.query;
   const now = new Date("2026-10-27T10:00:00.000Z");
   let sql;
@@ -79,7 +78,7 @@ test("driver invoice feed excludes unconfirmed, non-customer, rejected and cance
       rows: [{
         id: 12, restaurant_id: 5, restaurant_name: "Restaurant",
         order_type: "DELIVERY", status: "ASSIGNED",
-        assignment_status: "PENDING", current_driver_email_status: "SENT",
+        assignment_status: "PENDING", current_driver_email_status: "FAILED",
         source: "ANDROID_CUSTOMER", created_at: now, items: [],
       }],
     };
@@ -90,9 +89,10 @@ test("driver invoice feed excludes unconfirmed, non-customer, rejected and cance
     assert.match(sql, /o\.source = 'ANDROID_CUSTOMER'/);
     assert.match(sql, /o\.status <> 'CANCELLED'/);
     assert.match(sql, /a\.status IN \('PENDING','ACCEPTED'\)/);
-    assert.match(sql, /\(a\.status <> 'PENDING' OR delivery\.status = 'SENT'\)/);
+    assert.doesNotMatch(sql, /delivery\.status = 'SENT'/);
     assert.deepEqual(orders.map((order) => order.id), [12]);
-    assert.ok(orders.every((order) => order.currentDriverEmailStatus === "SENT"));
+    assert.equal(orders[0].assignmentStatus, "PENDING");
+    assert.equal(orders[0].currentDriverEmailStatus, "FAILED");
   } finally {
     pool.query = originalQuery;
   }

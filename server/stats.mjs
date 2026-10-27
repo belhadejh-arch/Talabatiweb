@@ -484,7 +484,6 @@ async function loadDriverOrderRows(
       "o.source = 'ANDROID_CUSTOMER'",
       "o.status <> 'CANCELLED'",
       "a.status IN ('PENDING','ACCEPTED')",
-      "(a.status <> 'PENDING' OR delivery.status = 'SENT')",
     );
   }
   if (filters.from) {
