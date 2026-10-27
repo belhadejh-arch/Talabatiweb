@@ -125,8 +125,8 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
   };
 
   return <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-    <DialogContent className="admin-dialog-content max-w-2xl max-h-[90vh] overflow-y-auto print:p-0 print:border-none print:shadow-none" data-testid="dialog-invoice">
-      <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+    <DialogContent className={`admin-dialog-content max-w-2xl max-h-[90vh] overflow-y-auto print:p-0 print:border-none print:shadow-none ${audience === "driver" ? "driver-invoice-dialog w-[calc(100vw-1rem)] max-w-[42rem] max-h-[calc(100dvh-1rem)]" : ""}`} data-testid="dialog-invoice">
+      <DialogHeader className={`flex flex-row items-center justify-between border-b pb-3 ${audience === "driver" ? "driver-invoice-header" : ""}`}>
         <DialogTitle className="flex items-center gap-2">
           <Receipt size={20} className="text-primary"/>
             <span>{restaurantSummary ? `فاتورة مداخيل مطعم: ${restaurantSummary.restaurantName}` : `فاتورة طلب #${order?.orderNumber ?? order?.id}`}</span>
@@ -138,7 +138,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
       </DialogHeader>
 
       {restaurantSummary ? (
-        <div className="p-4 space-y-4 text-right" dir="rtl">
+        <div className={`p-4 space-y-4 text-right ${audience === "driver" ? "driver-invoice-content" : ""}`} dir="rtl">
           <div className="flex justify-between items-start border-b pb-4">
             <div>
               <h2 className="text-xl font-bold">{restaurantSummary.restaurantName}</h2>
@@ -202,7 +202,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 p-3 bg-muted/40 rounded-xl text-xs">
+          <div className={`grid grid-cols-2 gap-3 p-3 bg-muted/40 rounded-xl text-xs ${audience === "driver" ? "driver-invoice-summary" : ""}`}>
             <div>
               <span className="text-muted-foreground block">بيانات العميل:</span>
               <strong className="text-sm block">{order.customerName}</strong>
@@ -215,7 +215,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
               <span className="text-muted-foreground block">حالة السائق المرتبط: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
                <span className="text-muted-foreground block">السائق المستلم: <strong className="text-foreground">{order.currentDriverName || (order.driverId ? `#${order.driverId}` : 'لم يُعيّن بعد')}</strong></span>
               <span className="text-muted-foreground block">قرار المطعم: <strong className="text-foreground">{order.restaurantDecisionStatus === 'ACCEPTED' ? 'وافق المطعم' : order.restaurantDecisionStatus === 'REJECTED' ? 'رفض المطعم' : order.restaurantDecisionStatus === 'DEFERRED' ? 'مؤجل' : 'بانتظار القرار'}</strong></span>
-              <span className="text-muted-foreground block">بريد السائق: <strong className="text-foreground">{order.currentDriverEmailStatus === 'SENT' ? 'تم تأكيد الإرسال' : order.currentDriverEmailStatus === 'SENDING' ? 'جارٍ الإرسال' : order.currentDriverEmailStatus === 'FAILED' ? 'فشل مؤقت؛ ستتم إعادة المحاولة' : order.currentDriverEmailStatus === 'PENDING' ? 'بانتظار الإرسال' : 'بانتظار تعيين سائق'}</strong></span>
+              <span className="text-muted-foreground block">بريد السائق: <strong className="text-foreground">{order.currentDriverEmailStatus === 'SENT' ? 'تم الإرسال عبر Gmail' : order.currentDriverEmailStatus === 'SENDING' ? 'جارٍ الإرسال' : order.currentDriverEmailStatus === 'FAILED' ? 'فشل الإرسال؛ ستتم إعادة المحاولة' : order.currentDriverEmailStatus === 'PENDING' ? 'بانتظار الإرسال' : 'بانتظار تعيين سائق'}</strong></span>
               <span className="text-muted-foreground block">حالة التوجيه: <strong className="text-foreground">{order.lastForwardedAt && (!order.currentDriverAssignedAt || new Date(order.currentDriverAssignedAt).getTime() <= new Date(order.lastForwardedAt).getTime()) ? `طُلب توجيهه إلى سائق آخر · ${dateLabel(order.lastForwardedAt)}` : order.currentDriverName ? `وُجّه إلى ${order.currentDriverName}` : 'بانتظار تعيين سائق'}</strong></span>
             </div>
           </div>
@@ -265,7 +265,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
 
           <div className="mt-4">
             <h4 className="font-bold text-xs mb-2 text-muted-foreground">تفاصيل الأصناف</h4>
-            <table className="w-full text-xs border-collapse">
+            <table className={`w-full text-xs border-collapse ${audience === "driver" ? "driver-invoice-items" : ""}`}>
               <thead>
                 <tr className="border-b text-muted-foreground">
                   <th className="py-2 text-right">الصنف</th>
@@ -298,7 +298,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
             </table>
           </div>
 
-          <div className="space-y-1.5 pt-3 border-t text-xs">
+          <div className={`space-y-1.5 pt-3 border-t text-xs ${audience === "driver" ? "driver-invoice-totals" : ""}`}>
             <div className="flex justify-between">
               <span className="text-muted-foreground">المجموع الفرعي:</span>
               <span className="font-semibold">{money(order.subtotal || (order.totalAmount - (order.deliveryFee || 0)))} {CURRENCY}</span>

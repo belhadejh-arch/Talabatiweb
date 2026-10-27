@@ -188,6 +188,7 @@ export type DriverOrder = Pick<
   | "status"
   | "assignmentStatus"
   | "driverApprovalStatus"
+  | "currentDriverEmailStatus"
   | "driverId"
   | "createdAt"
   | "cancelledAt"

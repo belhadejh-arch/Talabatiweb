@@ -57,6 +57,11 @@ test("driver order history is scoped to that driver's unique attempt rows", asyn
 
   assert.deepEqual(captured.values, [23]);
   assert.match(captured.sql, /WHERE a\.driver_id = \$1/);
+  assert.match(captured.sql, /delivery\.status AS current_driver_email_status/);
+  assert.match(
+    captured.sql,
+    /LEFT JOIN order_email_deliveries delivery\s+ON delivery\.assignment_id = a\.assignment_id/
+  );
   assert.match(captured.sql, /ORDER BY o\.created_at DESC, o\.id DESC\s*$/);
 });
 

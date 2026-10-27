@@ -59,6 +59,9 @@
 .driver-badge.rejected { background: #faeae5; color: #aa4932; }
 .driver-badge.cancelled { background: #ececf0; color: #5c6471; }
 .driver-badge.pending { background: #fff0db; color: #90602c; }
+.driver-badge.email-sent { background: #e2f1e7; color: #22734a; }
+.driver-badge.email-pending { background: #fff0db; color: #90602c; }
+.driver-badge.email-failed { background: #faeae5; color: #aa4932; white-space: normal; }
 .driver-order-body { padding: 0 19px 16px; }
 .driver-order-restaurant { font-size: 1rem; font-weight: 800; }
 .driver-order-summary { color: var(--driver-soft); line-height: 1.7; font-size: .8rem; margin-top: 5px; }
@@ -110,4 +113,37 @@
 .driver-login-note a { color: #315f72; font-weight: 800; text-decoration: underline; }
 @media(max-width: 950px) { .driver-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .driver-content-grid { grid-template-columns: 1fr; } .driver-side { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media(max-width: 700px) { .driver-login { grid-template-columns: 1fr; } .driver-login-art { min-height: 270px; padding: 25px 22px 35px; gap: 30px; } .driver-login-art h1 { font-size: 2.5rem; } .driver-login-art p { display: none; } .driver-login-form-area { display: block; padding: 35px 22px 60px; } .driver-login-card { margin-inline: auto; } .driver-nav { min-height: 64px; } .driver-brand-caption, .driver-brand-divider { display: none; } .driver-header-button span { display: none; } .driver-header-button { width: 38px; padding: 7px; } .driver-intro { padding-block: 30px 56px; } .driver-metrics { gap: 8px; } .driver-metric { padding: 14px; min-height: 116px; } .driver-metric strong { font-size: 2rem; } .driver-content-grid { margin-top: 28px; gap: 28px; } .driver-side { grid-template-columns: 1fr; } .driver-order-head { flex-direction: column; } .driver-order-badges { justify-content: flex-start; } }
+.driver-invoice-dialog { border-radius: 16px; }
+.driver-invoice-content { min-width: 0; }
+.driver-invoice-items { table-layout: fixed; }
+.driver-invoice-items th,
+.driver-invoice-items td { overflow-wrap: anywhere; }
+@media(max-width: 600px) {
+  .driver-invoice-dialog { padding: 12px; gap: 10px; }
+  .driver-invoice-header { align-items: flex-start; gap: 8px; padding-bottom: 10px; }
+  .driver-invoice-header [data-radix-dialog-title] { min-width: 0; align-items: flex-start; gap: 5px; font-size: .9rem; line-height: 1.45; }
+  .driver-invoice-header button { min-height: 34px; padding: 6px 8px; gap: 4px; font-size: .67rem; white-space: nowrap; }
+  .driver-invoice-content { padding: 2px 0 0 !important; gap: 12px !important; }
+  .driver-invoice-content > .flex { gap: 10px; }
+  .driver-invoice-content > .flex h2 { font-size: 1rem; }
+  .driver-invoice-summary { grid-template-columns: 1fr !important; gap: 8px; padding: 10px; }
+  .driver-invoice-content section { padding: 10px !important; }
+  .driver-invoice-content section [class*="grid-cols-"] { grid-template-columns: 1fr; gap: 7px; }
+  .driver-invoice-items th,
+  .driver-invoice-items td { padding: 6px 3px; font-size: .68rem; line-height: 1.5; }
+  .driver-invoice-items th:first-child,
+  .driver-invoice-items td:first-child { width: 40%; }
+  .driver-invoice-items th:nth-child(2),
+  .driver-invoice-items td:nth-child(2) { width: 13%; }
+  .driver-invoice-items th:nth-child(3),
+  .driver-invoice-items td:nth-child(3) { width: 21%; }
+  .driver-invoice-items th:nth-child(4),
+  .driver-invoice-items td:nth-child(4) { width: 26%; }
+  .driver-invoice-totals > div { gap: 10px; }
+}
+@media(max-width: 360px) {
+  .driver-invoice-dialog { padding: 10px; }
+  .driver-invoice-items th,
+  .driver-invoice-items td { font-size: .62rem; }
+}
 @media(prefers-reduced-motion:reduce) { .driver-page *, .driver-page *::before, .driver-page *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

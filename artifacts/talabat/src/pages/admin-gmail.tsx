@@ -63,7 +63,7 @@ export default function AdminGmail({ token, write }: { token: string; write: Wri
       <span className="metric-icon"><Mail size={20}/></span>
       <div>
         <h3>إرسال طلبات السائقين عبر Gmail</h3>
-        <p className="subtle text-sm mt-1">يُرسل الطلب إلى بريد السائق المسجّل عبر Gmail API، من دون منفذ SMTP.</p>
+        <p className="subtle text-sm mt-1">يُرسل الطلب الفعلي إلى بريد السائق المسجّل عبر Gmail API. يلزم ربط حساب الإرسال المركزي هنا؛ تأكيد السائق لبريده يثبت العنوان فقط.</p>
         {status.isLoading ? <p className="subtle text-sm mt-3">جارٍ التحقق من حالة الربط...</p>
           : status.error ? <p className="text-sm mt-3" role="alert">تعذّر قراءة حالة Gmail. تحقّق من ترحيل قاعدة البيانات ثم أعد المحاولة.</p>
           : status.data?.connected

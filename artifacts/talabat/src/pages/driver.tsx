@@ -41,6 +41,22 @@ function attemptTone(status: string | null | undefined) {
   return ({ ACCEPTED: 'accepted', REJECTED: 'rejected', CANCELLED: 'cancelled' } as Record<string, string>)[String(status || '').toUpperCase()] || 'pending';
 }
 
+function emailStatusLabel(status: string | null | undefined) {
+  return ({
+    PENDING: 'البريد بانتظار الإرسال',
+    SENDING: 'جارٍ إرسال البريد',
+    SENT: 'أُرسل عبر Gmail إلى بريدك',
+    FAILED: 'فشل الإرسال؛ تجري إعادة المحاولة'
+  } as Record<string, string>)[String(status || '').toUpperCase()] || 'لم تُسجل حالة البريد';
+}
+
+function emailStatusTone(status: string | null | undefined) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'SENT') return 'email-sent';
+  if (normalized === 'FAILED') return 'email-failed';
+  return 'email-pending';
+}
+
 function OrderCard({
   order,
   index,
@@ -88,6 +104,7 @@ function OrderCard({
       <div className="driver-order-badges">
         <span className={`driver-badge ${attemptTone(order.assignmentStatus)}`} data-testid={`status-driver-assignment-${order.id}-${index}`}>{attemptLabel(order.assignmentStatus)}</span>
         <span className={`driver-badge ${cancelled ? 'cancelled' : ''}`} data-testid={`status-driver-order-${order.id}-${index}`}>الطلب: {statusLabel(order.status)}</span>
+        <span className={`driver-badge ${emailStatusTone(order.currentDriverEmailStatus)}`} data-testid={`status-driver-email-${order.id}-${index}`}>{emailStatusLabel(order.currentDriverEmailStatus)}</span>
       </div>
     </div>
     <div className="driver-order-body">
@@ -364,7 +381,7 @@ export default function Driver() {
           <section className="driver-panel" aria-labelledby="driver-gmail-title">
             <div className="driver-panel-icon"><MailCheck size={22}/></div>
             <h2 id="driver-gmail-title">تأكيد بريد Gmail</h2>
-            <p>تحقّق من ملكيتك للبريد المسجّل في حساب السائق لتلقي إشعارات الطلبات.</p>
+            <p>تحقّق من أن هذا هو بريدك المسجّل. ربطه يثبت ملكية العنوان فقط؛ إرسال الطلبات فعليًا يعتمد أيضًا على ربط حساب Gmail المركزي من إعدادات المشرف.</p>
             <div className="driver-gmail-address"><span>البريد المسجّل</span><strong dir="ltr" data-testid="text-driver-registered-email">{gmail?.registeredEmail || session.driver.email}</strong></div>
             {gmailQuery.isLoading ? <div className="driver-skeleton" role="status" aria-label="جارٍ فحص حالة البريد" style={{ height: 38, width: '100%', marginTop: 16 }}/> : gmailQuery.error ? <div className="driver-error" role="alert" style={{ marginTop: 14, padding: 12 }} data-testid="status-driver-gmail-error">تعذّر فحص حالة Gmail: {(gmailQuery.error as Error).message}<br/><button type="button" className="driver-retry" onClick={() => void gmailQuery.refetch()} data-testid="button-driver-gmail-retry">إعادة المحاولة</button></div> : gmailVerified ? <div className="driver-inline-status" data-testid="status-driver-gmail-connected"><Check size={17}/> تم تأكيد ملكية بريدك <span dir="ltr">{gmail.email}</span></div> : <>
               {!gmail?.configured && <p data-testid="status-driver-gmail-unconfigured">إعداد Google على الخادم غير مكتمل. اطلب من الإدارة ضبط: <span dir="ltr">{gmail?.missingConfiguration?.join('، ') || 'إعدادات OAuth في Render'}</span></p>}
@@ -389,6 +406,7 @@ export default function Driver() {
       open={!!selectedInvoice}
       onClose={() => setSelectedInvoice(null)}
       order={selectedInvoice as unknown as Order}
+      audience="driver"
     />
   </div>;
 }

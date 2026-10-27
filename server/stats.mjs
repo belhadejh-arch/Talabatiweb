@@ -511,12 +511,15 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
             a.status AS assignment_status,
             a.driver_id AS assignment_driver_id,
             a.driver_email,
+            delivery.status AS current_driver_email_status,
             cancellation.note AS cancellation_reason,
             cancellation.created_at AS cancellation_at,
             COALESCE(order_lines.items, '[]'::json) AS items
        FROM order_driver_attempts a
        JOIN orders o ON o.id = a.order_id
        LEFT JOIN restaurants r ON r.id = o.restaurant_id
+        LEFT JOIN order_email_deliveries delivery
+          ON delivery.assignment_id = a.assignment_id
        LEFT JOIN LATERAL (
          SELECT h.note, h.created_at
            FROM order_status_history h
@@ -555,12 +558,16 @@ async function loadDriverOrderRows(driverId, filters, limit = null) {
 }
 
 function mapDriverOrderRow(row) {
-  return buildOrderInvoice(
+  const invoice = buildOrderInvoice(
     row,
     { name: row.restaurant_name || "" },
     row.items || [],
     row.assignment_status || null
   );
+  return {
+    ...invoice,
+    currentDriverEmailStatus: row.current_driver_email_status || null,
+  };
 }
 
 export async function getDriverOrders(driverId, filters, { limit = null } = {}) {
