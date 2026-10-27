@@ -456,6 +456,7 @@ export function formatDistance(km: number): string {
 }
 
 export const CURRENCY = "د.ل";
+const CUSTOMER_PLATFORM_ORIGIN = "https://talabat-one-ivory.vercel.app";
 
 export function restaurantMenuPath(restaurant: Pick<Restaurant, "id" | "name">) {
   const nameSlug =
@@ -469,8 +470,7 @@ export function restaurantMenuPath(restaurant: Pick<Restaurant, "id" | "name">) 
 }
 
 export function restaurantMenuUrl(restaurant: Pick<Restaurant, "id" | "name">) {
-  const basePath = import.meta.env.BASE_URL.replace(/\/+$/, "");
-  return `${window.location.origin}${basePath}${restaurantMenuPath(restaurant)}`;
+  return `${CUSTOMER_PLATFORM_ORIGIN}${restaurantMenuPath(restaurant)}`;
 }
 export const money = (value: number | string | null | undefined) =>
   new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(
