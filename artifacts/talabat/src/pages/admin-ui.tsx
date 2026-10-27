@@ -189,7 +189,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary, audienc
           </table>
         </div>
       ) : order ? (
-        <div className="p-4 space-y-4 text-right" dir="rtl">
+        <div className={`p-4 space-y-4 text-right ${audience === "driver" ? "driver-invoice-content" : ""}`} dir="rtl">
           <div className="flex justify-between items-start border-b pb-4">
             <div>
               <h2 className="text-xl font-extrabold">{order.restaurantName || 'مطعم طلبات'}</h2>
