@@ -91,6 +91,12 @@ export async function sendGmailIfConnected(payload, message) {
 }
 
 export function isOlderThanGmailConnection(payload, connectedAt) {
+  if (
+    payload.assignment.status === "PENDING" &&
+    payload.assignment.allow_first_send_after_gmail_connection === true
+  ) {
+    return false;
+  }
   const connected = new Date(connectedAt).getTime();
   return new Date(payload.order.created_at).getTime() < connected ||
     new Date(payload.assignment.created_at).getTime() < connected;

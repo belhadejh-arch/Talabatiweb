@@ -10,3 +10,5 @@
 - [Render SMTP egress](render-smtp-egress.md) — Render Free blocks Gmail SMTP on port 465; a healthy API and correct recipient do not imply email delivery.
 - [Restaurant access credentials](restaurant-account-credentials.md) — restaurant serials are encrypted and keyed by the stable SESSION_SECRET; rotate them before changing that secret.
 - [Vite production bundle timeouts](vite-bundle-timeout.md) — production builds can exceed five minutes during dependency transformation even when typechecking and the dev preview work.
+- [Real-order driver dispatch](real-order-dispatch.md) — send only committed customer orders; permit untouched queued mail after Gmail connection, never replay failed or ambiguous sends.
+- [Restaurant invoice privacy](restaurant-invoice-privacy.md) — restaurant invoices show customer name, order details, and assigned driver, but never customer contact or location.

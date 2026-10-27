@@ -46,7 +46,7 @@ export type Order = {
   restaurantId: number;
   restaurantName?: string;
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   orderType: "DELIVERY" | "RESERVATION";
   latitude?: number | null;
   longitude?: number | null;

@@ -36,6 +36,18 @@ test("pre-connection orders and assignments cannot be mailed as new deliveries",
   assert.equal(isOlderThanGmailConnection({
     order: { created_at: createdAfter }, assignment: { created_at: createdAfter },
   }, connectedAt), false);
+  assert.equal(isOlderThanGmailConnection({
+    order: { created_at: createdBefore },
+    assignment: {
+      created_at: createdBefore,
+      status: "PENDING",
+      allow_first_send_after_gmail_connection: true,
+    },
+  }, connectedAt), false);
+  assert.equal(isOlderThanGmailConnection({
+    order: { created_at: createdBefore },
+    assignment: { created_at: createdBefore, status: "PENDING" },
+  }, connectedAt), true);
 });
 
 test("Gmail API sends MIME only to the assigned driver's saved address", async () => {

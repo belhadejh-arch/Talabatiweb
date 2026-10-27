@@ -35,9 +35,15 @@ function jsonRequest(path, value) {
   return req;
 }
 
-test("restaurant portal includes current delivery orders and the complete history", () => {
+test("restaurant portal keeps order history but removes private customer details", () => {
   const orders = [
-    { id: 1, status: "REJECTED" },
+    {
+      id: 1, status: "REJECTED", customerName: "Customer",
+      customerPhone: "555", latitude: 32.1, longitude: 13.2,
+      deliveryLocation: "32.1, 13.2", mapsUrl: "https://maps.example",
+      notes: "Private note", currentDriverName: "Driver",
+      items: [{ productName: "Meal", quantity: 1 }],
+    },
     { id: 2, status: "TIMEOUT" },
     { id: 3, status: "ASSIGNED" },
     { id: 4, status: "NOT_ASSIGNED" },
@@ -50,6 +56,15 @@ test("restaurant portal includes current delivery orders and the complete histor
     filterRestaurantPortalOrders(orders).map((order) => order.id),
     [1, 2, 3, 4, 5, 6, 7],
   );
+  const restaurantOrder = filterRestaurantPortalOrders(orders)[0];
+  assert.equal(restaurantOrder.customerName, "Customer");
+  assert.equal(restaurantOrder.currentDriverName, "Driver");
+  assert.deepEqual(restaurantOrder.items, [{ productName: "Meal", quantity: 1 }]);
+  for (const privateField of [
+    "customerPhone", "latitude", "longitude", "deliveryLocation", "mapsUrl", "notes",
+  ]) {
+    assert.equal(Object.hasOwn(restaurantOrder, privateField), false, privateField);
+  }
 });
 
 const ORDER_IDEMPOTENCY_KEY = "d3f803b9-8f64-43a2-8d8a-1452ef5b3281";

@@ -118,7 +118,7 @@ export function ConfirmDialog({ open, onClose, title, description, action, onCon
   return <Dialog open={open} onOpenChange={v => { if (!v && !busy) { onClose(); setError(''); } }}><DialogContent className="admin-dialog-content" data-testid={`dialog-confirm-${testId}`}><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>{error && <div className="admin-flash error" role="alert">{error}</div>}<div className="admin-dialog-footer"><button className="admin-action" onClick={onClose} disabled={busy} data-testid={`button-dismiss-${testId}`}>تراجع</button><button className="admin-action danger" disabled={busy} data-testid={`button-confirm-${testId}`} onClick={async () => { setBusy(true); setError(''); try { await onConfirm(); onClose(); } catch (e) { setError(e instanceof Error ? e.message : 'تعذّر تنفيذ العملية.'); } finally { setBusy(false); } }}>{busy ? 'جارٍ التنفيذ...' : action}</button></div></DialogContent></Dialog>;
 }
 
-export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { open: boolean; onClose: () => void; order?: Order | null; restaurantSummary?: { restaurantName: string; date: string; ordersCount: number; totalRevenue: number; deliveryFees: number; orders: Order[] } | null }) {
+export function InvoiceDialog({ open, onClose, order, restaurantSummary, audience = "admin" }: { open: boolean; onClose: () => void; order?: Order | null; restaurantSummary?: { restaurantName: string; date: string; ordersCount: number; totalRevenue: number; deliveryFees: number; orders: Order[] } | null; audience?: "admin" | "driver" | "restaurant" }) {
   if (!open) return null;
   const handlePrint = () => {
     window.print();
@@ -206,14 +206,14 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             <div>
               <span className="text-muted-foreground block">بيانات العميل:</span>
               <strong className="text-sm block">{order.customerName}</strong>
-              <span dir="ltr" className="text-muted-foreground">{order.customerPhone}</span>
+              {audience !== "restaurant" && order.customerPhone && <span dir="ltr" className="text-muted-foreground">{order.customerPhone}</span>}
             </div>
             <div>
               <span className="text-muted-foreground block">نوع الطلب:</span>
               <strong className="text-sm block">{order.orderType === 'DELIVERY' ? 'توصيل طلب' : 'حجز طاولة'}</strong>
               <span className="text-muted-foreground mt-1 block">حالة الطلب: <strong className="text-foreground">{statusLabel(order.status)}</strong></span>
               <span className="text-muted-foreground block">حالة السائق المرتبط: <strong className="text-foreground">{driverApprovalLabel(order.driverApprovalStatus || order.assignmentStatus || undefined)}</strong></span>
-              <span className="text-muted-foreground block">السائق: <strong className="text-foreground">{order.driverId ? `#${order.driverId}` : 'لم يُعيّن بعد'}</strong></span>
+               <span className="text-muted-foreground block">السائق المستلم: <strong className="text-foreground">{order.currentDriverName || (order.driverId ? `#${order.driverId}` : 'لم يُعيّن بعد')}</strong></span>
               <span className="text-muted-foreground block">قرار المطعم: <strong className="text-foreground">{order.restaurantDecisionStatus === 'ACCEPTED' ? 'وافق المطعم' : order.restaurantDecisionStatus === 'REJECTED' ? 'رفض المطعم' : order.restaurantDecisionStatus === 'DEFERRED' ? 'مؤجل' : 'بانتظار القرار'}</strong></span>
               <span className="text-muted-foreground block">بريد السائق: <strong className="text-foreground">{order.currentDriverEmailStatus === 'SENT' ? 'تم تأكيد الإرسال' : order.currentDriverEmailStatus === 'SENDING' ? 'جارٍ الإرسال' : order.currentDriverEmailStatus === 'FAILED' ? 'فشل مؤقت؛ ستتم إعادة المحاولة' : order.currentDriverEmailStatus === 'PENDING' ? 'بانتظار الإرسال' : 'بانتظار تعيين سائق'}</strong></span>
               <span className="text-muted-foreground block">حالة التوجيه: <strong className="text-foreground">{order.lastForwardedAt && (!order.currentDriverAssignedAt || new Date(order.currentDriverAssignedAt).getTime() <= new Date(order.lastForwardedAt).getTime()) ? `طُلب توجيهه إلى سائق آخر · ${dateLabel(order.lastForwardedAt)}` : order.currentDriverName ? `وُجّه إلى ${order.currentDriverName}` : 'بانتظار تعيين سائق'}</strong></span>
@@ -253,7 +253,7 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             </div>
           </section>}
 
-          {order.orderType === 'DELIVERY' && (
+          {audience !== "restaurant" && order.orderType === 'DELIVERY' && (
             <section className="rounded-xl border p-3 text-xs" aria-label="موقع التوصيل" data-testid={`section-invoice-location-${order.id}`}>
               <strong className="block mb-1">موقع العميل</strong>
               {order.latitude != null && order.longitude != null
@@ -313,10 +313,10 @@ export function InvoiceDialog({ open, onClose, order, restaurantSummary }: { ope
             </div>
           </div>
 
-          <div className="p-2.5 bg-muted/30 rounded-lg text-xs mt-3">
+          {audience !== "restaurant" && <div className="p-2.5 bg-muted/30 rounded-lg text-xs mt-3">
             <strong className="block mb-0.5">ملاحظات العميل:</strong>
             <p className="text-muted-foreground">{order.notes || 'لا توجد ملاحظات.'}</p>
-          </div>
+          </div>}
         </div>
       ) : null}
 

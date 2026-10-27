@@ -31,7 +31,18 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function filterRestaurantPortalOrders(orders) {
-  return orders;
+  return orders.map((order) => {
+    const {
+      customerPhone,
+      latitude,
+      longitude,
+      deliveryLocation,
+      mapsUrl,
+      notes,
+      ...invoice
+    } = order;
+    return invoice;
+  });
 }
 
 const DRIVER_ATTEMPT_STATUSES = new Set([
@@ -1185,11 +1196,14 @@ async function forwardRestaurantOrder(restaurantId, orderId) {
       [orderId],
     );
     const order = (await client.query(
-      "SELECT id,restaurant_id,status,driver_id,order_type FROM orders WHERE id=$1 FOR UPDATE",
+      "SELECT id,restaurant_id,status,driver_id,order_type,source FROM orders WHERE id=$1 FOR UPDATE",
       [orderId],
     )).rows[0];
     if (!order || Number(order.restaurant_id) !== restaurantId) {
       throw new ApiError(404, "الطلب غير موجود في سجل هذا المطعم.");
+    }
+    if (order.source !== "ANDROID_CUSTOMER") {
+      throw new ApiError(409, "إعادة الإسناد متاحة للطلبات الفعلية الجديدة فقط.");
     }
     if (order.order_type !== "DELIVERY") {
       throw new ApiError(409, "إعادة الإسناد متاحة لطلبات التوصيل فقط.");

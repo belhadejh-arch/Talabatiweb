@@ -107,6 +107,10 @@ async function processJob(orderId) {
       "SELECT * FROM orders WHERE id=$1 FOR UPDATE",
       [orderId],
     )).rows[0];
+    if (order && order.source !== "ANDROID_CUSTOMER") {
+      await updateJob(client, orderId, "DONE");
+      return;
+    }
     if (!order || ["ACCEPTED", "CONFIRMED", "COMPLETED", "DELIVERED", "CANCELLED"].includes(order.status)) {
       await updateJob(client, orderId, "DONE");
       return;
@@ -278,8 +282,8 @@ async function processJob(orderId) {
 }
 
 async function claimEmail(orderId = null) {
-  // Linking Gmail API must not suddenly replay an old FAILED order. Deliveries
-  // created before the most recent connection require deliberate human review.
+  // Linking Gmail must not replay old sends. Untouched PENDING deliveries are
+  // safe to release; FAILED or ambiguous attempts still require review.
   let connectedAt = null;
   try {
     connectedAt = (await pool.query(
@@ -290,19 +294,23 @@ async function claimEmail(orderId = null) {
   }
   return withTransaction(async (client) => {
     const delivery = (await client.query(
-      `SELECT e.id
+      `SELECT e.id,e.status AS prior_status,
+              e.last_attempt_at AS prior_last_attempt_at,
+              o.created_at AS order_created_at,
+              a.created_at AS assignment_created_at
        FROM order_email_deliveries e
        JOIN order_driver_attempts a ON a.assignment_id=e.assignment_id
        JOIN order_email_dispatch_jobs j ON j.order_id=e.order_id AND j.state='ACTIVE'
        JOIN orders o ON o.id=e.order_id AND o.status='ASSIGNED'
+        AND o.source='ANDROID_CUSTOMER'
        JOIN drivers d ON d.id=e.driver_id AND d.restaurant_id=o.restaurant_id
        JOIN restaurants r ON r.id=o.restaurant_id AND r.status='ACTIVE'
        JOIN subscriptions s ON s.restaurant_id=r.id AND s.status='ACTIVE'
          AND s.start_date<=CURRENT_DATE AND s.expiry_date>=CURRENT_DATE
        WHERE e.status IN ('PENDING','FAILED')
          AND ($1::integer IS NULL OR e.order_id=$1)
-         AND ($2::timestamptz IS NULL OR
-              (e.created_at >= $2 AND o.created_at >= $2))
+          AND ($2::timestamptz IS NULL OR e.created_at >= $2 OR
+               (e.status='PENDING' AND e.last_attempt_at IS NULL))
          AND (e.next_retry_at IS NULL OR e.next_retry_at<=now())
          AND a.status='PENDING' AND ${ACTIVE_DRIVER}
        ORDER BY e.created_at,e.id LIMIT 1
@@ -310,23 +318,36 @@ async function claimEmail(orderId = null) {
       [orderId, connectedAt],
     )).rows[0];
     if (!delivery) return null;
-    return (await client.query(
+    const claimed = (await client.query(
       `UPDATE order_email_deliveries
         SET status='SENDING',last_attempt_at=now(),smtp_started_at=NULL,updated_at=now()
        WHERE id=$1 AND status IN ('PENDING','FAILED') RETURNING *`,
       [delivery.id],
     )).rows[0];
+    const predatesConnection = connectedAt && (
+      new Date(delivery.order_created_at).getTime() < new Date(connectedAt).getTime() ||
+      new Date(delivery.assignment_created_at).getTime() < new Date(connectedAt).getTime()
+    );
+    return {
+      ...claimed,
+      allowFirstSendAfterConnection:
+        delivery.prior_status === "PENDING" &&
+        delivery.prior_last_attempt_at == null &&
+        Boolean(predatesConnection),
+    };
   });
 }
 
 async function mailPayload(delivery) {
   const result = await pool.query(
-    `SELECT o.*, r.name AS restaurant_name, a.status AS assignment_status,
+    `SELECT o.*, r.name AS restaurant_name, d.name AS driver_name,
+            a.status AS assignment_status,
             a.created_at AS assignment_created_at,
             a.assignment_id, a.driver_id, a.driver_email
      FROM orders o
      JOIN restaurants r ON r.id=o.restaurant_id
      JOIN order_driver_attempts a ON a.assignment_id=$1 AND a.order_id=o.id
+     JOIN drivers d ON d.id=a.driver_id AND d.restaurant_id=o.restaurant_id
      WHERE o.id=$2`,
     [delivery.assignment_id, delivery.order_id],
   );
@@ -352,9 +373,11 @@ async function mailPayload(delivery) {
       order_id: row.id,
       assignment_id: row.assignment_id,
       driver_id: row.driver_id,
+      driver_name: row.driver_name,
       driver_email: delivery.driver_email,
       status: row.assignment_status,
       created_at: row.assignment_created_at,
+      allow_first_send_after_gmail_connection: delivery.allowFirstSendAfterConnection,
     },
     items,
     baseUrl: process.env.PUBLIC_API_URL?.trim()?.replace(/^["']|["']$/g, "")?.trim(),

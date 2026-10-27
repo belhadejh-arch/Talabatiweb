@@ -22,7 +22,8 @@ test("mail includes saved delivery and reservation details; tokens bind all IDs"
     status: "ASSIGNED", notes: "<script>bad</script>", created_at: new Date(),
   };
   const base = {
-    order, restaurant: { name: "مطعم الاختبار" }, assignment,
+    order, restaurant: { name: "مطعم الاختبار" },
+    assignment: { ...assignment, driver_name: "سائق الاختبار" },
     items: [{
       product_name: "طعام", quantity: 2, unit_price: "14", subtotal: "28",
       addons: [{ addon_name: "جبن إضافي", price: "2" }],
@@ -39,6 +40,7 @@ test("mail includes saved delivery and reservation details; tokens bind all IDs"
   assert.match(delivery.text, /جبن إضافي \(2\.00 د\.ل\)/);
   assert.match(delivery.text, /رسوم التوصيل: 2\.00 د\.ل/);
   assert.match(delivery.text, /المجموع النهائي: 30\.00 د\.ل/);
+  assert.match(delivery.text, /السائق المستلم: سائق الاختبار/);
   assert.match(delivery.text, /×2/);
   assert.match(delivery.text, /قبول الطلب:/);
   assert.match(delivery.html, /رقم الفاتورة/);

@@ -121,6 +121,7 @@ export function buildAssignmentEmail({ order, restaurant, items, assignment, bas
     `رقم الطلب: #${invoice.orderNumber}`,
     `رقم الفاتورة: ${invoice.invoiceNumber}`,
     `المطعم: ${invoice.restaurantName}`,
+    `السائق المستلم: ${assignment.driver_name || assignment.driver_email}`,
     `العميل: ${invoice.customerName}`,
     `الهاتف: ${invoice.customerPhone}`,
     `حالة الطلب: ${formattedStatus}`,
@@ -142,6 +143,7 @@ export function buildAssignmentEmail({ order, restaurant, items, assignment, bas
       <h2>فاتورة الطلب #${invoice.orderNumber}</h2>
       <p><strong>رقم الفاتورة:</strong> ${escapeHtml(invoice.invoiceNumber)}<br>
       <strong>المطعم:</strong> ${escapeHtml(invoice.restaurantName)}<br>
+      <strong>السائق المستلم:</strong> ${escapeHtml(assignment.driver_name || assignment.driver_email)}<br>
       <strong>العميل:</strong> ${escapeHtml(invoice.customerName)}<br>
       <strong>الهاتف:</strong> ${escapeHtml(invoice.customerPhone)}<br>
       <strong>حالة الطلب:</strong> ${escapeHtml(formattedStatus)}<br>

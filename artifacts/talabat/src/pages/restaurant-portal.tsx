@@ -493,7 +493,6 @@ export default function RestaurantPortalPage() {
         order.orderNumber,
         order.invoiceNumber,
         order.customerName,
-        order.customerPhone,
       ]
         .filter((value) => value != null)
         .join(" "),
@@ -1056,16 +1055,6 @@ export default function RestaurantPortalPage() {
                                 ))}
                               </ul>
                             )}
-                            {order.mapsUrl && (
-                              <a
-                                href={order.mapsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                data-testid={`link-fallback-order-map-${order.id}`}
-                              >
-                                فتح موقع العميل على الخريطة
-                              </a>
-                            )}
                           </div>
                         </div>
                       )}
@@ -1095,26 +1084,9 @@ export default function RestaurantPortalPage() {
                         .join("، ") ||
                       "لا توجد أصناف"}
                   </p>
-                  {order.notes && (
-                    <p className="restaurant-order-note">
-                      <strong>ملاحظة العميل:</strong> {order.notes}
-                    </p>
-                  )}
-                  {order.mapsUrl && (
-                    <a
-                      className="restaurant-order-map-link"
-                      href={order.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      data-testid={`link-restaurant-order-map-${order.id}`}
-                    >
-                      فتح موقع العميل على الخريطة
-                    </a>
-                  )}
                   <div className="restaurant-order-card-foot">
                     <div>
                       <span>العميل: {order.customerName}</span>
-                      <span dir="ltr">{order.customerPhone}</span>
                     </div>
                     <strong>
                       {money(order.totalAmount)} {CURRENCY}
@@ -1203,6 +1175,7 @@ export default function RestaurantPortalPage() {
         open={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
         order={selectedOrder}
+        audience="restaurant"
       />
     </div>
   );
