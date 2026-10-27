@@ -471,9 +471,22 @@ export async function getAdminRestaurantRevenues(anchorDate) {
   };
 }
 
-async function loadDriverOrderRows(driverId, filters, limit = null) {
+async function loadDriverOrderRows(
+  driverId,
+  filters,
+  limit = null,
+  { invoicesOnly = false } = {},
+) {
   const clauses = ["a.driver_id = $1"];
   const values = [driverId];
+  if (invoicesOnly) {
+    clauses.push(
+      "o.source = 'ANDROID_CUSTOMER'",
+      "o.status <> 'CANCELLED'",
+      "a.status IN ('PENDING','ACCEPTED')",
+      "(a.status <> 'PENDING' OR delivery.status = 'SENT')",
+    );
+  }
   if (filters.from) {
     values.push(filters.from);
     clauses.push(`o.created_at >= $${values.length}::date`);
@@ -571,7 +584,9 @@ function mapDriverOrderRow(row) {
 }
 
 export async function getDriverOrders(driverId, filters, { limit = null } = {}) {
-  const rows = await loadDriverOrderRows(driverId, filters, limit);
+  const rows = await loadDriverOrderRows(driverId, filters, limit, {
+    invoicesOnly: true,
+  });
   return rows.map(mapDriverOrderRow);
 }
 
