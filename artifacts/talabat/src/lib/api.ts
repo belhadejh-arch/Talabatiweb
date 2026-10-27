@@ -457,9 +457,20 @@ export function formatDistance(km: number): string {
 
 export const CURRENCY = "د.ل";
 
-export function restaurantMenuUrl(restaurantId: number) {
+export function restaurantMenuPath(restaurant: Pick<Restaurant, "id" | "name">) {
+  const nameSlug =
+    restaurant.name
+      .trim()
+      .toLocaleLowerCase()
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || `restaurant-${restaurant.id}`;
+  return `/restaurant/${restaurant.id}/${encodeURIComponent(nameSlug)}`;
+}
+
+export function restaurantMenuUrl(restaurant: Pick<Restaurant, "id" | "name">) {
   const basePath = import.meta.env.BASE_URL.replace(/\/+$/, "");
-  return `${window.location.origin}${basePath}/restaurant/${encodeURIComponent(String(restaurantId))}`;
+  return `${window.location.origin}${basePath}${restaurantMenuPath(restaurant)}`;
 }
 export const money = (value: number | string | null | undefined) =>
   new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(

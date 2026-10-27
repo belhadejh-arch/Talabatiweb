@@ -4,15 +4,16 @@ import { Info, MapPin, Plus, UtensilsCrossed, Share2, Check } from 'lucide-react
 import { Header, CartPanel, ErrorState, LoadingState } from '../components/common';
 import { useCatalog } from '../hooks/use-data';
 import { useCart } from '../lib/cart';
-import { catalogImageUrl, money, CURRENCY, restaurantMenuUrl } from '../lib/api';
+import { catalogImageUrl, money, CURRENCY, restaurantMenuPath, restaurantMenuUrl } from '../lib/api';
 
 export default function Browse() {
   const { data, isLoading, error, refetch } = useCatalog();
   const cart = useCart();
   const [, setLocation] = useLocation();
-  const [matchRest, paramsRest] = useRoute('/restaurant/:id');
-  const [matchR, paramsR] = useRoute('/r/:id');
-  const routeParam = paramsRest?.id || paramsR?.id;
+  const [, paramsNamedRest] = useRoute('/restaurant/:id/:name');
+  const [, paramsRest] = useRoute('/restaurant/:id');
+  const [, paramsR] = useRoute('/r/:id');
+  const routeParam = paramsNamedRest?.id || paramsRest?.id || paramsR?.id;
   const isStandaloneLink = Boolean(routeParam);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -45,13 +46,13 @@ export default function Browse() {
   const products = data?.products.filter(p => p.restaurantId === selected?.id) || [];
   const categories = [...new Set(products.map(p => p.category || 'القائمة'))];
 
-  const handleSelectRestaurant = (id: number) => {
-    setLocation(`/restaurant/${id}`);
+  const handleSelectRestaurant = (restaurant: (typeof restaurants)[number]) => {
+    setLocation(restaurantMenuPath(restaurant));
   };
 
   const copyDirectRestaurantLink = () => {
     if (!selected) return;
-    const url = restaurantMenuUrl(selected.id);
+    const url = restaurantMenuUrl(selected);
     navigator.clipboard?.writeText(url).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
@@ -103,7 +104,7 @@ export default function Browse() {
           </div>
         </div>
 
-        {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : !data || data.restaurants.length === 0 ? <div className="surface text-center py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h3 className="display text-2xl">لا توجد مطاعم حالياً</h3><p className="subtle mt-2">عد لاحقاً لرؤية المطاعم المتاحة.</p></div> : <div className="restaurant-grid">{restaurants.map(restaurant => <button key={restaurant.id} onClick={() => handleSelectRestaurant(restaurant.id)} className={`restaurant-card ${selected?.id === restaurant.id ? 'active' : ''}`} data-testid={`button-restaurant-${restaurant.id}`} aria-pressed={selected?.id === restaurant.id}>
+        {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : !data || data.restaurants.length === 0 ? <div className="surface text-center py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h3 className="display text-2xl">لا توجد مطاعم حالياً</h3><p className="subtle mt-2">عد لاحقاً لرؤية المطاعم المتاحة.</p></div> : <div className="restaurant-grid">{restaurants.map(restaurant => <button key={restaurant.id} onClick={() => handleSelectRestaurant(restaurant)} className={`restaurant-card ${selected?.id === restaurant.id ? 'active' : ''}`} data-testid={`button-restaurant-${restaurant.id}`} aria-pressed={selected?.id === restaurant.id}>
           {restaurant.imageUrl && <img className="restaurant-cover" src={catalogImageUrl(restaurant.imageUrl)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}
           <div className="flex items-center justify-between gap-1 mt-1">
             <h3 className="mb-0">{restaurant.name}</h3>

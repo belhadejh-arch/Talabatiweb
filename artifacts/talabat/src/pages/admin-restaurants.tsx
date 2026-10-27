@@ -43,10 +43,10 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
     return { todayOrders, todayRevenue, todayDelivery, allOrders: restOrders };
   };
 
-  const copyRestaurantLink = (id: number) => {
-    const url = restaurantMenuUrl(id);
+  const copyRestaurantLink = (restaurant: Restaurant) => {
+    const url = restaurantMenuUrl(restaurant);
     navigator.clipboard?.writeText(url).then(() => {
-      setCopiedId(id);
+      setCopiedId(restaurant.id);
       setTimeout(() => setCopiedId(null), 2500);
     }).catch(() => {});
   };
@@ -172,7 +172,7 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
                 <button
                   className="admin-action"
                   title="نسخ رابط قائمة هذا المطعم فقط لمشاركته مع الزبائن"
-                  onClick={() => copyRestaurantLink(r.id)}
+                  onClick={() => copyRestaurantLink(r)}
                   data-testid={`button-copy-link-restaurant-${r.id}`}
                 >
                   {copiedId === r.id ? <><Check size={14} className="text-green-600"/>تم النسخ</> : <><LinkIcon size={14}/>رابط قائمة المطعم</>}
