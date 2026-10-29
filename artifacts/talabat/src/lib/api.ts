@@ -293,7 +293,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 const jsonHeaders = { "Content-Type": "application/json" };
 export const api = {
-  catalog: () => request<Catalog>("/api/catalog"),
+  catalog: (restaurantId: number | null = null) =>
+    request<Catalog>(
+      restaurantId == null
+        ? "/api/catalog"
+        : `/api/catalog?restaurantId=${encodeURIComponent(String(restaurantId))}`,
+    ),
   createOrder: (input: OrderInput, key: string) =>
     request<{ order: Order }>("/api/orders", {
       method: "POST",
@@ -457,21 +462,14 @@ export function formatDistance(km: number): string {
 }
 
 export const CURRENCY = "د.ل";
-const CUSTOMER_PLATFORM_ORIGIN = "https://talabat-one-ivory.vercel.app";
+const CUSTOMER_PLATFORM_ORIGIN = "https://talabatiweb.vercel.app";
 
-export function restaurantMenuPath(restaurant: Pick<Restaurant, "id" | "name">) {
-  const nameSlug =
-    restaurant.name
-      .trim()
-      .toLocaleLowerCase()
-      .normalize("NFKC")
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/^-+|-+$/g, "") || `restaurant-${restaurant.id}`;
-  return `/restaurant/${restaurant.id}/${encodeURIComponent(nameSlug)}`;
+export function restaurantMenuPath(restaurant: Pick<Restaurant, "id">) {
+  return `/restaurant/${restaurant.id}`;
 }
 
-export function restaurantMenuUrl(restaurant: Pick<Restaurant, "id" | "name">) {
-  return `${CUSTOMER_PLATFORM_ORIGIN}${restaurantMenuPath(restaurant)}`;
+export function restaurantMenuUrl(restaurant: Pick<Restaurant, "id">) {
+  return new URL(restaurantMenuPath(restaurant), CUSTOMER_PLATFORM_ORIGIN).toString();
 }
 export const money = (value: number | string | null | undefined) =>
   new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(

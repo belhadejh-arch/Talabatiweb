@@ -7,14 +7,22 @@ import { useCart } from '../lib/cart';
 import { catalogImageUrl, money, CURRENCY, restaurantMenuPath, restaurantMenuUrl } from '../lib/api';
 
 export default function Browse() {
-  const { data, isLoading, error, refetch } = useCatalog();
-  const cart = useCart();
-  const [, setLocation] = useLocation();
   const [, paramsNamedRest] = useRoute('/restaurant/:id/:name');
   const [, paramsRest] = useRoute('/restaurant/:id');
   const [, paramsR] = useRoute('/r/:id');
   const routeParam = paramsNamedRest?.id || paramsRest?.id || paramsR?.id;
   const isStandaloneLink = Boolean(routeParam);
+  const parsedRestaurantId = routeParam && /^[1-9]\d*$/.test(routeParam)
+    ? Number(routeParam)
+    : null;
+  const standaloneRestaurantId = parsedRestaurantId && Number.isSafeInteger(parsedRestaurantId)
+    ? parsedRestaurantId
+    : null;
+  const { data, isLoading, error, refetch } = useCatalog(
+    isStandaloneLink ? standaloneRestaurantId : null,
+  );
+  const cart = useCart();
+  const [, setLocation] = useLocation();
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);

@@ -430,13 +430,14 @@ async function loadOrder(client, id) {
   return mapOrder(row, items);
 }
 
-async function getCatalog() {
+async function getCatalog(restaurantId = null) {
   const restaurantsResult = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
             r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude,
             r.opening_time, r.closing_time
        FROM restaurants r
       WHERE r.status = 'ACTIVE'
+        AND ($1::int IS NULL OR r.id = $1)
         AND EXISTS (
           SELECT 1
             FROM subscriptions s
@@ -446,6 +447,7 @@ async function getCatalog() {
              AND s.expiry_date >= CURRENT_DATE
         )
       ORDER BY r.name, r.id`,
+    [restaurantId],
   );
   const restaurantIds = restaurantsResult.rows.map((row) => Number(row.id));
   if (!restaurantIds.length) {
@@ -1772,7 +1774,12 @@ async function routeApi(req, res, url) {
   }
   if (path === "/api/catalog") {
     if (method !== "GET") return methodNotAllowed(res);
-    sendJson(res, 200, await getCatalog());
+    const rawRestaurantId = url.searchParams.get("restaurantId");
+    const restaurantId =
+      rawRestaurantId === null
+        ? null
+        : positiveInt(rawRestaurantId, "رقم المطعم");
+    sendJson(res, 200, await getCatalog(restaurantId));
     return true;
   }
   if (path === "/api/orders") {

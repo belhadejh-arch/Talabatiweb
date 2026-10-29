@@ -166,6 +166,28 @@ test("method-not-allowed responses are reported as handled", async () => {
   assert.equal(res.statusCode, 405);
 });
 
+test("catalog rejects invalid restaurant ids before database access", async () => {
+  const originalQuery = pool.query;
+  let queryCount = 0;
+  pool.query = async () => {
+    queryCount += 1;
+    throw new Error("Database should not be queried for an invalid restaurant id");
+  };
+
+  try {
+    const res = responseRecorder();
+    const handled = await handleApi(
+      { url: "/api/catalog?restaurantId=invalid", method: "GET", headers: {} },
+      res,
+    );
+    assert.equal(handled, true);
+    assert.equal(res.statusCode, 400);
+    assert.equal(queryCount, 0);
+  } finally {
+    pool.query = originalQuery;
+  }
+});
+
 test("oversized JSON bodies are rejected before database access", async () => {
   const res = responseRecorder();
   let drained = false;

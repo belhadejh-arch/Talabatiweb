@@ -25,7 +25,11 @@ const meta: Record<string, { title: string; description: string }> = {
 function PageMetadata() {
   const [location] = useLocation();
   useEffect(() => {
-    const page = meta[location] || { title: 'الصفحة غير موجودة | طلبات', description: 'الصفحة المطلوبة غير موجودة.' };
+    const pathname = location.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
+    const isRestaurantMenu = /^\/(?:restaurant\/[^/]+(?:\/[^/]+)?|r\/[^/]+)$/.test(pathname);
+    const page = meta[pathname] || (isRestaurantMenu
+      ? { title: 'قائمة المطعم | طلبات', description: 'تصفّح قائمة الطعام الخاصة بهذا المطعم وأرسل طلبك.' }
+      : { title: 'الصفحة غير موجودة | طلبات', description: 'الصفحة المطلوبة غير موجودة.' });
     document.title = page.title;
     document.documentElement.lang = 'ar';
     document.documentElement.dir = 'rtl';

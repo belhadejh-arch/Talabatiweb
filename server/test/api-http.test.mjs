@@ -752,6 +752,32 @@ test(
         ),
       );
 
+      const restaurantCatalog = await request(
+        baseUrl,
+        `/api/catalog?restaurantId=${restaurantId}`,
+      );
+      assert.equal(restaurantCatalog.status, 200);
+      assert.deepEqual(
+        restaurantCatalog.payload.restaurants.map((row) => row.id),
+        [restaurantId],
+      );
+      assert.ok(
+        restaurantCatalog.payload.products.length > 0 &&
+          restaurantCatalog.payload.products.every(
+            (row) => row.restaurantId === restaurantId,
+          ),
+      );
+      assert.ok(
+        restaurantCatalog.payload.subscriptions.every(
+          (row) => row.restaurantName === `HTTP fixture ${suffix}`,
+        ),
+      );
+      const invalidRestaurantCatalog = await request(
+        baseUrl,
+        "/api/catalog?restaurantId=invalid",
+      );
+      assert.equal(invalidRestaurantCatalog.status, 400);
+
       const idempotencyKey = randomUUID();
       const deliveryBody = {
         restaurantId,
