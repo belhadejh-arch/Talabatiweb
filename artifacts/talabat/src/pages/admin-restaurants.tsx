@@ -44,6 +44,7 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
   };
 
   const copyRestaurantLink = (restaurant: Restaurant) => {
+    if (!restaurant.catalogAvailable) return;
     const url = restaurantMenuUrl(restaurant);
     navigator.clipboard?.writeText(url).then(() => {
       setCopiedId(restaurant.id);
@@ -171,11 +172,18 @@ export default function AdminRestaurants({ restaurants, orders = [], token, writ
 
                 <button
                   className="admin-action"
-                  title="نسخ رابط قائمة هذا المطعم فقط لمشاركته مع الزبائن"
+                  disabled={!r.catalogAvailable}
+                  title={r.catalogAvailable
+                    ? "نسخ رابط قائمة هذا المطعم فقط لمشاركته مع الزبائن"
+                    : "يظهر رابط القائمة بعد تفعيل المطعم واشتراكه"}
                   onClick={() => copyRestaurantLink(r)}
                   data-testid={`button-copy-link-restaurant-${r.id}`}
                 >
-                  {copiedId === r.id ? <><Check size={14} className="text-green-600"/>تم النسخ</> : <><LinkIcon size={14}/>رابط قائمة المطعم</>}
+                  {!r.catalogAvailable
+                    ? <><LinkIcon size={14}/>الرابط بعد التفعيل</>
+                    : copiedId === r.id
+                      ? <><Check size={14} className="text-green-600"/>تم النسخ</>
+                      : <><LinkIcon size={14}/>رابط قائمة المطعم</>}
                 </button>
 
                 <button className="admin-action" onClick={() => setEditing(r)} data-testid={`button-edit-restaurant-${r.id}`}>

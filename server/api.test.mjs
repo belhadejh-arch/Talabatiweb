@@ -406,7 +406,7 @@ test("ON CONFLICT retries persist and compare the normalized request hash", asyn
         : { rows: [{ id: 56, client_request_hash: sampleNormalizedOrderHash() }] };
     }
     if (sql.includes("FROM restaurants r")) {
-      return { rows: [{ id: 1, name: "مطعم", delivery_fee: "0.000", opening_time: "00:00:00", closing_time: "23:59:59" }] };
+      return { rows: [{ id: 1, name: "مطعم", delivery_fee: "0.000", opening_time: "00:00:00", closing_time: "24:00:00" }] };
     }
     if (sql.includes("FROM products p")) {
       return {
@@ -464,7 +464,7 @@ test("an ON CONFLICT fallback rejects a different payload hash", async () => {
         : { rows: [{ id: 56, client_request_hash: "different-payload-hash" }] };
     }
     if (sql.includes("FROM restaurants r")) {
-      return { rows: [{ id: 1, name: "مطعم", delivery_fee: "0.000", opening_time: "00:00:00", closing_time: "23:59:59" }] };
+      return { rows: [{ id: 1, name: "مطعم", delivery_fee: "0.000", opening_time: "00:00:00", closing_time: "24:00:00" }] };
     }
     if (sql.includes("FROM products p")) {
       return {

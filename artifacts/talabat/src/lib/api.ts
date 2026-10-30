@@ -13,6 +13,7 @@ export type Restaurant = {
   closingTime?: string;
   isOpen?: boolean;
   status?: string;
+  catalogAvailable?: boolean;
 };
 export type Product = {
   id: number;

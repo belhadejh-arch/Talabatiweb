@@ -651,6 +651,42 @@ test(
       ).rows[0];
       fixtures.subscriptions.push(Number(subscription.id));
 
+      const activeCatalogState = await request(
+        baseUrl,
+        "/api/admin/overview",
+        { token: adminToken },
+      );
+      assert.equal(activeCatalogState.status, 200);
+      assert.equal(
+        activeCatalogState.payload.restaurants.find(
+          (row) => row.id === restaurantId,
+        )?.catalogAvailable,
+        true,
+      );
+      await pool.query(
+        "UPDATE subscriptions SET expiry_date=CURRENT_DATE - 1 WHERE id=$1",
+        [subscription.id],
+      );
+      try {
+        const expiredCatalogState = await request(
+          baseUrl,
+          "/api/admin/overview",
+          { token: adminToken },
+        );
+        assert.equal(expiredCatalogState.status, 200);
+        assert.equal(
+          expiredCatalogState.payload.restaurants.find(
+            (row) => row.id === restaurantId,
+          )?.catalogAvailable,
+          false,
+        );
+      } finally {
+        await pool.query(
+          "UPDATE subscriptions SET expiry_date=CURRENT_DATE + 10 WHERE id=$1",
+          [subscription.id],
+        );
+      }
+
       originalDispatchTimeout = Number(
         (
           await pool.query(

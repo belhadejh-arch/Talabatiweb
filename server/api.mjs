@@ -239,6 +239,10 @@ function mapRestaurant(row) {
       : "22:00",
     isOpen: isRestaurantOpen(row),
     status: row.status || "ACTIVE",
+    catalogAvailable:
+      row.catalog_available == null
+        ? undefined
+        : Boolean(row.catalog_available),
   };
 }
 
@@ -1261,7 +1265,17 @@ async function listRestaurants({ activeOnly = false } = {}) {
   const result = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.description, r.status,
             r.logo_url, r.cover_url, r.delivery_fee, r.latitude, r.longitude,
-            r.opening_time, r.closing_time
+            r.opening_time, r.closing_time,
+            (
+              r.status = 'ACTIVE' AND EXISTS (
+                SELECT 1
+                  FROM subscriptions s
+                 WHERE s.restaurant_id = r.id
+                   AND s.status = 'ACTIVE'
+                   AND s.start_date <= CURRENT_DATE
+                   AND s.expiry_date >= CURRENT_DATE
+              )
+            ) AS catalog_available
        FROM restaurants r
       ${activeOnly ? "WHERE r.status = 'ACTIVE'" : ""}
       ORDER BY r.name, r.id`,

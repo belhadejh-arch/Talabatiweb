@@ -70,7 +70,7 @@ export default function Browse() {
   return <div dir="rtl" className="storefront min-h-[100dvh]">
     <Header standaloneName={isStandaloneLink ? selected?.name || 'قائمة المطعم' : undefined} standaloneRestaurantId={isStandaloneLink ? selected?.id : undefined} />
     {isStandaloneLink && (isLoading || error || !selected) ? <main className="shell py-16 text-center" data-testid={error ? 'status-restaurant-load-error' : !isLoading ? 'status-restaurant-not-found' : 'status-restaurant-loading'}>
-      {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : <div className="surface py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h1 className="display text-2xl">المطعم غير متاح</h1><p className="subtle mt-2">تأكد من صحة الرابط أو تواصل مع المطعم للحصول على رابط جديد.</p></div>}
+      {isLoading ? <LoadingState/> : error ? <ErrorState message={(error as Error).message} onRetry={() => { void refetch(); }}/> : <div className="surface py-12"><div className="empty-illustration"><UtensilsCrossed size={29}/></div><h1 className="display text-2xl">المطعم غير متاح حالياً</h1><p className="subtle mt-2">تظهر القائمة بعد تفعيل المطعم واشتراكه الساري. لا حاجة إلى رابط جديد.</p></div>}
     </main> : <>
     <section className="hero" style={selected?.imageUrl ? { backgroundImage: `url("${catalogImageUrl(selected.imageUrl)}")` } : undefined}><div className="shell hero-inner">
       <div className="restaurant-identity">

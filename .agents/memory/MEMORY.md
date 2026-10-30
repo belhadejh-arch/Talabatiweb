@@ -12,3 +12,4 @@
 - [Vite production bundle timeouts](vite-bundle-timeout.md) — production builds can exceed five minutes during dependency transformation even when typechecking and the dev preview work.
 - [Real-order driver dispatch](real-order-dispatch.md) — show the assigned invoice even when email delivery fails; keep decisions in email and never replay failed or ambiguous sends.
 - [Restaurant invoice privacy](restaurant-invoice-privacy.md) — restaurant invoices show customer name, order details, and assigned driver, but never customer contact or location.
+- [Inactive restaurant links](inactive-restaurant-links.md) — keep customer menus hidden until restaurant activation and a current subscription.
